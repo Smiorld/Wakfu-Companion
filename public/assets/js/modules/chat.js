@@ -98,7 +98,7 @@ let wakfuExternalGlossaryPromise = null;
 let wakfuExactTermMap = null;
 let wakfuFuzzyAliasIndex = null;
 
-const WAKFU_GLOSSARY_URL = "assets/data/wakfu_term_glossary.json?v=20260609d";
+const WAKFU_GLOSSARY_URL = "assets/data/wakfu_term_glossary.json?v=20260610a";
 const WAKFU_GENERIC_LATIN_ALIAS_WORDS = new Set([
   "all",
   "any",

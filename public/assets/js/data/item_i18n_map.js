@@ -2906,13 +2906,893 @@ const ITEM_I18N_MAP = {
     "祖尔纳拉缎带　Zulnara Ribbon"
   ]
   ,
-  "Puffball Spore": [
-    "蓬松孢子 Puffball Spore"
+  "Puffball Spores": [
+    "蓬松孢子 Puffball Spores"
   ],
-  "Death Cap Spore": [
-    "死亡帽孢子 Death Cap Spore"
+  "Death Cap Spores": [
+    "死亡帽孢子 Death Cap Spores"
   ],
-  "Mottled Mushroom Seed": [
-    "斑点蘑菇种子 Mottled Mushroom Seed"
+  "Mottled Mushroom Spores": [
+    "斑点蘑菇孢子 Mottled Mushroom Spores"
+  ]
+  ,
+  "Crystalline Iron Ore": [
+    "\u6c34\u6676\u94c1\u77ff\u3000Crystalline Iron Ore"
+  ],
+  "Burning Coal": [
+    "\u71c3\u70e7\u7684\u7164\u77ff\u3000Burning Coal"
+  ],
+  "Trombone Ore": [
+    "\u5c16\u53eb\u4eae\u94dc\u77ff\u3000Trombone Ore"
+  ],
+  "Darkness Cobalt": [
+    "\u9ed1\u6697\u94b4\u77ff\u3000Darkness Cobalt"
+  ],
+  "Consolatory Bronze": [
+    "\u6170\u85c9\u9752\u94dc\u77ff\u3000Consolatory Bronze"
+  ],
+  "Smoked Quartz": [
+    "\u718f\u77f3\u82f1\u77ff\u3000Smoked Quartz"
+  ],
+  "Shiny Zinc": [
+    "\u95ea\u4eae\u950c\u77ff\u3000Shiny Zinc"
+  ],
+  "Imperial Bauxite": [
+    "\u5e1d\u738b\u94c1\u77fe\u571f\u3000Imperial Bauxite"
+  ],
+  "Dragonheart Amethyst": [
+    "\u9f99\u5fc3\u7d2b\u6c34\u6676\u3000Dragonheart Amethyst"
+  ],
+  "Koral Reef": [
+    "\u6697\u7901\u73ca\u745a\u77ff\u3000Koral Reef"
+  ],
+  "Polished Taroudium": [
+    "\u5149\u4eae\u5854\u7f57\u8fea\u59c6\u77ff\u3000Polished Taroudium"
+  ],
+  "Luminous Lead Ore": [
+    "\u4eae\u94c5\u77ff\u3000Luminous Lead Ore"
+  ],
+  "Onyx Ore": [
+    "\u739b\u7459\u77ff\u3000Onyx Ore"
+  ],
+  "Sumptuous Mythwil Ore": [
+    "\u9876\u7ea7\u79d8\u94f6\u77ff\u3000Sumptuous Mythwil Ore"
+  ],
+  "Dull Sapphire": [
+    "\u6697\u6de1\u7684\u84dd\u5b9d\u77f3\u3000Dull Sapphire"
+  ],
+  "Foreal Titanium": [
+    "\u5bcc\u949b\u77ff\u3000Foreal Titanium"
+  ],
+  "Acid Sryanure": [
+    "\u6c30\u9178\u77ff\u3000Acid Sryanure"
+  ],
+  "Prehistoric Amber": [
+    "\u53f2\u524d\u7425\u73c0\u3000Prehistoric Amber"
+  ],
+  "Chrome-Plated Mercury": [
+    "\u9540\u94ec\u6c34\u94f6\u3000Chrome-Plated Mercury"
+  ],
+  "Shiny Silver Ore": [
+    "\u95ea\u4eae\u94f6\u77ff\u3000Shiny Silver Ore"
+  ],
+  "Iridescent Obsidian": [
+    "\u95ea\u5149\u9ed1\u66dc\u77f3\u3000Iridescent Obsidian"
+  ],
+  "Absolute Garnet": [
+    "\u7edd\u5bf9\u77f3\u69b4\u77f3\u3000Absolute Garnet"
+  ],
+  "Polished Zircon": [
+    "\u5149\u4eae\u9506\u77f3\u3000Polished Zircon"
+  ]
+  ,
+  "Rozen Seed": [
+    "\u7f57\u6cfd\u6069\u79cd\u5b50\u3000Rozen Seed"
+  ],
+  "Ash Cutting": [
+    "\u767d\u8721\u6811\u679d\u3000Ash Cutting"
+  ],
+  "Jonik Ash Wood": [
+    "\u5c24\u5c3c\u514b\u767d\u8721\u6728\u3000Jonik Ash Wood"
+  ],
+  "Hazel Cutting": [
+    "\u699b\u6811\u679d\u3000Hazel Cutting"
+  ],
+  "Hazelnut": [
+    "\u699b\u5b50\u3000Hazelnut"
+  ],
+  "Babezel Wood": [
+    "\u5b9d\u5b9d\u699b\u6728\u3000Babezel Wood"
+  ],
+  "Chestnut Cutting": [
+    "\u6817\u6811\u679d\u3000Chestnut Cutting"
+  ],
+  "Chestnut": [
+    "\u6817\u5b50\u3000Chestnut"
+  ],
+  "Gilbert Chestnut Wood": [
+    "\u5409\u4f2f\u7279\u6817\u6728\u3000Gilbert Chestnut Wood"
+  ],
+  "Api Cutting": [
+    "\u82f9\u6735\u6811\u679d\u3000Api Cutting"
+  ],
+  "Api": [
+    "\u82f9\u6735\u3000Api"
+  ],
+  "Francis Premier Api Wood": [
+    "\u5f17\u6717\u897f\u65af\u7684\u82f9\u6735\u6728\u3000Francis Premier Api Wood"
+  ],
+  "Birch Cutting": [
+    "\u6866\u6811\u679d\u3000Birch Cutting"
+  ],
+  "Relentless Birch Wood": [
+    "\u575a\u97e7\u6866\u6728\u3000Relentless Birch Wood"
+  ],
+  "Boabob Cutting": [
+    "\u5012\u683d\u6811\u679d\u3000Boabob Cutting"
+  ],
+  "Marlhai Boabob Wood": [
+    "\u5012\u540a\u6728\u3000Marlhai Boabob Wood"
+  ],
+  "Weeping Willow Cutting": [
+    "\u67f3\u6811\u679d\u3000Weeping Willow Cutting"
+  ],
+  "Whining Willow Wood": [
+    "\u54c0\u9e23\u67f3\u6728\u3000Whining Willow Wood"
+  ],
+  "Citronana Cutting": [
+    "\u9999\u8549\u6811\u679d\u3000Citronana Cutting"
+  ],
+  "Citronana": [
+    "\u9999\u8549\u3000Citronana"
+  ],
+  "Exemplary Citronana Wood": [
+    "\u6a21\u8303\u9999\u8549\u6728\u3000Exemplary Citronana Wood"
+  ],
+  "Baby Redwood Cutting": [
+    "\u5c0f\u7ea2\u6749\u6811\u679d\u3000Baby Redwood Cutting"
+  ],
+  "Uiouqes Wood": [
+    "\u6749\u7ea2\u6728\u3000Uiouqes Wood"
+  ],
+  "Pooplar Cutting": [
+    "\u767d\u6768\u6811\u679d\u3000Pooplar Cutting"
+  ],
+  "Hallowed Pooplar Wood": [
+    "\u795e\u5723\u767d\u6768\u6728\u3000Hallowed Pooplar Wood"
+  ],
+  "Hornbeam Cutting": [
+    "\u89d2\u6811\u679d\u3000Hornbeam Cutting"
+  ],
+  "Raging Hornbeam Wood": [
+    "\u8302\u76db\u7684\u89d2\u6728\u3000Raging Hornbeam Wood"
+  ],
+  "Tadbole Cutting": [
+    "\u5854\u5fb7\u6ce2\u5c14\u6811\u679d\u3000Tadbole Cutting"
+  ],
+  "Oafish Tadbole Wood": [
+    "\u575a\u786c\u5854\u5fb7\u6ce2\u5c14\u6728\u3000Oafish Tadbole Wood"
+  ],
+  "Creeping Vine Cutting": [
+    "\u722c\u884c\u85e4\u8513\u679d\u6761\u3000Creeping Vine Cutting"
+  ],
+  "Lianecdote": [
+    "\u6eba\u7231\u85e4\u3000Lianecdote"
+  ],
+  "Frozen Cutting": [
+    "\u5317\u5730\u6811\u679d\u3000Frozen Cutting"
+  ],
+  "Frogistified Wood": [
+    "\u6781\u5730\u6728\u3000Frogistified Wood"
+  ],
+  "Yew Cutting": [
+    "\u7d2b\u6749\u6811\u679d\u3000Yew Cutting"
+  ],
+  "Supernatural Yew Wood": [
+    "\u795e\u5947\u7d2b\u6749\u6728\u3000Supernatural Yew Wood"
+  ],
+  "Prickly Cutting": [
+    "\u523a\u6811\u679d\u3000Prickly Cutting"
+  ],
+  "Powpaya": [
+    "\u706b\u9f99\u679c\u3000Powpaya"
+  ],
+  "Tropickle Cactus": [
+    "\u70ed\u5e26\u638c\u4ed9\u4eba\u3000Tropickle Cactus"
+  ],
+  "Mosscandel Cutting": [
+    "\u4e4c\u78f7\u6811\u679d\u3000Mosscandel Cutting"
+  ],
+  "Sporal Yeast": [
+    "\u5b62\u5b50\u9175\u6bcd\u3000Sporal Yeast"
+  ],
+  "Marmalot Cutting": [
+    "\u7384\u94c1\u6811\u679d\u3000Marmalot Cutting"
+  ],
+  "Radiant Marmalot Wood": [
+    "\u53d1\u5149\u7384\u94c1\u6728\u3000Radiant Marmalot Wood"
+  ],
+  "Elderberry Cutting": [
+    "\u63a5\u9aa8\u6811\u679d\u3000Elderberry Cutting"
+  ],
+  "Mortal Wood": [
+    "\u5c38\u6728\u3000Mortal Wood"
+  ],
+  "Sylvan Cutting": [
+    "\u677e\u6811\u679d\u3000Sylvan Cutting"
+  ],
+  "Tantrum Wood": [
+    "\u7329\u7ea2\u6728\u3000Tantrum Wood"
+  ],
+  "Dry Pine Cutting": [
+    "\u67af\u677e\u6811\u679d\u3000Dry Pine Cutting"
+  ],
+  "Exceptional Wood": [
+    "\u67af\u840e\u6728\u3000Exceptional Wood"
+  ],
+  "Cherry Tree Cutting": [
+    "\u6a31\u6811\u679d\u3000Cherry Tree Cutting"
+  ],
+  "Sakura Wood": [
+    "\u6a31\u82b1\u6728\u3000Sakura Wood"
+  ],
+  "Divi Divi Cutting": [
+    "\u7af9\u679d\u3000Divi Divi Cutting"
+  ],
+  "Divi Up Wood": [
+    "\u6652\u8863\u7aff\u3000Divi Up Wood"
+  ],
+  "Kokonut Cutting": [
+    "\u6930\u6811\u6811\u679d\u3000Kokonut Cutting"
+  ],
+  "Kokos Nucifera": [
+    "\u83b2\u6930\u6728\u3000Kokos Nucifera"
+  ],
+  "Mahogany Cutting": [
+    "\u6843\u5fc3\u6811\u679d\u3000Mahogany Cutting"
+  ],
+  "Mahocurrent Wood": [
+    "\u4f18\u8d28\u6843\u5fc3\u6728\u3000Mahocurrent Wood"
+  ],
+  "Bramble Cutting": [
+    "\u68d8\u6811\u679d\u3000Bramble Cutting"
+  ],
+  "Blackberries": [
+    "\u9ed1\u8393\u3000Blackberries"
+  ],
+  "Tabas'KO Wood": [
+    "\u6740\u4eba\u68d8\u3000Tabas'KO Wood"
+  ],
+  "Carya Cutting": [
+    "\u5c71\u6838\u6843\u6811\u679d\u3000Carya Cutting"
+  ],
+  "Caryoka Wood": [
+    "\u68ee\u5df4\u6838\u6843\u6728\u3000Caryoka Wood"
+  ],
+  "Twisted Seaweed Cutting": [
+    "\u7f20\u85fb\u6811\u679d\u3000Twisted Seaweed Cutting"
+  ],
+  "Algae Rhythm Wood": [
+    "\u8282\u594f\u85fb\u6728\u3000Algae Rhythm Wood"
+  ],
+  "Despair Tree Cutting": [
+    "\u7edd\u671b\u6811\u679d\u3000Despair Tree Cutting"
+  ],
+  "Desolation Wood": [
+    "\u51c4\u51c9\u6728\u3000Desolation Wood"
+  ],
+  "Nonbeeching Cutting": [
+    "\u865a\u5984\u6811\u679d\u3000Nonbeeching Cutting"
+  ],
+  "Madness Wood": [
+    "\u75af\u72c2\u6728\u3000Madness Wood"
+  ],
+  "Astracacia Cutting": [
+    "\u661f\u601d\u6811\u679d\u3000Astracacia Cutting"
+  ],
+  "Moon of Changing Eras": [
+    "\u8fc1\u6708\u6728\u3000Moon of Changing Eras"
+  ],
+  "Luzyl Cutting": [
+    "\u5362\u5179\u6811\u679d\u3000Luzyl Cutting"
+  ],
+  "Lazu-Luzyl": [
+    "\u62c9\u7956\u5362\u5179\u6728\u3000Lazu-Luzyl"
+  ]
+  ,
+  "Bow Meow Seed": [
+    "\u55b5\u55b5\u79cd\u5b50\u3000Bow Meow Seed"
+  ]
+  ,
+  "Gobball Seed": [
+    "\u7ef5\u7403\u79cd\u5b50\u3000Gobball Seed"
+  ]
+  ,
+  "Mimilk": [
+    "\u7f8a\u5976\u3000Mimilk"
+  ]
+  ,
+  "Larva Seed": [
+    "\u53d8\u5f02\u866b\u79cd\u5b50\u3000Larva Seed"
+  ]
+  ,
+  "Larva Brains": [
+    "\u53d8\u5f02\u866b\u8111\u3000Larva Brains"
+  ]
+  ,
+  "Tofu Seed": [
+    "\u8c46\u8299\u79cd\u5b50\u3000Tofu Seed"
+  ]
+  ,
+  "Tofu Gizzards": [
+    "\u7096\u8c46\u8299\u3000Tofu Gizzards"
+  ]
+  ,
+  "Wodent Seed": [
+    "\u5154\u5154\u79cd\u5b50\u3000Wodent Seed"
+  ]
+  ,
+  "Piwi Seed": [
+    "\u557e\u557e\u79cd\u5b50\u3000Piwi Seed"
+  ]
+  ,
+  "Piwi Egg": [
+    "\u7c89\u8272\u557e\u557e\u86cb\u3000Piwi Egg"
+  ]
+  ,
+  "Essence of Raised Skeleton": [
+    "\u9ab7\u9ac5\u7cbe\u534e\u3000Essence of Raised Skeleton"
+  ]
+  ,
+  "Treechnee Seed": [
+    "\u6811\u4eba\u79cd\u5b50\u3000Treechnee Seed"
+  ]
+  ,
+  "Treechnid Leg": [
+    "\u6811\u7cbe\u817f\u3000Treechnid Leg"
+  ]
+  ,
+  "Crackler Seed": [
+    "\u788e\u77f3\u8005\u79cd\u5b50\u3000Crackler Seed"
+  ]
+  ,
+  "Crackler Heart": [
+    "\u77f3\u5fc3\u3000Crackler Heart"
+  ]
+  ,
+  "Deathburn Essence": [
+    "\u6b7b\u71c3\u7cbe\u534e\u3000Deathburn Essence"
+  ]
+  ,
+  "Mine Crackler Seed": [
+    "\u77ff\u6d1e\u788e\u77f3\u8005\u79cd\u5b50\u3000Mine Crackler Seed"
+  ]
+  ,
+  "Moogrr Seed": [
+    "\u54de\u54de\u79cd\u5b50\u3000Moogrr Seed"
+  ]
+  ,
+  "Moogrr Filet": [
+    "\u725b\u91cc\u810a\u3000Moogrr Filet"
+  ]
+  ,
+  "Pirate Essence": [
+    "\u6d77\u76d7\u7cbe\u534e\u3000Pirate Essence"
+  ]
+  ,
+  "Bitter-Hammer Essence": [
+    "\u82e6\u9524\u7cbe\u534e\u3000Bitter-Hammer Essence"
+  ]
+  ,
+  "Bwork Seed": [
+    "\u517d\u4eba\u79cd\u5b50\u3000Bwork Seed"
+  ]
+  ,
+  "Cwab Seed": [
+    "\u8783\u87f9\u79cd\u5b50\u3000Cwab Seed"
+  ]
+  ,
+  "Cwab Stick": [
+    "\u87f9\u8089\u68d2\u3000Cwab Stick"
+  ]
+  ,
+  "Kokoko Seed": [
+    "\u6930\u6811\u79cd\u5b50\u3000Kokoko Seed"
+  ]
+  ,
+  "Mollusky Seed": [
+    "\u868c\u58f3\u79cd\u5b50\u3000Mollusky Seed"
+  ]
+  ,
+  "Kralove Heart": [
+    "\u7231\u9c7f\u4e4b\u5fc3\u3000Kralove Heart"
+  ]
+  ,
+  "Selachii Seed": [
+    "\u9ca8\u9c7c\u79cd\u5b50\u3000Selachii Seed"
+  ]
+  ,
+  "Selachii Steak": [
+    "\u9ca8\u9c7c\u8089\u6392\u3000Selachii Steak"
+  ]
+  ,
+  "Wild Gobball Seed": [
+    "\u91ce\u6027\u7ef5\u7403\u79cd\u5b50\u3000Wild Gobball Seed"
+  ]
+  ,
+  "Thick Skin": [
+    "\u539a\u76ae\u3000Thick Skin"
+  ]
+  ,
+  "Arachnee Seed": [
+    "\u76d8\u4e1d\u602a\u79cd\u5b50\u3000Arachnee Seed"
+  ]
+  ,
+  "Blibli Seed": [
+    "\u5495\u54e9\u79cd\u5b50\u3000Blibli Seed"
+  ]
+  ,
+  "Snout": [
+    "\u732a\u9f3b\u3000Snout"
+  ]
+  ,
+  "Boowolf Seed": [
+    "\u72fc\u79cd\u5b50\u3000Boowolf Seed"
+  ]
+  ,
+  "Boowolf Steak": [
+    "\u72fc\u8089\u6392\u3000Boowolf Steak"
+  ]
+  ,
+  "Crobak Seed": [
+    "\u4e4c\u9e26\u79cd\u5b50\u3000Crobak Seed"
+  ]
+  ,
+  "Crow Gizzards": [
+    "\u7096\u4e4c\u9e26\u3000Crow Gizzards"
+  ]
+  ,
+  "Crobak Egg": [
+    "\u4e4c\u9e26\u86cb\u3000Crobak Egg"
+  ]
+  ,
+  "Mushdskito Seed": [
+    "\u6ecb\u6ecb\u79cd\u5b50\u3000Mushdskito Seed"
+  ]
+  ,
+  "Mushd Hand": [
+    "\u6ce5\u624b\u3000Mushd Hand"
+  ]
+  ,
+  "Raskaw Seed": [
+    "\u9e26\u4eba\u79cd\u5b50\u3000Raskaw Seed"
+  ]
+  ,
+  "Rat Seed": [
+    "\u8001\u9f20\u79cd\u5b50\u3000Rat Seed"
+  ]
+  ,
+  "Rat Clette": [
+    "\u9f20\u5976\u916a\u3000Rat Clette"
+  ]
+  ,
+  "Strich Seed": [
+    "\u9e35\u9e1f\u79cd\u5b50\u3000Strich Seed"
+  ]
+  ,
+  "Chafer Essence": [
+    "\u9ab8\u9aa8\u7cbe\u534e\u3000Chafer Essence"
+  ]
+  ,
+  "Tibia": [
+    "\u80eb\u9aa8\u3000Tibia"
+  ]
+  ,
+  "Mortifying Essence": [
+    "\u8150\u5c38\u7cbe\u534e\u3000Mortifying Essence"
+  ]
+  ,
+  "Cadaverous Skin": [
+    "\u82cd\u767d\u4e4b\u76ae\u3000Cadaverous Skin"
+  ]
+  ,
+  "Mine Chafer Essence": [
+    "\u77ff\u6d1e\u9ab8\u9aa8\u7cbe\u534e\u3000Mine Chafer Essence"
+  ]
+  ,
+  "Essence of Monk": [
+    "\u50e7\u4fa3\u7cbe\u534e\u3000Essence of Monk"
+  ]
+  ,
+  "Sandy Beach Seed": [
+    "\u8005\u55b1\u6d77\u6ee9\u79cd\u5b50\u3000Sandy Beach Seed"
+  ]
+  ,
+  "Scara Seed": [
+    "\u72ec\u89d2\u4ed9\u79cd\u5b50\u3000Scara Seed"
+  ]
+  ,
+  "Scarapace": [
+    "\u7532\u866b\u58f3\u3000Scarapace"
+  ]
+  ,
+  "Schnek Seed": [
+    "\u65af\u96f7\u514b\u79cd\u5b50\u3000Schnek Seed"
+  ]
+  ,
+  "Schnek Silk": [
+    "\u65af\u96f7\u514b\u4e1d\u3000Schnek Silk"
+  ]
+  ,
+  "Mortified Essence": [
+    "\u5438\u8840\u7cbe\u534e\u3000Mortified Essence"
+  ]
+  ,
+  "Bilbizarre Liqueur": [
+    "\u55b1\u7ef4\u8428\u5229\u53e3\u9152\u3000Bilbizarre Liqueur"
+  ]
+  ,
+  "Snowy Seed": [
+    "\u51b0\u96ea\u79cd\u5b50\u3000Snowy Seed"
+  ]
+  ,
+  "Brrrbli Seed": [
+    "\u5bd2\u51b0\u5495\u54e9\u79cd\u5b50\u3000Brrrbli Seed"
+  ]
+  ,
+  "Brrrbli Hairs": [
+    "\u5bd2\u51b0\u732a\u9b03\u3000Brrrbli Hairs"
+  ]
+  ,
+  "Jelly Extract": [
+    "\u8005\u55b1\u79cd\u5b50\u3000Jelly Extract"
+  ]
+  ,
+  "Magik Riktus Essence": [
+    "\u571f\u532a\u79cd\u5b50\u3000Magik Riktus Essence"
+  ]
+  ,
+  "Riktus Essence": [
+    "\u571f\u532a\u7cbe\u534e\u3000Riktus Essence"
+  ]
+  ,
+  "Riktus Gold Tooth": [
+    "\u571f\u532a\u91d1\u7259\u3000Riktus Gold Tooth"
+  ]
+  ,
+  "Essence of Whisperer": [
+    "\u4f4e\u8bed\u7cbe\u534e\u3000Essence of Whisperer"
+  ]
+  ,
+  "Last Murmur": [
+    "\u901d\u8005\u4e4b\u606f\u3000Last Murmur"
+  ]
+  ,
+  "Whispering Crackly Heart": [
+    "\u4f4e\u8bed\u788e\u5fc3\u3000Whispering Crackly Heart"
+  ]
+  ,
+  "Castuc Seed": [
+    "\u638c\u4ed9\u4eba\u79cd\u5b50\u3000Castuc Seed"
+  ]
+  ,
+  "Mechanikal Essence": [
+    "\u68b0\u5361\u79cd\u5b50\u3000Mechanikal Essence"
+  ]
+  ,
+  "Essence of Northern Chafer": [
+    "\u5317\u5730\u9ab8\u9aa8\u7cbe\u534e\u3000Essence of Northern Chafer"
+  ]
+  ,
+  "Polar Crackler Seed": [
+    "\u6781\u5730\u788e\u77f3\u8005\u79cd\u5b50\u3000Polar Crackler Seed"
+  ]
+  ,
+  "Puddly Seed": [
+    "\u5e03\u4e01\u79cd\u5b50\u3000Puddly Seed"
+  ]
+  ,
+  "Puddly Bottle": [
+    "\u5e03\u4e01\u74f6\u3000Puddly Bottle"
+  ]
+  ,
+  "Snapper Seed": [
+    "\u9c7c\u602a\u79cd\u5b50\u3000Snapper Seed"
+  ]
+  ,
+  "Snapper Flesh": [
+    "\u9c7c\u8089\u3000Snapper Flesh"
+  ]
+  ,
+  "Tormented Shushu Seed": [
+    "\u78e8\u9b42\u8005\u79cd\u5b50\u3000Tormented Shushu Seed"
+  ]
+  ,
+  "Whirly Seed": [
+    "\u65cb\u9e1f\u79cd\u5b50\u3000Whirly Seed"
+  ]
+  ,
+  "Whirloin Steak": [
+    "\u65cb\u9e1f\u8089\u6392\u3000Whirloin Steak"
+  ]
+  ,
+  "Blackspore Seed": [
+    "\u9ed1\u6697\u5b62\u5b50\u79cd\u5b50\u3000Blackspore Seed"
+  ]
+  ,
+  "Dark Treechnid Seed": [
+    "\u9ed1\u6697\u6811\u7cbe\u79cd\u5b50\u3000Dark Treechnid Seed"
+  ]
+  ,
+  "Treechnid Sap": [
+    "\u6811\u7075\u8102\u3000Treechnid Sap"
+  ]
+  ,
+  "Treechnid Amber": [
+    "\u6811\u7cbe\u7425\u73c0\u3000Treechnid Amber"
+  ]
+  ,
+  "Drheller Seed": [
+    "\u5730\u7a74\u517d\u79cd\u5b50\u3000Drheller Seed"
+  ]
+  ,
+  "Fanatical Shushu Seed": [
+    "\u6444\u9b42\u8005\u79cd\u5b50\u3000Fanatical Shushu Seed"
+  ]
+  ,
+  "Lenald Seed": [
+    "\u798f\u72f8\u79cd\u5b50\u3000Lenald Seed"
+  ]
+  ,
+  "Tendel Pelt": [
+    "\u798f\u72f8\u6bdb\u76ae\u3000Tendel Pelt"
+  ]
+  ,
+  "Muvegitant Seed": [
+    "\u53d8\u79cd\u852c\u83dc\u79cd\u5b50\u3000Muvegitant Seed"
+  ]
+  ,
+  "Transmuted Pistil": [
+    "\u53d8\u5f02\u96cc\u854a\u3000Transmuted Pistil"
+  ]
+  ,
+  "Wabbit Seed": [
+    "\u75af\u5154\u79cd\u5b50\u3000Wabbit Seed"
+  ]
+  ,
+  "Enurado Seed": [
+    "\u57c3\u52aa\u5353\u79cd\u5b50\u3000Enurado Seed"
+  ]
+  ,
+  "Luxury Slobber": [
+    "\u9ec4\u91d1\u9ecf\u6db2\u3000Luxury Slobber"
+  ]
+  ,
+  "Blop Seed": [
+    "\u8f6f\u6ce5\u79cd\u5b50\u3000Blop Seed"
+  ]
+  ,
+  "Blop Essence": [
+    "\u8f6f\u6ce5\u7cbe\u534e\u3000Blop Essence"
+  ]
+  ,
+  "Plantala Seed": [
+    "\u830e\u602a\u79cd\u5b50\u3000Plantala Seed"
+  ]
+  ,
+  "Kavortin' Plantala": [
+    "\u5b09\u95f9\u830e\u602a\u3000Kavortin' Plantala"
+  ]
+  ,
+  "Alamode Plantala": [
+    "\u65f6\u9ae6\u830e\u602a\u3000Alamode Plantala"
+  ]
+  ,
+  "Sandyoptera Seed": [
+    "\u6c99\u7fc5\u866b\u79cd\u5b50\u3000Sandyoptera Seed"
+  ]
+  ,
+  "Sharp Wings": [
+    "\u950b\u5229\u7fc5\u8180\u3000Sharp Wings"
+  ]
+  ,
+  "Srambad Seed": [
+    "\u65af\u62c9\u59c6\u79cd\u5b50\u3000Srambad Seed"
+  ]
+  ,
+  "Steamy Skin": [
+    "\u84b8\u6c7d\u751f\u76ae\u3000Steamy Skin"
+  ]
+  ,
+  "Well-Guawded Seed": [
+    "\u5154\u7cbe\u82f1\u79cd\u5b50\u3000Well-Guawded Seed"
+  ]
+  ,
+  "Wemoved Awmow": [
+    "\u5378\u4e0b\u7684\u62a4\u7532\u3000Wemoved Awmow"
+  ]
+  ,
+  "Infected Seed": [
+    "\u53d7\u611f\u67d3\u7684\u79cd\u5b50\u3000Infected Seed"
+  ]
+  ,
+  "Elite Riktus Essence": [
+    "\u7cbe\u82f1\u571f\u532a\u79cd\u5b50\u3000Elite Riktus Essence"
+  ]
+  ,
+  "Hoodlum Essence": [
+    "\u8499\u9762\u4eba\u7cbe\u534e\u3000Hoodlum Essence"
+  ]
+  ,
+  "Unregulated Seed": [
+    "\u65e0\u7f81\u4e4b\u79cd\u3000Unregulated Seed"
+  ]
+  ,
+  "Present Sandglass Sand": [
+    "\u7559\u5143\u6c99\u6f0f\u4e4b\u7802\u3000Present Sandglass Sand"
+  ]
+  ,
+  "Kali's Henchman Blood": [
+    "\u5361\u5229\u8840\u79cd\u3000Kali's Henchman Blood"
+  ]
+  ,
+  "Rogue Essence": [
+    "\u76d7\u8d3c\u79cd\u5b50\u3000Rogue Essence"
+  ]
+  ,
+  "Supple Sole": [
+    "\u67d4\u8f6f\u978b\u5e95\u3000Supple Sole"
+  ]
+  ,
+  "Rogue Treasure": [
+    "\u76d7\u8d3c\u5b9d\u7269\u3000Rogue Treasure"
+  ]
+  ,
+  "Stalagmote Seed": [
+    "\u77f3\u7b0b\u7cbe\u79cd\u5b50\u3000Stalagmote Seed"
+  ]
+  ,
+  "Regulated Seed": [
+    "\u68b0\u7279\u79cd\u5b50\u3000Regulated Seed"
+  ]
+  ,
+  "Archaic Part": [
+    "\u9648\u65e7\u90e8\u4ef6\u3000Archaic Part"
+  ]
+  ,
+  "Crocodyl Seed": [
+    "\u9cc4\u9c7c\u79cd\u5b50\u3000Crocodyl Seed"
+  ]
+  ,
+  "Gerbean Seed": [
+    "\u6c99\u9f20\u79cd\u5b50\u3000Gerbean Seed"
+  ]
+  ,
+  "Kanniball Seed": [
+    "\u6c49\u5c3c\u82ad\u79cd\u5b50\u3000Kanniball Seed"
+  ]
+  ,
+  "Kannivore Seed": [
+    "\u6c49\u5c3c\u8349\u79cd\u5b50\u3000Kannivore Seed"
+  ]
+  ,
+  "Pandissident Essence": [
+    "\u5fe4\u9006\u79cd\u5b50\u3000Pandissident Essence"
+  ]
+  ,
+  "Tropikoko Seed": [
+    "\u6930\u4eba\u79cd\u5b50\u3000Tropikoko Seed"
+  ]
+  ,
+  "Badgerox Seed": [
+    "\u737e\u517d\u4e4b\u79cd\u3000Badgerox Seed"
+  ]
+  ,
+  "Blightopard Seed": [
+    "\u7978\u8c79\u79cd\u5b50\u3000Blightopard Seed"
+  ]
+  ,
+  "Bubourg Seed": [
+    "\u9e2e\u9e1f\u79cd\u5b50\u3000Bubourg Seed"
+  ]
+  ,
+  "Magmatic Lavas": [
+    "\u7194\u5ca9\u79cd\u5b50\u3000Magmatic Lavas"
+  ]
+  ,
+  "Dreggon Seed": [
+    "\u86cb\u9f99\u79cd\u5b50"
+  ]
+  ,
+  "Dreggon Horn": [
+    "\u86cb\u9f99\u7284\u89d2\u3000Dreggon Horn"
+  ]
+  ,
+  "Ethernal Essence": [
+    "\u5929\u6c14\u79cd\u5b50\u3000Ethernal Essence"
+  ]
+  ,
+  "Last Sigh": [
+    "\u4e34\u7ec8\u4e4b\u606f\u3000Last Sigh"
+  ]
+  ,
+  "Pandala Ghost Essence": [
+    "\u6f58\u8fbe\u62c9\u5e7d\u7075\u79cd\u5b50\u3000Pandala Ghost Essence"
+  ]
+  ,
+  "Crabstacean Seed": [
+    "\u58f3\u7532\u79cd\u5b50\u3000Crabstacean Seed"
+  ]
+  ,
+  "Pingwin Seed": [
+    "\u4f01\u9e45\u79cd\u5b50\u3000Pingwin Seed"
+  ]
+  ,
+  "Plantiguard Seed": [
+    "\u536b\u718a\u79cd\u5b50\u3000Plantiguard Seed"
+  ]
+  ,
+  "Scramshell Seed": [
+    "\u722c\u58f3\u7c7b\u79cd\u5b50\u3000Scramshell Seed"
+  ]
+  ,
+  "Sunsloth Seed": [
+    "\u8273\u9633\u79cd\u5b50\u3000Sunsloth Seed"
+  ]
+  ,
+  "Tundrazor Seed": [
+    "\u51bb\u539f\u79cd\u5b50\u3000Tundrazor Seed"
+  ]
+  ,
+  "Vandalophrenic Seed": [
+    "\u86ee\u517d\u79cd\u5b50\u3000Vandalophrenic Seed"
+  ]
+  ,
+  "Abyssal Creeper Seed": [
+    "\u6e0a\u6d77\u4f0f\u602a\u79cd\u5b50\u3000Abyssal Creeper Seed"
+  ]
+  ,
+  "Destroyer Seed": [
+    "\u574f\u706d\u79cd\u5b50\u3000Destroyer Seed"
+  ]
+  ,
+  "Foggernaut Guard Essence": [
+    "\u84b8\u6c7d\u5b88\u536b\u7cbe\u534e\u3000Foggernaut Guard Essence"
+  ]
+  ,
+  "Horridemon Seed": [
+    "\u6050\u60e7\u79cd\u5b50\u3000Horridemon Seed"
+  ]
+  ,
+  "Phytomorph Seed": [
+    "\u690d\u79cd\u79cd\u5b50\u3000Phytomorph Seed"
+  ]
+  ,
+  "Streye Seed": [
+    "\u5de8\u773c\u79cd\u5b50\u3000Streye Seed"
+  ]
+  ,
+  "Voidivion Seed": [
+    "\u865a\u7a7a\u79cd\u5b50\u3000Voidivion Seed"
+  ]
+  ,
+  "Bworkana Clan Essence": [
+    "\u5361\u7eb3\u517d\u4eba\u7cbe\u534e\u3000Bworkana Clan Essence"
+  ]
+  ,
+  "Ferociraptor Seed": [
+    "\u731b\u6050\u9f99\u79cd\u5b50\u3000Ferociraptor Seed"
+  ]
+  ,
+  "Nox Machine Essence": [
+    "\u8bfa\u514b\u5e0c\u673a\u68b0\u7cbe\u534e\u3000Nox Machine Essence"
+  ]
+  ,
+  "Primount Seed": [
+    "\u539f\u59cb\u517d\u79cd\u5b50\u3000Primount Seed"
+  ]
+  ,
+  "Starvannah Seed": [
+    "\u661f\u539f\u517d\u79cd\u5b50\u3000Starvannah Seed"
   ]
 };

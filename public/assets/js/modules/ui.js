@@ -633,7 +633,7 @@ function renderTracker() {
     if (item.profession === "ALL" && item.imgId) {
       itemIconPath = `./assets/img/items/${item.imgId}.png`;
     } else {
-      const safeItemName = item.name.replace(/\s+/g, "_");
+      const safeItemName = (item.imgName || item.name).replace(/\s+/g, "_");
       itemIconPath = `./assets/img/resources/${safeItemName}.png`;
     }
 

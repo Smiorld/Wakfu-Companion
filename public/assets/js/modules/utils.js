@@ -309,9 +309,6 @@ async function togglePiP(elementId, title) {
     // Force renders
     renderMeter();
     renderTracker();
-    if (elementId === "tracker-list" && typeof initTrackerDropdowns === "function") {
-      initTrackerDropdowns();
-    }
     if (elementId === "chat-list") refreshChatVisibility();
   } catch (err) {
     console.error("Failed to open PiP window:", err);
