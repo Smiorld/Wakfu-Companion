@@ -105,6 +105,171 @@ function getTrackerDisplayName(itemName) {
   return chineseName ? `${chineseName}  ${itemName}` : itemName;
 }
 
+function getTrackerAutocompleteDocuments() {
+  const docs = [document];
+  if (pipWindow && pipWindow.document) docs.push(pipWindow.document);
+  return docs;
+}
+
+function syncTrackerInputOptions(doc, resetInput = false) {
+  const itemDatalist = doc.getElementById("item-datalist");
+  const itemInput = doc.getElementById("item-input");
+  if (!itemDatalist || !itemInput) return;
+
+  if (resetInput) itemInput.value = "";
+  itemDatalist.innerHTML = "";
+
+  trackerCatalog.forEach((itemData) => {
+    const optionValue = String(itemData.displayName || itemData.name || "").trim();
+    if (!optionValue) return;
+    const opt = doc.createElement("option");
+    opt.value = optionValue;
+    itemDatalist.appendChild(opt);
+  });
+}
+
+function getTrackerAutocompletePopup(doc) {
+  let popup = doc.getElementById("tracker-autocomplete-popup");
+  if (popup) return popup;
+
+  popup = doc.createElement("div");
+  popup.id = "tracker-autocomplete-popup";
+  popup.style.position = "fixed";
+  popup.style.zIndex = "9999";
+  popup.style.display = "none";
+  popup.style.maxHeight = "280px";
+  popup.style.overflowY = "auto";
+  popup.style.background = "#1e1e1e";
+  popup.style.border = "1px solid rgba(0, 225, 255, 0.35)";
+  popup.style.borderRadius = "8px";
+  popup.style.boxShadow = "0 12px 30px rgba(0, 0, 0, 0.45)";
+  popup.style.padding = "4px";
+  popup.style.minWidth = "220px";
+  doc.body.appendChild(popup);
+  return popup;
+}
+
+function hideTrackerAutocomplete(doc = document) {
+  const popup = doc.getElementById("tracker-autocomplete-popup");
+  if (popup) popup.style.display = "none";
+}
+
+function findTrackerAutocompleteMatches(query) {
+  const normalizedQuery = normalizeTrackerText(query);
+  if (!normalizedQuery) return trackerCatalog.slice(0, 18);
+
+  const ranked = trackerCatalog
+    .map((entry) => {
+      let score = -1;
+
+      entry.aliases.forEach((alias) => {
+        const normalizedAlias = normalizeTrackerText(alias);
+        if (!normalizedAlias) return;
+        if (normalizedAlias === normalizedQuery) score = Math.max(score, 100);
+        else if (normalizedAlias.startsWith(normalizedQuery))
+          score = Math.max(score, 80);
+        else if (normalizedAlias.includes(normalizedQuery))
+          score = Math.max(score, 60);
+      });
+
+      if (score < 0) return null;
+      return { entry, score };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.entry.displayName.localeCompare(b.entry.displayName);
+    })
+    .slice(0, 18)
+    .map((row) => row.entry);
+
+  return ranked;
+}
+
+function renderTrackerAutocomplete(doc, query) {
+  const input = doc.getElementById("item-input");
+  if (!input) return;
+
+  const matches = findTrackerAutocompleteMatches(query);
+  const popup = getTrackerAutocompletePopup(doc);
+
+  if (!matches.length) {
+    popup.style.display = "none";
+    return;
+  }
+
+  const rect = input.getBoundingClientRect();
+  popup.style.left = `${rect.left}px`;
+  popup.style.top = `${rect.bottom + 6}px`;
+  popup.style.width = `${Math.max(rect.width, 260)}px`;
+  popup.innerHTML = "";
+
+  matches.forEach((entry) => {
+    const option = doc.createElement("button");
+    option.type = "button";
+    option.textContent = entry.displayName;
+    option.style.display = "block";
+    option.style.width = "100%";
+    option.style.border = "0";
+    option.style.background = "transparent";
+    option.style.color = "#ddd";
+    option.style.textAlign = "left";
+    option.style.padding = "8px 10px";
+    option.style.borderRadius = "6px";
+    option.style.cursor = "pointer";
+    option.style.fontSize = "0.9rem";
+
+    option.addEventListener("mouseenter", () => {
+      option.style.background = "rgba(0, 225, 255, 0.14)";
+      option.style.color = "#fff";
+    });
+
+    option.addEventListener("mouseleave", () => {
+      option.style.background = "transparent";
+      option.style.color = "#ddd";
+    });
+
+    option.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      input.value = entry.displayName;
+      popup.style.display = "none";
+      input.focus();
+    });
+
+    popup.appendChild(option);
+  });
+
+  popup.style.display = "block";
+}
+
+function bindTrackerAutocomplete(doc) {
+  const input = doc.getElementById("item-input");
+  if (!input || input.dataset.autocompleteBound === "true") return;
+
+  input.dataset.autocompleteBound = "true";
+
+  input.addEventListener("focus", () => {
+    renderTrackerAutocomplete(doc, input.value);
+  });
+
+  input.addEventListener("input", () => {
+    renderTrackerAutocomplete(doc, input.value);
+  });
+
+  input.addEventListener("blur", () => {
+    doc.defaultView.setTimeout(() => hideTrackerAutocomplete(doc), 120);
+  });
+
+  doc.addEventListener("click", (event) => {
+    if (
+      event.target !== input &&
+      !event.target.closest("#tracker-autocomplete-popup")
+    ) {
+      hideTrackerAutocomplete(doc);
+    }
+  });
+}
+
 function buildTrackerCatalog() {
   trackerCatalog = [];
   trackerLookup = new Map();
@@ -207,20 +372,10 @@ function parseTrackedItemLog(line) {
 function initTrackerDropdowns() {
   if (typeof professionItems === "undefined") return;
 
-  const itemDatalist = getUI("item-datalist");
-  const itemInput = getUI("item-input");
-  if (!itemDatalist || !itemInput) return;
-
   buildTrackerCatalog();
-  itemInput.value = "";
-  itemDatalist.innerHTML = "";
-
-  trackerCatalog.forEach((itemData) => {
-    const optionValue = String(itemData.displayName || itemData.name || "").trim();
-    if (!optionValue) return;
-    const opt = document.createElement("option");
-    opt.value = optionValue;
-    itemDatalist.appendChild(opt);
+  getTrackerAutocompleteDocuments().forEach((doc) => {
+    syncTrackerInputOptions(doc, true);
+    bindTrackerAutocomplete(doc);
   });
 
   loadTrackerState();
