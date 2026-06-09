@@ -92,6 +92,102 @@ const WAKFU_FIXED_TRANSLATION_TERMS = [
 ];
 
 let wakfuTranslationAliases = null;
+let wakfuTranslationAliasPromise = null;
+let wakfuExternalGlossary = null;
+let wakfuExternalGlossaryPromise = null;
+let wakfuExactTermMap = null;
+let wakfuFuzzyAliasIndex = null;
+
+const WAKFU_GLOSSARY_URL = "assets/data/wakfu_term_glossary.json?v=20260609d";
+const WAKFU_GENERIC_LATIN_ALIAS_WORDS = new Set([
+  "all",
+  "any",
+  "area",
+  "attack",
+  "available",
+  "back",
+  "bag",
+  "bags",
+  "battlefield",
+  "battlefields",
+  "bonus",
+  "book",
+  "books",
+  "box",
+  "boxes",
+  "category",
+  "change",
+  "chest",
+  "chests",
+  "color",
+  "container",
+  "containers",
+  "control",
+  "damage",
+  "door",
+  "doors",
+  "dungeon",
+  "dungeons",
+  "effect",
+  "effects",
+  "event",
+  "events",
+  "filter",
+  "guild",
+  "hero",
+  "heroes",
+  "item",
+  "items",
+  "key",
+  "market",
+  "marketplace",
+  "marketplaces",
+  "name",
+  "path",
+  "player",
+  "quest",
+  "quests",
+  "reward",
+  "rewards",
+  "road",
+  "score",
+  "sign",
+  "signs",
+  "spell",
+  "spells",
+  "state",
+  "statue",
+  "statues",
+  "support",
+  "surface",
+  "title",
+  "treasure",
+  "treasures",
+  "type",
+  "wall",
+  "water",
+  "workspaces",
+  "exit",
+]);
+const WAKFU_LATIN_CONNECTOR_WORDS = new Set([
+  "of",
+  "the",
+  "and",
+  "to",
+  "in",
+  "on",
+  "for",
+  "a",
+  "an",
+  "de",
+  "du",
+  "la",
+  "le",
+  "des",
+  "da",
+  "do",
+  "del",
+]);
 
 function escapeTranslationRegex(text) {
   return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -105,6 +201,73 @@ function normalizeTranslationAlias(text) {
     .trim();
 }
 
+function normalizeLatinAlias(text) {
+  return normalizeTranslationAlias(text)
+    .toLowerCase()
+    .replace(/[’']/g, "'")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isCjkAlias(text) {
+  return /[\u3400-\u9FFF]/.test(String(text || ""));
+}
+
+function isLatinAlias(text) {
+  const value = String(text || "");
+  return /[A-Za-z]/.test(value) && !isCjkAlias(value);
+}
+
+function isLowValueLatinAlias(text) {
+  const words = normalizeLatinAlias(text)
+    .split(" ")
+    .filter(Boolean)
+    .filter((word) => !WAKFU_LATIN_CONNECTOR_WORDS.has(word));
+
+  if (words.length === 0) return true;
+  if (words.length === 1) {
+    return WAKFU_GENERIC_LATIN_ALIAS_WORDS.has(words[0]);
+  }
+  return words.every((word) => WAKFU_GENERIC_LATIN_ALIAS_WORDS.has(word));
+}
+
+function isLikelyStandaloneGlossaryInput(text) {
+  const value = normalizeTranslationAlias(text);
+  if (!value || value.length > 48) return false;
+  if (/[\r\n]/.test(value)) return false;
+  if (/[.!?;:,，。！？；：]/.test(value)) return false;
+  return value.split(/\s+/).filter(Boolean).length <= 5;
+}
+
+function buildLatinBoundaryPattern(alias) {
+  return new RegExp(
+    `(^|[^A-Za-z0-9])(${escapeTranslationRegex(alias)})(?=$|[^A-Za-z0-9])`,
+    "gi"
+  );
+}
+
+async function loadWakfuExternalGlossary() {
+  if (Array.isArray(wakfuExternalGlossary)) return wakfuExternalGlossary;
+  if (wakfuExternalGlossaryPromise) return wakfuExternalGlossaryPromise;
+
+  wakfuExternalGlossaryPromise = fetch(WAKFU_GLOSSARY_URL)
+    .then((response) => (response.ok ? response.json() : []))
+    .then((data) => {
+      wakfuExternalGlossary = Array.isArray(data) ? data : [];
+      return wakfuExternalGlossary;
+    })
+    .catch(() => {
+      wakfuExternalGlossary = [];
+      return wakfuExternalGlossary;
+    })
+    .finally(() => {
+      wakfuExternalGlossaryPromise = null;
+    });
+
+  return wakfuExternalGlossaryPromise;
+}
+
 function extractPrimaryChineseTerm(rawValue, englishName) {
   const normalizedValue = normalizeTranslationAlias(rawValue);
   if (!normalizedValue) return "";
@@ -116,65 +279,123 @@ function extractPrimaryChineseTerm(rawValue, englishName) {
   return withoutEnglish || normalizedValue;
 }
 
-function buildWakfuTranslationAliases() {
+async function buildWakfuTranslationAliases() {
   if (wakfuTranslationAliases) return wakfuTranslationAliases;
+  if (wakfuTranslationAliasPromise) return wakfuTranslationAliasPromise;
 
-  const termEntries = new Map();
+  wakfuTranslationAliasPromise = (async () => {
+    const termEntries = new Map();
+    const externalGlossary = await loadWakfuExternalGlossary();
 
-  const registerTerm = (englishName, chineseName, extraAliases = []) => {
-    const english = normalizeTranslationAlias(englishName);
-    const chinese = normalizeTranslationAlias(chineseName);
-    if (!english || !chinese) return;
+    const registerTerm = (englishName, chineseName, extraAliases = [], options = {}) => {
+      const english = normalizeTranslationAlias(englishName);
+      const chinese = normalizeTranslationAlias(chineseName);
+      if (!english || !chinese) return;
 
-    const existing = termEntries.get(english) || {
-      english,
-      chinese,
-      aliases: new Set(),
+      const existing = termEntries.get(english) || {
+        english,
+        chinese,
+        aliases: new Set(),
+        forceProtect: false,
+      };
+
+      existing.chinese = existing.chinese || chinese;
+      existing.forceProtect = existing.forceProtect || Boolean(options.forceProtect);
+      existing.aliases.add(english);
+      existing.aliases.add(chinese);
+      existing.aliases.add(`${chinese} ${english}`);
+
+      extraAliases.forEach((alias) => {
+        const normalizedAlias = normalizeTranslationAlias(alias);
+        if (!normalizedAlias) return;
+        existing.aliases.add(normalizedAlias);
+
+        const primaryChinese = extractPrimaryChineseTerm(normalizedAlias, english);
+        if (primaryChinese) {
+          existing.aliases.add(primaryChinese);
+          existing.aliases.add(`${primaryChinese} ${english}`);
+        }
+      });
+
+      termEntries.set(english, existing);
     };
 
-    existing.chinese = existing.chinese || chinese;
-    existing.aliases.add(english);
-    existing.aliases.add(chinese);
-    existing.aliases.add(`${chinese} ${english}`);
+    if (typeof ITEM_I18N_MAP !== "undefined") {
+      Object.entries(ITEM_I18N_MAP).forEach(([englishName, aliases]) => {
+        if (!Array.isArray(aliases) || aliases.length === 0) return;
+        const chineseName = extractPrimaryChineseTerm(aliases[0], englishName);
+        registerTerm(englishName, chineseName, aliases, { forceProtect: true });
+      });
+    }
 
-    extraAliases.forEach((alias) => {
-      const normalizedAlias = normalizeTranslationAlias(alias);
-      if (!normalizedAlias) return;
-      existing.aliases.add(normalizedAlias);
-
-      const primaryChinese = extractPrimaryChineseTerm(normalizedAlias, english);
-      if (primaryChinese) {
-        existing.aliases.add(primaryChinese);
-        existing.aliases.add(`${primaryChinese} ${english}`);
-      }
+    WAKFU_FIXED_TRANSLATION_TERMS.forEach(([englishName, chineseName]) => {
+      registerTerm(englishName, chineseName, [], { forceProtect: true });
     });
 
-    termEntries.set(english, existing);
-  };
-
-  if (typeof ITEM_I18N_MAP !== "undefined") {
-    Object.entries(ITEM_I18N_MAP).forEach(([englishName, aliases]) => {
-      if (!Array.isArray(aliases) || aliases.length === 0) return;
-      const chineseName = extractPrimaryChineseTerm(aliases[0], englishName);
-      registerTerm(englishName, chineseName, aliases);
+    externalGlossary.forEach((pair) => {
+      if (!Array.isArray(pair) || pair.length < 2) return;
+      registerTerm(pair[0], pair[1]);
     });
-  }
 
-  WAKFU_FIXED_TRANSLATION_TERMS.forEach(([englishName, chineseName]) => {
-    registerTerm(englishName, chineseName);
+    const exactTermMap = new Map();
+    const fuzzyAliasIndex = new Map();
+
+    wakfuTranslationAliases = [...termEntries.values()]
+      .flatMap((entry) =>
+        [...entry.aliases].map((alias) => {
+          const normalizedAlias = normalizeTranslationAlias(alias);
+          if (!normalizedAlias || normalizedAlias.length < 2) return null;
+
+          const latin = isLatinAlias(normalizedAlias);
+          const normalizedLatin = latin ? normalizeLatinAlias(normalizedAlias) : "";
+          const shouldSkipLowValueLatin =
+            latin && !entry.forceProtect && isLowValueLatinAlias(normalizedAlias);
+
+          if (shouldSkipLowValueLatin) {
+            return null;
+          }
+
+          if (latin && normalizedLatin) {
+            exactTermMap.set(`latin:${normalizedLatin}`, entry);
+          } else if (!latin) {
+            exactTermMap.set(`text:${normalizedAlias}`, entry);
+          }
+
+          if (latin) {
+            const wordCount = normalizedLatin ? normalizedLatin.split(" ").filter(Boolean).length : 0;
+            if (wordCount >= 1 && wordCount <= 3 && normalizedLatin.length >= 4 && normalizedLatin.length <= 24) {
+              const indexKey = `${wordCount}:${normalizedLatin[0]}`;
+              const bucket = fuzzyAliasIndex.get(indexKey) || [];
+              bucket.push({
+                alias: normalizedAlias,
+                normalizedLatin,
+                entry,
+              });
+              fuzzyAliasIndex.set(indexKey, bucket);
+            }
+          }
+
+          return {
+            alias: normalizedAlias,
+            entry,
+            isLatin: latin,
+            pattern: latin
+              ? buildLatinBoundaryPattern(normalizedAlias)
+              : new RegExp(escapeTranslationRegex(normalizedAlias), "g"),
+          };
+        })
+      )
+      .filter(Boolean)
+      .sort((a, b) => b.alias.length - a.alias.length);
+
+    wakfuExactTermMap = exactTermMap;
+    wakfuFuzzyAliasIndex = fuzzyAliasIndex;
+    return wakfuTranslationAliases;
+  })().finally(() => {
+    wakfuTranslationAliasPromise = null;
   });
 
-  wakfuTranslationAliases = [...termEntries.values()]
-    .flatMap((entry) =>
-      [...entry.aliases].map((alias) => ({
-        alias,
-        entry,
-      }))
-    )
-    .filter(({ alias }) => alias.length >= 2)
-    .sort((a, b) => b.alias.length - a.alias.length);
-
-  return wakfuTranslationAliases;
+  return wakfuTranslationAliasPromise;
 }
 
 function getProtectedTermOutput(entry, targetLang) {
@@ -185,26 +406,204 @@ function getProtectedTermOutput(entry, targetLang) {
   return entry.english;
 }
 
-function protectWakfuTerms(text, targetLang) {
+function createProtectedToken(placeholders, entry, targetLang) {
+  const token = `__WAKFU_TERM_${placeholders.length}__`;
+  placeholders.push({
+    token,
+    replacement: getProtectedTermOutput(entry, targetLang),
+  });
+  return token;
+}
+
+function replaceExactProtectedTerms(sourceText, aliasRows, placeholders, targetLang) {
+  let protectedText = sourceText;
+
+  aliasRows.forEach(({ pattern, entry, isLatin }) => {
+    if (isLatin) {
+      protectedText = protectedText.replace(pattern, (match, prefix) => {
+        return `${prefix}${createProtectedToken(placeholders, entry, targetLang)}`;
+      });
+    } else {
+      protectedText = protectedText.replace(pattern, () =>
+        createProtectedToken(placeholders, entry, targetLang)
+      );
+    }
+  });
+
+  return protectedText;
+}
+
+function splitProtectedSegments(text) {
+  return String(text || "").split(/(__WAKFU_TERM_\d+__)/g);
+}
+
+function getTypoToleranceThreshold(value) {
+  if (value.length <= 6) return 1;
+  if (value.length <= 12) return 2;
+  return 2;
+}
+
+function getBoundedLevenshteinDistance(a, b, maxDistance) {
+  if (Math.abs(a.length - b.length) > maxDistance) return maxDistance + 1;
+
+  const prev = new Array(b.length + 1);
+  const next = new Array(b.length + 1);
+
+  for (let j = 0; j <= b.length; j++) prev[j] = j;
+
+  for (let i = 1; i <= a.length; i++) {
+    next[0] = i;
+    let rowMin = next[0];
+
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      next[j] = Math.min(
+        prev[j] + 1,
+        next[j - 1] + 1,
+        prev[j - 1] + cost
+      );
+      rowMin = Math.min(rowMin, next[j]);
+    }
+
+    if (rowMin > maxDistance) return maxDistance + 1;
+
+    for (let j = 0; j <= b.length; j++) prev[j] = next[j];
+  }
+
+  return prev[b.length];
+}
+
+function replaceFuzzyLatinTermsInSegment(segment, placeholders, targetLang) {
+  if (!wakfuFuzzyAliasIndex || !segment || !/[A-Za-z]/.test(segment)) {
+    return segment;
+  }
+
+  const words = [];
+  const wordRegex = /[A-Za-z][A-Za-z'’-]*/g;
+  let match;
+
+  while ((match = wordRegex.exec(segment))) {
+    words.push({
+      value: match[0],
+      start: match.index,
+      end: match.index + match[0].length,
+    });
+  }
+
+  if (words.length === 0) return segment;
+
+  let output = "";
+  let cursor = 0;
+  let index = 0;
+
+  while (index < words.length) {
+    let matched = false;
+
+    for (let wordCount = 3; wordCount >= 1; wordCount--) {
+      if (index + wordCount > words.length) continue;
+
+      let gapsAreSpaces = true;
+      for (let gapIndex = index; gapIndex < index + wordCount - 1; gapIndex++) {
+        const gap = segment.slice(words[gapIndex].end, words[gapIndex + 1].start);
+        if (!/^\s+$/.test(gap)) {
+          gapsAreSpaces = false;
+          break;
+        }
+      }
+      if (!gapsAreSpaces) continue;
+
+      const start = words[index].start;
+      const end = words[index + wordCount - 1].end;
+      const rawCandidate = segment.slice(start, end);
+      const normalizedCandidate = normalizeLatinAlias(rawCandidate);
+      if (normalizedCandidate.length < 4) continue;
+
+      const indexKey = `${wordCount}:${normalizedCandidate[0]}`;
+      const bucket = wakfuFuzzyAliasIndex.get(indexKey);
+      if (!bucket || bucket.length === 0) continue;
+
+      const tolerance = getTypoToleranceThreshold(normalizedCandidate);
+      const bestMatch = bucket.find(({ normalizedLatin }) => {
+        const distance = getBoundedLevenshteinDistance(
+          normalizedCandidate,
+          normalizedLatin,
+          tolerance
+        );
+        return distance <= tolerance;
+      });
+
+      if (!bestMatch) continue;
+
+      output += segment.slice(cursor, start);
+      output += createProtectedToken(placeholders, bestMatch.entry, targetLang);
+      cursor = end;
+      index += wordCount;
+      matched = true;
+      break;
+    }
+
+    if (!matched) {
+      index += 1;
+    }
+  }
+
+  output += segment.slice(cursor);
+  return output;
+}
+
+function replaceFuzzyLatinTerms(text, placeholders, targetLang) {
+  return splitProtectedSegments(text)
+    .map((segment) =>
+      /^__WAKFU_TERM_\d+__$/.test(segment)
+        ? segment
+        : replaceFuzzyLatinTermsInSegment(segment, placeholders, targetLang)
+    )
+    .join("");
+}
+
+async function lookupExactGlossaryTranslation(text, targetLang) {
+  await buildWakfuTranslationAliases();
+
+  const sourceText = String(text || "").trim();
+  if (!sourceText || !wakfuExactTermMap || !isLikelyStandaloneGlossaryInput(sourceText)) {
+    return null;
+  }
+
+  const latinKey = normalizeLatinAlias(sourceText);
+  const directLatin = latinKey ? wakfuExactTermMap.get(`latin:${latinKey}`) : null;
+  if (directLatin) {
+    return {
+      text: getProtectedTermOutput(directLatin, targetLang),
+      lang: String(targetLang || ""),
+    };
+  }
+
+  const directText = wakfuExactTermMap.get(`text:${normalizeTranslationAlias(sourceText)}`);
+  if (directText) {
+    return {
+      text: getProtectedTermOutput(directText, targetLang),
+      lang: String(targetLang || ""),
+    };
+  }
+
+  return null;
+}
+
+async function protectWakfuTerms(text, targetLang) {
   const sourceText = String(text || "");
   if (!sourceText) {
     return { protectedText: "", placeholders: [], targetLang };
   }
 
-  let protectedText = sourceText;
+  const aliasRows = await buildWakfuTranslationAliases();
   const placeholders = [];
-
-  buildWakfuTranslationAliases().forEach(({ alias, entry }) => {
-    const pattern = new RegExp(escapeTranslationRegex(alias), "g");
-    protectedText = protectedText.replace(pattern, () => {
-      const token = `__WAKFU_TERM_${placeholders.length}__`;
-      placeholders.push({
-        token,
-        replacement: getProtectedTermOutput(entry, targetLang),
-      });
-      return token;
-    });
-  });
+  let protectedText = replaceExactProtectedTerms(
+    sourceText,
+    aliasRows,
+    placeholders,
+    targetLang
+  );
+  protectedText = replaceFuzzyLatinTerms(protectedText, placeholders, targetLang);
 
   return { protectedText, placeholders, targetLang };
 }
@@ -230,7 +629,10 @@ async function requestGoogleTranslation(text, targetLang) {
 }
 
 async function translateWithProtectedTerms(text, targetLang) {
-  const protectedPayload = protectWakfuTerms(text, targetLang);
+  const exactMatch = await lookupExactGlossaryTranslation(text, targetLang);
+  if (exactMatch) return exactMatch;
+
+  const protectedPayload = await protectWakfuTerms(text, targetLang);
   const translationResult = await requestGoogleTranslation(
     protectedPayload.protectedText,
     targetLang

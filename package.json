@@ -4,7 +4,8 @@
   "description": "Static site for Wakfu Companion",
   "main": "index.html",
   "scripts": {
-    "start": "npx serve -l $PORT"
+    "start": "npx serve -l $PORT",
+    "build:glossary": "node scripts/build-wakfu-term-glossary.js"
   },
   "dependencies": {
     "serve": "^14.0.0"

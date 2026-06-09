@@ -8,6 +8,8 @@ Thumbs.db
 
 # Local analysis artifacts
 artifacts/
-scripts/
+scripts/*
+!scripts/build-wakfu-term-glossary.js
 wakfu_chat.log*.sample
 *.sample
+AGENT.md
