@@ -868,8 +868,8 @@ button.aux-btn:hover {
 }
 .rare-star-badge {
   position: absolute;
-  left: -3px;
-  bottom: -4px;
+  right: -3px;
+  top: -4px;
   z-index: 3;
   font-size: 12px;
   line-height: 1;
@@ -2220,8 +2220,8 @@ body.pip-window .empty-state {
   border-radius: 8px;
 }
 .slot-icon-wrap .rare-star-badge {
-  left: -2px;
-  bottom: -3px;
+  right: -2px;
+  top: -3px;
   font-size: 13px;
 }
 
@@ -2230,12 +2230,17 @@ body.pip-window .empty-state {
   position: absolute;
   bottom: 4px;
   right: 4px;
-  font-size: 0.75rem;
+  max-width: calc(100% - 8px);
+  font-size: 0.68rem;
   font-weight: bold;
   color: #fff;
   text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
   pointer-events: none;
   font-family: monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+  text-align: right;
 }
 
 /* Progress Bar (Bottom Edge) */

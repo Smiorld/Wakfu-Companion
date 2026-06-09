@@ -640,6 +640,14 @@ function renderTracker() {
     const rarityName = (item.rarity || "common").toLowerCase();
     const isRare = rarityName === "rare";
     const usageInfo = getItemUsage(item.name);
+    const currentCountText = String(item.current);
+    const targetCountText = String(item.target);
+    const combinedSlotCountText =
+      item.target > 0 ? `${currentCountText}/${targetCountText}` : currentCountText;
+    const slotCountText =
+      item.target > 0 && combinedSlotCountText.length <= 7
+        ? combinedSlotCountText
+        : currentCountText;
     const priceInfo = item.price
       ? `\n当前价值：${(item.current * item.price).toLocaleString()} ₭`
       : "";
@@ -673,7 +681,7 @@ function renderTracker() {
           <img src="${itemIconPath}" class="slot-icon" onerror="this.onerror=null; this.src='./assets/img/resources/not_found.png';">
           ${isRare ? '<span class="rare-star-badge" aria-hidden="true">&#9733;</span>' : ""}
         </div>
-        <div class="slot-count">${item.current.toLocaleString()}</div>
+        <div class="slot-count">${slotCountText}</div>
         <div class="slot-progress-container"><div class="slot-progress-bar" style="width: ${progress}%"></div></div>
       `;
       listEl.appendChild(slot);
