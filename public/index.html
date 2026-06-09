@@ -73,7 +73,7 @@
 
           <!-- Controls Area -->
           <div class="dm-controls-bar">
-            <div class="controls-group">
+            <div class="controls-group controls-group-primary">
               <button class="toggle-btn" id="autoResetToggle">
                 <span id="autoResetText">自动重置</span>
               </button>
@@ -88,10 +88,12 @@
                 <button class="hist-btn disabled" id="btn-hist-4" onclick="viewHistory(4)">5</button>
               </div>
 
-              <div style="flex-grow: 1"></div>
-              <button class="export-btn" id="discordBtn" title="Copy Report for Discord" onclick="exportToDiscord()">📋</button>
-              <button class="aux-btn" id="clearSummonBindingsBtn" title="仅清除本场召唤物或单位的合并绑定，不重置当前统计">清并</button>
-              <button class="reset-btn" id="resetBtn">重置</button>
+              <div class="controls-spacer"></div>
+              <div class="controls-actions">
+                <button class="export-btn" id="discordBtn" title="Copy Report for Discord" onclick="exportToDiscord()">📋</button>
+                <button class="aux-btn" id="clearSummonBindingsBtn" title="仅清除本场召唤物或单位的合并绑定，不重置当前统计">清并</button>
+                <button class="reset-btn" id="resetBtn">重置</button>
+              </div>
             </div>
           </div>
 
@@ -140,45 +142,41 @@
 
         <!-- 2. Item Tracker -->
         <div class="tool-panel">
-          <div class="panel-header">
-            <img src="./assets/img/headers/item_tracker.png" class="header-label-icon" onerror="this.style.display='none'" />
-            <span class="header-label">追踪器</span>
-
-            <!-- NEW: Profession Filters -->
-            <div class="tracker-filters">
-              <button class="filter-icon-btn active" id="tf-all" onclick="setTrackerFilter('SHOW_ALL')" title="显示全部">全部</button>
-              <button class="filter-icon-btn" id="tf-farmer" onclick="setTrackerFilter('Farmer')" title="种植">
-                <img src="./assets/img/resources/farmer.png" onerror="this.style.display='none'" />
-              </button>
-              <button class="filter-icon-btn" id="tf-fisherman" onclick="setTrackerFilter('Fisherman')" title="钓鱼">
-                <img src="./assets/img/resources/fisherman.png" onerror="this.style.display='none'" />
-              </button>
-              <button class="filter-icon-btn" id="tf-herbalist" onclick="setTrackerFilter('Herbalist')" title="草药">
-                <img src="./assets/img/resources/herbalist.png" onerror="this.style.display='none'" />
-              </button>
-              <button class="filter-icon-btn" id="tf-lumberjack" onclick="setTrackerFilter('Lumberjack')" title="伐木">
-                <img src="./assets/img/resources/lumberjack.png" onerror="this.style.display='none'" />
-              </button>
-              <button class="filter-icon-btn" id="tf-miner" onclick="setTrackerFilter('Miner')" title="采矿">
-                <img src="./assets/img/resources/miner.png" onerror="this.style.display='none'" />
-              </button>
-              <button class="filter-icon-btn" id="tf-trapper" onclick="setTrackerFilter('Trapper')" title="畜牧">
-                <img src="./assets/img/resources/trapper.png" onerror="this.style.display='none'" />
-              </button>
+          <div class="panel-header tracker-header">
+            <div class="tracker-title-group">
+              <img src="./assets/img/headers/item_tracker.png" class="header-label-icon" onerror="this.style.display='none'" />
+              <span class="header-label">追踪器</span>
             </div>
 
-            <!-- Sort Button (Removed inline margin-left) -->
-            <button class="pip-btn" id="tracker-sort-btn" onclick="sortTrackerItems()" title="按专业排序" style="font-size: 0.8rem; font-weight: bold">↓</button>
+            <div class="tracker-header-actions">
+              <div class="tracker-filters">
+                <button class="filter-icon-btn active" id="tf-all" onclick="setTrackerFilter('SHOW_ALL')" title="显示全部">全部</button>
+                <button class="filter-icon-btn" id="tf-farmer" onclick="setTrackerFilter('Farmer')" title="种植">
+                  <img src="./assets/img/resources/farmer.png" onerror="this.style.display='none'" />
+                </button>
+                <button class="filter-icon-btn" id="tf-fisherman" onclick="setTrackerFilter('Fisherman')" title="钓鱼">
+                  <img src="./assets/img/resources/fisherman.png" onerror="this.style.display='none'" />
+                </button>
+                <button class="filter-icon-btn" id="tf-herbalist" onclick="setTrackerFilter('Herbalist')" title="草药">
+                  <img src="./assets/img/resources/herbalist.png" onerror="this.style.display='none'" />
+                </button>
+                <button class="filter-icon-btn" id="tf-lumberjack" onclick="setTrackerFilter('Lumberjack')" title="伐木">
+                  <img src="./assets/img/resources/lumberjack.png" onerror="this.style.display='none'" />
+                </button>
+                <button class="filter-icon-btn" id="tf-miner" onclick="setTrackerFilter('Miner')" title="采矿">
+                  <img src="./assets/img/resources/miner.png" onerror="this.style.display='none'" />
+                </button>
+                <button class="filter-icon-btn" id="tf-trapper" onclick="setTrackerFilter('Trapper')" title="畜牧">
+                  <img src="./assets/img/resources/trapper.png" onerror="this.style.display='none'" />
+                </button>
+              </div>
 
-                        <button class="filter-icon-btn" id="tracker-loss-toggle" onclick="toggleTrackerLossMode()" title="&#22833;&#21435;&#29289;&#21697;&#26102;&#25187;&#20943;&#36827;&#24230;&#65306;&#20851;&#38381;">&#20943;</button>
-
-<button class="pip-btn" id="btn-toggle-totals" onclick="toggleTrackerTotals()" title="显示或隐藏卡玛总计" style="margin-right: 5px; font-weight: bold; color: #ffd700">₭</button>
-
-            <!-- View Toggle Button -->
-            <button class="pip-btn" id="tracker-view-toggle" onclick="toggleTrackerView()" title="切换网格或列表视图" style="margin-right: 5px">☰</button>
-
-            <!-- PiP Button -->
-            <button class="pip-btn" onclick="togglePiP('tracker-list', '追踪器')" title="画中画">⧉</button>
+              <button class="pip-btn" id="tracker-sort-btn" onclick="sortTrackerItems()" title="按专业排序" style="font-size: 0.8rem; font-weight: bold">↓</button>
+              <button class="filter-icon-btn" id="tracker-loss-toggle" onclick="toggleTrackerLossMode()" title="&#22833;&#21435;&#29289;&#21697;&#26102;&#25187;&#20943;&#36827;&#24230;&#65306;&#20851;&#38381;">&#20943;</button>
+              <button class="pip-btn" id="btn-toggle-totals" onclick="toggleTrackerTotals()" title="显示或隐藏卡玛总计" style="margin-right: 5px; font-weight: bold; color: #ffd700">₭</button>
+              <button class="pip-btn" id="tracker-view-toggle" onclick="toggleTrackerView()" title="切换网格或列表视图" style="margin-right: 5px">☰</button>
+              <button class="pip-btn" onclick="togglePiP('tracker-list', '追踪器')" title="画中画">⧉</button>
+            </div>
           </div>
           <div class="tracker-controls">
             <input type="text" id="item-input" list="item-datalist" class="tracker-select" placeholder="搜索物品..." autocomplete="off" />
@@ -393,23 +391,29 @@
                   <span class="route-step">新世总部 Neo HQ</span>
                 </div>
 
-                <!-- Row 2: 4 Items -->
+                <!-- Row 2 -->
                 <div class="route-row">
-                  <span class="route-step" data-tooltip="Lv. 6-20&#10;Lv. 21-35">阿斯特鲁卜下水道 Astrub Sewers</span>
+                  <span class="route-step" data-tooltip="Lv. 6-20&#10;Lv. 21-35">阿斯图布下水道 Astrub Sewers</span>
                   <span class="route-arrow">➜</span>
                   <span class="route-step" data-tooltip="Lv. 36-50&#10;Lv. 51-65&#10;Lv. 216-230">艾瑞伯利亚 Ereboria</span>
-                  <span class="route-arrow">➜</span>
+                </div>
+
+                <!-- Row 3 -->
+                <div class="route-row">
                   <span class="route-step" data-tooltip="Lv. 66-80&#10;Lv. 126-140&#10;Lv. 156-170&#10;Lv. 186-200">邦塔 Bonta</span>
                   <span class="route-arrow">➜</span>
                   <span class="route-step" data-tooltip="Lv. 81-95&#10;Lv. 141-155">布拉克玛 Brakmar</span>
                 </div>
 
-                <!-- Row 3: 4 Items -->
+                <!-- Row 4 -->
                 <div class="route-row">
                   <span class="route-step" data-tooltip="Lv. 96-110&#10;Lv. 111-125">浮冰大陆 Ice Floe</span>
                   <span class="route-arrow">➜</span>
                   <span class="route-step" data-tooltip="Lv. 171-185">月岛 Moon</span>
-                  <span class="route-arrow">➜</span>
+                </div>
+
+                <!-- Row 5 -->
+                <div class="route-row">
                   <span class="route-step" data-tooltip="Lv. 201-215">欧萨莫达神域 Osamosa</span>
                   <span class="route-arrow">➜</span>
                   <span class="route-step" data-tooltip="Lv. 231-245">迷雾岛 Misty Isle</span>
@@ -635,9 +639,10 @@
 
         <span class="footer-btn" onclick="toggleSessionWindow()" style="margin-right: 10px">会话总结</span>
 
-        <span class="footer-btn" id="bug-report-btn">反馈 Bug</span>
       </div>
     </div>
+
+    <button class="bug-report-fab" id="bug-report-btn" type="button">反馈 Bug</button>
 
     <!-- Session Recap -->
     <div id="session-window" class="floating-window session-window-init" style="display: none">

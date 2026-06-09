@@ -338,12 +338,29 @@ body {
   background: #222;
   padding: 8px 10px;
   border-bottom: 1px solid #333;
+  overflow: hidden;
 }
 .controls-group {
   display: flex;
   gap: 8px;
   align-items: center;
   width: 100%;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+.controls-group-primary > * {
+  flex-shrink: 0;
+}
+.controls-spacer {
+  flex: 1 1 auto;
+  min-width: 8px;
+}
+.controls-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 button {
@@ -359,13 +376,16 @@ button {
   justify-content: center;
   align-items: center;
   transition: all 0.2s ease;
+  white-space: nowrap;
+  min-width: 0;
 }
 button.toggle-btn {
   background-color: #333;
   color: #aaa;
   border: 1px solid #444;
-  min-width: 125px;
+  min-width: clamp(88px, 8vw, 125px);
   white-space: nowrap;
+  padding: 0 clamp(8px, 1vw, 12px);
 }
 button.toggle-btn:hover {
   background-color: #3a3a3a;
@@ -391,6 +411,7 @@ button.aux-btn {
   background-color: #333;
   color: #ddd;
   border: 1px solid #555;
+  padding: 0 clamp(8px, 0.9vw, 12px);
 }
 button.aux-btn:hover {
   background-color: #3d3d3d;
@@ -419,6 +440,9 @@ button.aux-btn:hover {
   justify-content: flex-start;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+  flex-wrap: nowrap;
+  overflow: hidden;
 }
 .header-label {
   font-size: 1rem;
@@ -978,13 +1002,16 @@ button.aux-btn:hover {
   border-bottom: 1px solid #333;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
 }
 .trans-label {
   font-size: 0.75rem;
   color: #888;
-  margin-right: 5px;
+  margin-right: 2px;
   text-transform: uppercase;
   font-weight: bold;
+  order: 2;
+  white-space: nowrap;
 }
 .lang-btn {
   background: #333;
@@ -994,6 +1021,9 @@ button.aux-btn:hover {
   font-size: 0.75rem;
   min-width: 40px;
   border-radius: 4px;
+}
+#btnMaster {
+  order: 3;
 }
 .lang-btn:hover {
   filter: brightness(1.2);
@@ -1335,15 +1365,16 @@ button.aux-btn:hover {
 .route-container {
   display: flex;
   flex-direction: column;
-  gap: 6px; /* Vertical space between rows */
+  gap: 10px; /* Vertical space between rows */
 }
 .route-row {
   display: flex;
   justify-content: flex-start;
-  align-items: center;
-  gap: 4px;
+  align-items: stretch;
+  align-content: flex-start;
+  gap: 6px 4px;
   width: 100%;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 .route-box {
   background: #222;
@@ -1369,13 +1400,23 @@ button.aux-btn:hover {
 }
 .route-step {
   background: #333;
-  padding: 2px 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  min-width: 0;
+  padding: 6px 8px;
   border-radius: 4px;
   border: 1px solid #444;
   position: relative;
   cursor: default;
-  font-size: 0.75rem;
-  white-space: nowrap;
+  font-size: 0.74rem;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  flex: 1 1 88px;
+  text-align: center;
 }
 .route-step[data-tooltip] {
   cursor: help;
@@ -1387,7 +1428,9 @@ button.aux-btn:hover {
 }
 .route-arrow {
   color: #555;
-  font-size: 0.7rem;
+  font-size: 0.78rem;
+  align-self: center;
+  flex: 0 0 auto;
   user-select: none;
 }
 
@@ -1898,8 +1941,8 @@ button.aux-btn:hover {
   background: #333; /* Give it a slight background so the box is visible */
   border: 1px solid #444;
   color: #fff;
-  width: 30px;
-  height: 30px;
+  width: clamp(24px, 2vw, 30px);
+  height: clamp(24px, 2vw, 30px);
   margin-left: 0;
   display: flex;
   align-items: center;
@@ -1907,12 +1950,6 @@ button.aux-btn:hover {
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s;
-}
-
-@media (max-width: 1300px) {
-  .tracker-filters {
-    display: none; /* Hide filters if space is tight, or adapt */
-  }
 }
 
 .pip-btn:hover {
@@ -2604,17 +2641,40 @@ body.pip-window .empty-state {
 .tracker-filters {
   display: flex;
   gap: 4px;
-  margin-left: auto; /* Pushes to the right */
-  margin-right: 10px;
   align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: flex-end;
+  margin: 0;
+}
+
+.tracker-header {
+  gap: 8px;
+}
+
+.tracker-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.tracker-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .filter-icon-btn {
   background: #333;
   border: 1px solid #444;
   color: #888;
-  width: 28px;
-  height: 28px;
+  width: clamp(24px, 1.9vw, 28px);
+  height: clamp(24px, 1.9vw, 28px);
   border-radius: 4px;
   cursor: pointer;
   padding: 0;
@@ -2627,8 +2687,8 @@ body.pip-window .empty-state {
 }
 
 .filter-icon-btn img {
-  width: 18px;
-  height: 18px;
+  width: clamp(14px, 1.3vw, 18px);
+  height: clamp(14px, 1.3vw, 18px);
   object-fit: contain;
   pointer-events: none;
 }
@@ -2653,9 +2713,9 @@ body.pip-window .empty-state {
   border: 1px solid #555;
   font-size: 1.2rem;
   padding: 0;
-  width: 30px;
+  width: clamp(24px, 2vw, 30px);
   height: 28px;
-  margin-right: 10px;
+  margin-right: 0;
   border-radius: 4px;
   cursor: pointer;
   display: flex;
@@ -2674,12 +2734,15 @@ body.pip-window .empty-state {
 .history-container {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-left: 10px;
+  gap: 3px;
+  margin-left: 6px;
   background: rgba(0, 0, 0, 0.2);
-  padding: 2px 6px;
+  padding: 2px 4px;
   border-radius: 4px;
   border: 1px solid #333;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .hist-btn {
@@ -2699,7 +2762,7 @@ body.pip-window .empty-state {
 /* Specific width for the LIVE button */
 #btn-live {
   width: auto;
-  padding: 0 6px;
+  padding: 0 4px;
 }
 
 .hist-btn:hover:not(.disabled) {
@@ -2727,11 +2790,23 @@ body.pip-window .empty-state {
 
 /* Responsive adjustment */
 @media (max-width: 1400px) {
-  #btn-live {
-    display: none;
-  } /* Hide text label on small screens */
   .hist-sep {
     display: none;
+  }
+}
+
+@media (max-width: 1650px) {
+  .controls-group {
+    gap: 6px;
+  }
+
+  button {
+    font-size: 0.72rem;
+  }
+
+  .header-label {
+    font-size: 0.92rem;
+    letter-spacing: 0.5px;
   }
 }
 
@@ -2794,6 +2869,31 @@ body.pip-window .empty-state {
 }
 .footer-btn:last-child {
   margin-right: 0;
+}
+
+.bug-report-fab {
+  position: fixed;
+  left: 18px;
+  bottom: 8px;
+  z-index: 1100;
+  border: 1px solid #5f5f5f;
+  background: rgba(72, 72, 72, 0.94);
+  color: #d8d8d8;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.bug-report-fab:hover {
+  background: rgba(92, 92, 92, 0.98);
+  color: #fff;
+  border-color: #8a8a8a;
+  transform: translateY(-1px);
 }
 
 #dungeon-sidebar .sidebar-content {
@@ -3128,7 +3228,9 @@ body.pip-window .empty-state {
   align-items: center;
   gap: 5px;
   flex-grow: 1; /* Fills the space between buttons */
-  margin: 0 10px;
+  margin: 0;
+  min-width: 180px;
+  order: 1;
 }
 
 /* Optimization: Class to hide filtered messages */
