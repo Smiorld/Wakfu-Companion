@@ -574,7 +574,7 @@ async function lookupExactGlossaryTranslation(text, targetLang) {
   if (directLatin) {
     return {
       text: getProtectedTermOutput(directLatin, targetLang),
-      lang: String(targetLang || ""),
+      lang: containsChineseText(sourceText) ? "zh-CN" : "en",
     };
   }
 
@@ -582,7 +582,7 @@ async function lookupExactGlossaryTranslation(text, targetLang) {
   if (directText) {
     return {
       text: getProtectedTermOutput(directText, targetLang),
-      lang: String(targetLang || ""),
+      lang: containsChineseText(sourceText) ? "zh-CN" : "en",
     };
   }
 
