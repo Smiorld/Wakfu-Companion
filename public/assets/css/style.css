@@ -844,6 +844,43 @@ button.aux-btn:hover {
   flex-shrink: 0;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
 }
+.resource-icon-wrap,
+.slot-icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.resource-icon-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+}
+.resource-icon-wrap.is-rare,
+.slot-icon-wrap.is-rare {
+  background:
+    radial-gradient(circle at 35% 35%, rgba(120, 255, 170, 0.34), rgba(46, 204, 113, 0.12) 60%, transparent 78%),
+    linear-gradient(135deg, rgba(46, 204, 113, 0.18), rgba(255, 215, 0, 0.08));
+  box-shadow:
+    inset 0 0 0 1px rgba(120, 255, 170, 0.32),
+    0 0 8px rgba(46, 204, 113, 0.2);
+}
+.rare-star-badge {
+  position: absolute;
+  left: -3px;
+  bottom: -4px;
+  z-index: 3;
+  font-size: 12px;
+  line-height: 1;
+  color: #ffd54a;
+  text-shadow:
+    0 0 1px #000,
+    1px 1px 0 #000,
+    -1px 1px 0 #000,
+    0 0 4px rgba(255, 213, 74, 0.45);
+  pointer-events: none;
+}
 .t-info-text {
   display: flex;
   align-items: center;
@@ -2176,6 +2213,16 @@ body.pip-window .empty-state {
   height: 40px;
   object-fit: contain;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.8));
+}
+.slot-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+}
+.slot-icon-wrap .rare-star-badge {
+  left: -2px;
+  bottom: -3px;
+  font-size: 13px;
 }
 
 /* Count Overlay (Bottom Right) */

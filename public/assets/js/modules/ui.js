@@ -638,6 +638,7 @@ function renderTracker() {
     }
 
     const rarityName = (item.rarity || "common").toLowerCase();
+    const isRare = rarityName === "rare";
     const usageInfo = getItemUsage(item.name);
     const priceInfo = item.price
       ? `\n当前价值：${(item.current * item.price).toLocaleString()} ₭`
@@ -668,7 +669,10 @@ function renderTracker() {
           item.id
         })">×</button>
         <img src="${profIconPath}" class="slot-prof-icon" onerror="this.style.display='none'">
-        <img src="${itemIconPath}" class="slot-icon" onerror="this.onerror=null; this.src='./assets/img/resources/not_found.png';">
+        <div class="slot-icon-wrap ${isRare ? "is-rare" : ""}">
+          <img src="${itemIconPath}" class="slot-icon" onerror="this.onerror=null; this.src='./assets/img/resources/not_found.png';">
+          ${isRare ? '<span class="rare-star-badge" aria-hidden="true">&#9733;</span>' : ""}
+        </div>
         <div class="slot-count">${item.current.toLocaleString()}</div>
         <div class="slot-progress-container"><div class="slot-progress-bar" style="width: ${progress}%"></div></div>
       `;
@@ -686,7 +690,10 @@ function renderTracker() {
         <div class="t-left-group" style="cursor: pointer;" onclick="openTrackerModal(${
           item.id
         })">
-            <img src="${itemIconPath}" class="resource-icon" onerror="this.onerror=null; this.src='./assets/img/resources/not_found.png';">
+            <div class="resource-icon-wrap ${isRare ? "is-rare" : ""}">
+                <img src="${itemIconPath}" class="resource-icon" onerror="this.onerror=null; this.src='./assets/img/resources/not_found.png';">
+                ${isRare ? '<span class="rare-star-badge" aria-hidden="true">&#9733;</span>' : ""}
+            </div>
             <div class="t-info-text">
                 <img src="./assets/img/quality/${rarityName}.png" class="rarity-icon" onerror="this.style.display='none'">
                 <span class="t-level-badge">Lvl. ${item.level}</span>
