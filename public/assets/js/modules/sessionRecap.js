@@ -28,12 +28,11 @@ let sessionStats = {
 
 let sessionStartTime = null;
 let sessionTimerInterval = null;
+const REGEX_QUEST_SUCCESS_ONLY = /(?:quest finished|quest completed|completed the quest|finished the quest|won the quest|qu锚te termin茅e|termin茅 la qu锚te|mission accomplie|misi贸n cumplida|completado la misi贸n|miss茫o cumprida|completou a miss茫o|\u4f60\u5b8c\u6210\u4e86\u4efb\u52a1|\u4efb\u52a1\u5b8c\u6210|\u5b8c\u6210\u4efb\u52a1|".*?"\u4efb\u52a1(?:\u83b7\u80dc|\u5b8c\u6210))/i;
 
 const REGEX_KAMAS = /(?:won|earned|gained|gagn?|ganado|ganhou|spent|lost|perdu|perdio|gasto|gastou|\u5f97\u5230|\u83b7\u5f97|\u5931\u53bb|\u82b1\u8d39)\S*\s*([\d\s.,\u00A0]+)\s*(?:kamas?|\u5361\u739b)/i;
 const REGEX_KAMAS_SPENT = /(?:spent|lost|perdu|perdio|gasto|gastou|\u5931\u53bb|\u82b1\u8d39)/i;
 const REGEX_XP = /(?:won|earned|gained|gagné|ganado|ganhou|\+|经验\s*\+)\s*([\d\s.,\u00A0]+)\s*(?:xp|经验)?/i;
-const REGEX_QUEST = /(?:quest finished|quest completed|completed the quest|finished the quest|won the quest|failed to complete the quest|quête terminée|terminé la quête|mission accomplie|misión cumplida|completado la misión|missão cumprida|completou a missão|任务“.*?”开始了|你完成了任务“.*?”|".*?"任务(?:失败|获胜)|“.*?”任务(?:失败|获胜)|任务完成|完成任务)/i;
-
 const PROFESSION_LABEL_MAP = {
   Armorer: "Armorer",
   Baker: "Baker",
@@ -210,15 +209,13 @@ function processSessionLog(line) {
   }
 
   const questName = extractSessionQuestName(line);
-  if (questName) {
-    if (isEnvironmentalChallengeQuest(questName)) {
+  const isQuestSuccess = REGEX_QUEST_SUCCESS_ONLY.test(line);
+  if (isQuestSuccess) {
+    if (questName && isEnvironmentalChallengeQuest(questName)) {
       sessionStats.challenges++;
     } else {
       sessionStats.quests++;
     }
-    statChanged = true;
-  } else if (REGEX_QUEST.test(lower)) {
-    sessionStats.quests++;
     statChanged = true;
   }
 
