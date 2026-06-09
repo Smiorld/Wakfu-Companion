@@ -1,0 +1,752 @@
+// CHAT MODULE: Handles Chat, Logs, Formatting, and Translation
+const chatListEl = document.getElementById("chat-list");
+const scrollBtn = document.getElementById("chat-scroll-btn");
+const REGEX_WAIT = /(?:wait (\d+) seconds|保留\s+(\d+)\s+秒到下一回合|等待[:：]?\s*(\d+)\s*秒?)/i;
+
+const CHAT_CHANNEL_ALIASES = {
+  logs: [
+    "game log",
+    "fight log",
+    "combat",
+    "information",
+    "informaci?n",
+    "registro",
+    "lutas",
+    "\u6218\u6597\u65e5\u5fd7",
+    "\u9519\u8bef\u4fe1\u606f",
+    "\u7cfb\u7edf",
+  ],
+  vicinity: ["vicinity", "proximit", "local", "vizinhan?a", "\u672c\u5730", "\u9644\u8fd1"],
+  private: ["private", "whisper", "priv", "sussurro", "\u79c1\u804a", "\u5bc6\u8bed"],
+  group: ["group", "groupe", "grupo", "\u7ec4\u961f", "\u961f\u4f0d"],
+  guild: ["guild", "guilde", "gremio", "\u516c\u4f1a"],
+  trade: ["trade", "commerce", "comercio", "\u4ea4\u6613"],
+  community: ["community", "communaut", "comunidad", "comunidade", "\u793e\u533a"],
+  recruitment: [
+    "recruitment",
+    "recrutement",
+    "reclutamiento",
+    "recrutamento",
+    "\u62db\u52df",
+    "\u82f1\u6587\u62db\u52df",
+  ],
+  politics: ["politic"],
+  pvp: ["pvp", "jcj", "camp"],
+};
+
+function containsChineseText(text) {
+  return /[\u3400-\u9FFF]/.test(text);
+}
+
+function getDefaultTranslationTarget(text, preferredTarget) {
+  return containsChineseText(text) ? preferredTarget : "zh-CN";
+}
+
+function getChatListNode() {
+  if (chatListEl) return chatListEl;
+  if (typeof getUI === "function") return getUI("chat-list");
+  return document.getElementById("chat-list");
+}
+
+function getChatElement(id) {
+  if (typeof getUI === "function") return getUI(id);
+  return document.getElementById(id);
+}
+
+function isTargetLanguageMatch(detectedLang, targetLang) {
+  const detected = String(detectedLang || "").toLowerCase();
+  const target = String(targetLang || "").toLowerCase();
+  if (!detected || !target) return false;
+
+  if (target.startsWith("en")) return detected.startsWith("en");
+  if (target.startsWith("fr")) return detected.startsWith("fr");
+  if (target.startsWith("es")) return detected.startsWith("es");
+  if (target.startsWith("pt")) return detected.startsWith("pt");
+  if (target.startsWith("zh")) return detected.startsWith("zh");
+
+  return detected === target;
+}
+
+const WAKFU_FIXED_TRANSLATION_TERMS = [
+  ["Farmer", "种植"],
+  ["Fisherman", "钓鱼"],
+  ["Herbalist", "草药"],
+  ["Trapper", "畜牧"],
+  ["Lumberjack", "伐木"],
+  ["Miner", "采矿"],
+  ["Baker", "面点"],
+  ["Armorer", "制甲"],
+  ["Jeweler", "珠宝"],
+  ["Handyman", "工匠"],
+  ["Leather Dealer", "皮匠"],
+  ["Tailor", "裁缝"],
+  ["Weapons Master", "武器大师"],
+  ["Weapon Master", "武器大师"],
+  ["Chef", "厨师"],
+  ["Combat", "战斗"],
+  ["Kamas", "卡玛"],
+  ["Kama", "卡玛"],
+  ["Heaven Bag", "庇护袋"],
+  ["Bilbyza", "喱维萨"],
+  ["Kel'Dwa Ring", "菌菇戒指"],
+];
+
+let wakfuTranslationAliases = null;
+
+function escapeTranslationRegex(text) {
+  return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeTranslationAlias(text) {
+  return String(text || "")
+    .replace(/\u00A0/g, " ")
+    .replace(/\u3000/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractPrimaryChineseTerm(rawValue, englishName) {
+  const normalizedValue = normalizeTranslationAlias(rawValue);
+  if (!normalizedValue) return "";
+
+  const withoutEnglish = normalizedValue
+    .replace(new RegExp(`\\s*${escapeTranslationRegex(englishName)}\\s*$`, "i"), "")
+    .trim();
+
+  return withoutEnglish || normalizedValue;
+}
+
+function buildWakfuTranslationAliases() {
+  if (wakfuTranslationAliases) return wakfuTranslationAliases;
+
+  const termEntries = new Map();
+
+  const registerTerm = (englishName, chineseName, extraAliases = []) => {
+    const english = normalizeTranslationAlias(englishName);
+    const chinese = normalizeTranslationAlias(chineseName);
+    if (!english || !chinese) return;
+
+    const existing = termEntries.get(english) || {
+      english,
+      chinese,
+      aliases: new Set(),
+    };
+
+    existing.chinese = existing.chinese || chinese;
+    existing.aliases.add(english);
+    existing.aliases.add(chinese);
+    existing.aliases.add(`${chinese} ${english}`);
+
+    extraAliases.forEach((alias) => {
+      const normalizedAlias = normalizeTranslationAlias(alias);
+      if (!normalizedAlias) return;
+      existing.aliases.add(normalizedAlias);
+
+      const primaryChinese = extractPrimaryChineseTerm(normalizedAlias, english);
+      if (primaryChinese) {
+        existing.aliases.add(primaryChinese);
+        existing.aliases.add(`${primaryChinese} ${english}`);
+      }
+    });
+
+    termEntries.set(english, existing);
+  };
+
+  if (typeof ITEM_I18N_MAP !== "undefined") {
+    Object.entries(ITEM_I18N_MAP).forEach(([englishName, aliases]) => {
+      if (!Array.isArray(aliases) || aliases.length === 0) return;
+      const chineseName = extractPrimaryChineseTerm(aliases[0], englishName);
+      registerTerm(englishName, chineseName, aliases);
+    });
+  }
+
+  WAKFU_FIXED_TRANSLATION_TERMS.forEach(([englishName, chineseName]) => {
+    registerTerm(englishName, chineseName);
+  });
+
+  wakfuTranslationAliases = [...termEntries.values()]
+    .flatMap((entry) =>
+      [...entry.aliases].map((alias) => ({
+        alias,
+        entry,
+      }))
+    )
+    .filter(({ alias }) => alias.length >= 2)
+    .sort((a, b) => b.alias.length - a.alias.length);
+
+  return wakfuTranslationAliases;
+}
+
+function getProtectedTermOutput(entry, targetLang) {
+  const target = String(targetLang || "").toLowerCase();
+  if (target.startsWith("zh")) {
+    return `${entry.chinese} ${entry.english}`;
+  }
+  return entry.english;
+}
+
+function protectWakfuTerms(text, targetLang) {
+  const sourceText = String(text || "");
+  if (!sourceText) {
+    return { protectedText: "", placeholders: [], targetLang };
+  }
+
+  let protectedText = sourceText;
+  const placeholders = [];
+
+  buildWakfuTranslationAliases().forEach(({ alias, entry }) => {
+    const pattern = new RegExp(escapeTranslationRegex(alias), "g");
+    protectedText = protectedText.replace(pattern, () => {
+      const token = `__WAKFU_TERM_${placeholders.length}__`;
+      placeholders.push({
+        token,
+        replacement: getProtectedTermOutput(entry, targetLang),
+      });
+      return token;
+    });
+  });
+
+  return { protectedText, placeholders, targetLang };
+}
+
+function restoreWakfuTerms(text, protectedPayload) {
+  let restored = String(text || "");
+  (protectedPayload?.placeholders || []).forEach(({ token, replacement }) => {
+    restored = restored.split(token).join(replacement);
+  });
+  return restored;
+}
+
+async function requestGoogleTranslation(text, targetLang) {
+  const sourceUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
+  const response = await fetch(sourceUrl);
+  const data = await response.json();
+  if (!data || !data[0]) return null;
+
+  return {
+    text: data[0].map((x) => x[0]).join(""),
+    lang: data[2] || "",
+  };
+}
+
+async function translateWithProtectedTerms(text, targetLang) {
+  const protectedPayload = protectWakfuTerms(text, targetLang);
+  const translationResult = await requestGoogleTranslation(
+    protectedPayload.protectedText,
+    targetLang
+  );
+
+  if (!translationResult) return null;
+
+  return {
+    text: restoreWakfuTerms(translationResult.text, protectedPayload),
+    lang: translationResult.lang,
+  };
+}
+
+if (chatListEl && scrollBtn) {
+  chatListEl.addEventListener("scroll", () => {
+    const distanceToBottom = chatListEl.scrollHeight - chatListEl.scrollTop - chatListEl.clientHeight;
+    if (distanceToBottom > 150) {
+      scrollBtn.classList.add("visible");
+    } else {
+      scrollBtn.classList.remove("visible");
+    }
+  });
+}
+
+function scrollToChatBottom() {
+  const list = getChatListNode();
+  if (list) {
+    list.scrollTop = list.scrollHeight;
+    if (typeof parseFile === "function") {
+      parseFile();
+    }
+  }
+}
+
+window.scrollToChatBottom = scrollToChatBottom;
+
+const CHAT_COLORS = {
+  Vicinity: "#cccccc",
+  Private: "#00e1ff",
+  Group: "#aa66ff",
+  Guild: "#ffaa00",
+  Trade: "#dd7700",
+  Politics: "#ffff00",
+  PvP: "#00aaaa",
+  Community: "#3366ff",
+  Recruitment: "#ff2255",
+  Logs: "#bbbbbb",
+  Default: "#888888",
+};
+
+let currentChatSearchTerm = "";
+
+function processChatLog(line) {
+  const parts = line.split(" - ");
+  if (parts.length < 2) return;
+
+  const rawTime = parts[0].split(",")[0];
+  const localTime = formatLocalTime(rawTime);
+  const rest = parts.slice(1).join(" - ");
+
+  let channel = "General";
+  let author = "";
+  let message = rest;
+
+  const bracketMatch = rest.match(/^\[(.*?)\] (.*)/);
+  if (bracketMatch) {
+    channel = bracketMatch[1];
+    const contentAfter = bracketMatch[2];
+    const authorSplit = contentAfter.indexOf(" : ");
+    if (authorSplit !== -1) {
+      author = contentAfter.substring(0, authorSplit);
+      message = contentAfter.substring(authorSplit + 3);
+    } else {
+      message = contentAfter;
+    }
+  } else {
+    const authorSplit = rest.indexOf(" : ");
+    if (authorSplit !== -1) {
+      author = rest.substring(0, authorSplit);
+      message = rest.substring(authorSplit + 3);
+      if (channel === "General") channel = "Vicinity";
+    }
+  }
+
+  const cleanMessage = (" " + message).slice(1);
+  addChatMessage(localTime, channel, author, cleanMessage);
+}
+
+function addChatMessage(time, channel, author, message, skipAuto = false) {
+  const list = getChatListNode();
+  if (!list) return;
+  const isAtBottom = list.scrollHeight - list.scrollTop - list.clientHeight <= 50;
+
+  const emptyState = list.querySelector(".empty-state");
+  if (emptyState) list.innerHTML = "";
+
+  const waitMatch = message.match(REGEX_WAIT);
+  if (waitMatch) {
+    const seconds = parseInt(waitMatch[1] || waitMatch[2] || waitMatch[3], 10);
+    if (!Number.isNaN(seconds)) triggerChatCooldown(seconds);
+  }
+
+  while (list.children.length >= MAX_CHAT_HISTORY) {
+    list.removeChild(list.firstChild);
+  }
+
+  const div = document.createElement("div");
+  div.className = "chat-msg";
+
+  const category = getCategoryFromChannel(channel);
+  div.setAttribute("data-category", category);
+  const color = getChannelColor(category);
+
+  div._searchText = `[${channel}] ${author} ${message}`.toLowerCase();
+  div._rawMessage = message;
+
+  let isVisible = true;
+  if (currentChatFilter === "all") {
+    if (category === "logs") isVisible = false;
+  } else if (currentChatFilter === "logs") {
+    if (category !== "logs") isVisible = false;
+  } else if (category === currentChatFilter) {
+    isVisible = true;
+  } else if ((category === "vicinity" || category === "private") && category !== "logs") {
+    isVisible = true;
+  } else {
+    isVisible = false;
+  }
+
+  if (isVisible && currentChatSearchTerm.trim() !== "" && !div._searchText.includes(currentChatSearchTerm)) {
+    isVisible = false;
+  }
+
+  if (!isVisible) div.classList.add("hidden-msg");
+
+  let displayMessage = message;
+  const lowerChan = channel.toLowerCase();
+
+  if (lowerChan.includes("game log") || lowerChan.includes("\u7cfb\u7edf")) {
+    displayMessage = formatGameLog(message);
+  } else if (
+    lowerChan.includes("fight log") ||
+    lowerChan.includes("combat") ||
+    lowerChan.includes("lutas") ||
+    lowerChan.includes("information") ||
+    lowerChan.includes("\u6218\u6597\u65e5\u5fd7")
+  ) {
+    displayMessage = formatFightLog(message);
+  }
+
+  const transId = "trans-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
+  const channelTag = `[${channel}]`;
+
+  div.innerHTML = `
+    <div class="chat-meta">
+      <span class="chat-time">${time}</span>
+      <span class="chat-channel" style="color:${color}">${channelTag}</span>
+      <span class="chat-author" style="color:${color}">${author}</span>
+      <button class="manual-trans-btn" data-tid="${transId}">T</button>
+    </div>
+    <div class="chat-content">${displayMessage}</div>
+    <div id="${transId}" class="translated-block" style="display:none;"></div>
+  `;
+
+  list.appendChild(div);
+
+  if (isAtBottom) {
+    list.scrollTop = list.scrollHeight;
+  }
+
+  if (transConfig.enabled && !skipAuto) {
+    if (category === "logs") return;
+    queueTranslation(message, transId, false);
+  }
+}
+
+if (chatListEl) {
+  chatListEl.addEventListener("click", (e) => {
+    if (e.target.classList.contains("manual-trans-btn")) {
+      const btn = e.target;
+      const msgDiv = btn.closest(".chat-msg");
+      const transId = btn.dataset.tid;
+
+      if (msgDiv && msgDiv._rawMessage) {
+        queueTranslation(msgDiv._rawMessage, transId, true);
+      }
+    }
+  });
+}
+
+function setChatFilter(filter) {
+  currentChatFilter = filter;
+  const docs = [document];
+  if (pipWindow && pipWindow.document) docs.push(pipWindow.document);
+  docs.forEach((doc) => {
+    doc.querySelectorAll(".filter-btn").forEach((btn) => btn.classList.remove("active"));
+  });
+
+  let btnId = "filterALL";
+  if (filter !== "all") {
+    if (filter === "recruitment") btnId = "filterRECRUIT";
+    else if (filter === "community") btnId = "filterCOMM";
+    else if (filter === "logs") btnId = "filterLOGS";
+    else btnId = "filter" + filter.toUpperCase();
+  }
+
+  docs.forEach((doc) => {
+    const activeBtn = doc.getElementById(btnId);
+    if (activeBtn) activeBtn.classList.add("active");
+  });
+
+  refreshChatVisibility();
+}
+
+function refreshChatVisibility() {
+  const list = getChatListNode();
+  if (!list) return;
+  const messages = list.children;
+  const isSearchActive = currentChatSearchTerm.trim() !== "";
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    if (msg.classList.contains("empty-state")) continue;
+
+    const category = msg.getAttribute("data-category");
+    let isVisible = true;
+
+    if (currentChatFilter === "all") {
+      if (category === "logs") isVisible = false;
+    } else if (currentChatFilter === "logs") {
+      if (category !== "logs") isVisible = false;
+    } else {
+      const isExact = category === currentChatFilter;
+      const isExc = category === "vicinity" || category === "private";
+      if (!isExact && (!isExc || currentChatFilter === "logs")) isVisible = false;
+    }
+
+    if (isVisible && isSearchActive && !msg._searchText.includes(currentChatSearchTerm)) {
+      isVisible = false;
+    }
+
+    msg.classList.toggle("hidden-msg", !isVisible);
+  }
+
+  list.scrollTop = list.scrollHeight;
+}
+
+function onChatSearchInput(val) {
+  currentChatSearchTerm = val.toLowerCase().trim();
+  refreshChatVisibility();
+}
+
+function clearChatSearch() {
+  const input = getChatElement("chat-text-filter");
+  if (input) input.value = "";
+  currentChatSearchTerm = "";
+  refreshChatVisibility();
+}
+
+function formatGameLog(message) {
+  let formatted = message;
+  let isKama = false;
+  const kamaRegex = /(\d+(?:[.,\s\u00A0]\d+)*)([\s\u00A0]+)(kamas?|卡玛)/gi;
+
+  if (kamaRegex.test(formatted)) {
+    isKama = true;
+    formatted = formatted.replace(kamaRegex, '<span class="kama-log">$1</span>$2<span class="kama-log">$3</span>');
+  }
+
+  if (!isKama && typeof LOOT_KEYWORDS !== "undefined") {
+    if (LOOT_KEYWORDS.some((kw) => message.toLowerCase().includes(kw))) {
+      formatted = formatted.replace(/(?<!>)\b(\d+(?:[.,]\d+)*\s*x?)\b(?![^<]*<\/span>)/g, '<span class="loot-log">$1</span>');
+    }
+  }
+
+  return formatted.replace(/"([^"<]+)"(?![^<]*>)/g, '"<b>$1</b>"');
+}
+
+function formatFightLog(message) {
+  let formatted = message;
+  const lower = message.toLowerCase();
+
+  const elementMap = {
+    "Fire|Feu|Fuego|Fogo|火系": { cls: "dmg-fire", icon: "sFIRE.png" },
+    "Air|Aire|Ar|风系": { cls: "dmg-air", icon: "sAIR.png" },
+    "Earth|Terre|Tierra|Terra|地系": { cls: "dmg-earth", icon: "sEARTH.png" },
+    "Water|Eau|Agua|Água|水系": { cls: "dmg-water", icon: "sWATER.png" },
+    "Light|Lumière|Luz|光系": { cls: "dmg-light", icon: "sLIGHT.png" },
+    "Stasis|Stase|Estasis|Estase|创生|创生力": { cls: "dmg-stasis", icon: "sSTASIS.png" },
+  };
+
+  formatted = formatted.replace(/(?<!>)([-+]?\s?[\d,.]+)(\s+Elemental Resistance|[\s\u3000]+元素抗性)/gi, (match, numberStr) => {
+    let cleanNum = numberStr.trim();
+    const val = parseFloat(cleanNum.replace(/[,.\s]/g, ""));
+    if (val > 0 && !cleanNum.includes("+") && !cleanNum.includes("-")) {
+      cleanNum = "+" + cleanNum;
+    }
+    return `<span style="font-weight:bold; color:#ccc;">${cleanNum}</span> <img src="./assets/img/elements/Elemental_Resistance.png" class="element-icon" alt="Res" title="Elemental Resistance">`;
+  });
+
+  for (const [pattern, data] of Object.entries(elementMap)) {
+    const regex = new RegExp(`(-\\s?[\\d,.]+)\\s+(HP|PV|PdV|生命)\\s+[（(]\\s*((?:${pattern}))\\s*[)）]`, "gi");
+    formatted = formatted.replace(regex, `<span class="${data.cls}">$1 $2</span> <span class="copy-only">($3)</span><img src="./assets/img/elements/${data.icon}" class="element-icon" alt="">`);
+  }
+
+  formatted = formatted.replace(
+    /(?<!>)(-\s?[\d,.]+)\s(HP|PV|PdV|生命)(?!\s*<span)(?!\s*<img)(?![^<]*<\/span>)/g,
+    `<span class="game-log-number">$1 $2</span> <img src="./assets/img/elements/sNEUTRAL.png" class="element-icon" alt="">`
+  );
+
+  for (const [pattern, data] of Object.entries(elementMap)) {
+    const regex = new RegExp(`(?<!>)[（(]\\s*((?:${pattern}))\\s*[)）]`, "gi");
+    formatted = formatted.replace(regex, `<span class="copy-only">($1)</span><img src="./assets/img/elements/${data.icon}" class="element-icon" alt="">`);
+  }
+
+  if (lower.includes("level") || lower.includes("lvl") || lower.includes("niveau") || lower.includes("nivel") || lower.includes("级") || lower.includes("等级")) {
+    formatted = formatted.replace(/(?<!>)(?:\+|-)?\b\d+(?:[.,]\d+)*\b(?![^<]*>)/g, '<span class="game-log-number">$&</span>');
+  }
+
+  return formatted.replace(/[（(]([^<>()（）]+)[)）]/g, "(<b>$1</b>)");
+}
+
+function queueTranslation(text, elementId, isManual) {
+  translationQueue.push({ text, elementId, isManual });
+  processTranslationQueue();
+}
+
+async function processTranslationQueue() {
+  if (isTranslating || translationQueue.length === 0) return;
+
+  const item = translationQueue[0];
+
+  if (!transConfig.enabled && !item.isManual) {
+    translationQueue.length = 0;
+    return;
+  }
+
+  isTranslating = true;
+  translationQueue.shift();
+
+  try {
+    if (!item.isManual && item.text.length < 3) throw new Error("Short");
+    if (item.text.length < 500) {
+      const result = await fetchTranslation(item.text);
+      if (result) {
+        const l = result.lang.toLowerCase();
+        const show = item.isManual || !l.startsWith("zh");
+
+        if (show) {
+          const el = getChatElement(item.elementId);
+          if (el) {
+            el.style.display = "flex";
+            el.innerHTML = `<span class="trans-icon">译</span> ${result.text}`;
+          }
+        }
+      }
+    }
+  } catch (e) {}
+
+  isTranslating = false;
+  setTimeout(processTranslationQueue, 50);
+}
+
+async function fetchTranslation(text, targetLang = "zh-CN") {
+  try {
+    return await translateWithProtectedTerms(text, targetLang);
+  } catch (e) {
+    return null;
+  }
+}
+
+function getCategoryFromChannel(channelName) {
+  const lower = channelName.toLowerCase();
+  for (const [category, aliases] of Object.entries(CHAT_CHANNEL_ALIASES)) {
+    if (aliases.some((alias) => lower.includes(alias.toLowerCase()))) return category;
+  }
+  return "other";
+}
+
+function getChannelColor(category) {
+  const map = {
+    logs: CHAT_COLORS.Logs,
+    vicinity: CHAT_COLORS.Vicinity,
+    private: CHAT_COLORS.Private,
+    group: CHAT_COLORS.Group,
+    guild: CHAT_COLORS.Guild,
+    trade: CHAT_COLORS.Trade,
+    politics: CHAT_COLORS.Politics,
+    pvp: CHAT_COLORS.PvP,
+    community: CHAT_COLORS.Community,
+    recruitment: CHAT_COLORS.Recruitment,
+  };
+  return map[category] || CHAT_COLORS.Default;
+}
+
+function openQuickTransModal() {
+  const modal = document.getElementById("quick-trans-modal");
+  const input = document.getElementById("qt-input");
+  const counter = document.getElementById("qt-char-count");
+
+  input.value = "";
+  counter.textContent = "0";
+  document.getElementById("qt-output").textContent = "...";
+  document.getElementById("qt-output").style.color = "#666";
+
+  input.oninput = function () {
+    counter.textContent = this.value.length;
+  };
+
+  modal.style.display = "flex";
+  input.focus();
+}
+
+function closeQuickTransModal() {
+  document.getElementById("quick-trans-modal").style.display = "none";
+}
+
+async function performQuickTrans(targetLang) {
+  const text = document.getElementById("qt-input").value.trim();
+  const outputEl = document.getElementById("qt-output");
+
+  if (!text) return;
+  outputEl.textContent = "\u7ffb\u8bd1\u4e2d...";
+  outputEl.style.color = "#888";
+
+  try {
+    const result = await translateWithProtectedTerms(text, targetLang);
+
+    if (result) {
+      const translatedText = isTargetLanguageMatch(result.lang, targetLang)
+        ? text
+        : result.text;
+      outputEl.textContent = translatedText;
+      outputEl.style.color = "var(--accent)";
+    } else {
+      outputEl.textContent = "\u7ffb\u8bd1\u5931\u8d25\u3002";
+      outputEl.style.color = "#e74c3c";
+    }
+  } catch (e) {
+    console.error("Quick Trans Error:", e);
+    outputEl.textContent = "\u7f51\u7edc\u9519\u8bef\u3002";
+    outputEl.style.color = "#e74c3c";
+  }
+}
+
+function copyQuickTrans() {
+  const outputEl = document.getElementById("qt-output");
+  const text = outputEl.textContent;
+  const btn = document.querySelector(".qt-copy-btn");
+
+  if (
+    text &&
+    text !== "..." &&
+    text !== "\u7ffb\u8bd1\u4e2d..." &&
+    text !== "\u7f51\u7edc\u9519\u8bef\u3002"
+  ) {
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = "✓";
+      btn.style.color = "#2ecc71";
+      setTimeout(() => {
+        btn.textContent = "复制";
+        btn.style.color = "";
+      }, 1500);
+    });
+  }
+}
+
+function toggleMasterSwitch() {
+  transConfig.enabled = !transConfig.enabled;
+  if (!transConfig.enabled) {
+    translationQueue.length = 0;
+    isTranslating = false;
+  }
+  updateLangButtons();
+}
+
+function updateLangButtons() {
+  const btnMaster = getChatElement("btnMaster");
+  if (!btnMaster) return;
+  if (transConfig.enabled) {
+    btnMaster.className = "lang-btn master-on";
+    btnMaster.textContent = "\u5df2\u5f00\u542f";
+  } else {
+    btnMaster.className = "lang-btn master-off";
+    btnMaster.textContent = "\u5df2\u5173\u95ed";
+  }
+}
+
+function triggerChatCooldown(seconds) {
+  const container = getChatElement("chat-cooldown-container");
+  if (!container) return;
+
+  if (container.children.length >= 2) {
+    container.removeChild(container.firstElementChild);
+  }
+
+  const pill = document.createElement("div");
+  pill.className = "cooldown-pill";
+
+  const timerId = Date.now() + Math.random();
+  pill.innerHTML = `<span class="cooldown-icon">⏳</span> <span id="cd-${timerId}">${seconds}s</span>`;
+  container.appendChild(pill);
+
+  let remaining = seconds;
+  const span = pill.querySelector(`#cd-${timerId}`);
+
+  const interval = setInterval(() => {
+    remaining--;
+    if (span) span.textContent = `${remaining}s`;
+
+    if (remaining <= 0) {
+      clearInterval(interval);
+      pill.style.animation = "fadeOutRight 0.3s ease forwards";
+      setTimeout(() => {
+        if (pill.parentNode) pill.parentNode.removeChild(pill);
+      }, 300);
+    }
+  }, 1000);
+}

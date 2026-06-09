@@ -1,0 +1,13 @@
+Stable & Others/
+Screenshots/
+.vscode/
+node_modules/
+.wrangler/
+.DS_Store
+Thumbs.db
+
+# Local analysis artifacts
+artifacts/
+scripts/
+wakfu_chat.log*.sample
+*.sample

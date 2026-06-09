@@ -1,0 +1,796 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>沃土伴侣 v1.0 | 汉化、修复：T2薯条</title>
+    <link rel="stylesheet" href="assets/css/style.css" />
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  </head>
+  <body>
+    <div class="main-content">
+      <!-- Setup (Overlay) -->
+      <div id="setup-panel">
+        <div class="drop-zone" id="drop-zone">
+          <div style="margin-bottom: 16px; text-align: center">
+            <h2 style="margin: 0; color: var(--accent, #00e1ff); font-size: 1.6rem">沃土伴侣 v1.0</h2>
+            <p style="margin: 6px 0 0; color: #bbb; font-size: 0.9rem">汉化、修复：T2薯条</p>
+          </div>
+          <h3>把 `wakfu_chat.log` 拖到这里</h3>
+          <p style="color: #aaa; margin-bottom: 5px">默认路径（可复制到资源管理器）：</p>
+
+          <!-- Cleaned Path Container -->
+          <div class="path-container">
+            <code id="log-path" class="log-path-code">%AppData%\zaap\gamesLogs\wakfu\logs\</code>
+            <button id="copy-path-btn" class="copy-path-btn">复制</button>
+          </div>
+          <p>直接从文件夹把日志拖进来即可开始。</p>
+          <div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid #333; color: #aaa; font-size: 0.85rem; line-height: 1.7">
+            <div>原作者：Nexus-Hub <a href="https://github.com/Nexus-Hub/Wakfu-Companion" target="_blank" rel="noopener noreferrer" style="color: var(--accent, #00e1ff)">GitHub</a></div>
+            <div>汉化、修复版作者：T2薯条 | QQ：1541599745</div>
+          </div>
+        </div>
+
+        <!-- Cleaned Reconnect Container -->
+        <div id="reconnect-container" class="reconnect-container">
+          <p class="prev-file-label">发现上次使用的文件：</p>
+          <h3 id="prev-filename" class="prev-filename">wakfu-chat.log</h3>
+
+          <button id="reconnect-btn" class="add-track-btn reconnect-action-btn">重新连接</button>
+
+          <p class="browser-warning">（浏览器会再次确认权限）</p>
+
+          <div class="new-file-wrapper">
+            <button id="new-file-btn" class="new-file-link">选择其他文件</button>
+          </div>
+          <div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid #333; color: #aaa; font-size: 0.85rem; line-height: 1.7">
+            <div>原作者：Nexus-Hub <a href="https://github.com/Nexus-Hub/Wakfu-Companion" target="_blank" rel="noopener noreferrer" style="color: var(--accent, #00e1ff)">GitHub</a></div>
+            <div>汉化、修复版作者：T2薯条 | QQ：1541599745</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3-Column Layout -->
+      <div class="panels-container">
+        <!-- 1. Combat Meter (Damage, Healing & Armor) -->
+        <div class="tool-panel">
+          <div class="panel-header tab-header">
+            <div class="meter-tab active" id="tab-damage" onclick="switchMeterMode('damage')">
+              <img src="./assets/img/headers/damage.png" class="tab-icon" onerror="this.style.display='none'" />
+              伤害
+            </div>
+            <div class="meter-tab" id="tab-healing" onclick="switchMeterMode('healing')">
+              <img src="./assets/img/headers/healing.png" class="tab-icon" onerror="this.style.display='none'" />
+              治疗
+            </div>
+            <div class="meter-tab" id="tab-armor" onclick="switchMeterMode('armor')">
+              <img src="./assets/img/headers/armor.png" class="tab-icon" onerror="this.style.display='none'" />
+              护甲
+            </div>
+            <!-- PiP Button -->
+            <button class="pip-btn" onclick="togglePiP('meter-split-container', '战斗统计')" title="画中画">⧉</button>
+          </div>
+
+          <!-- Controls Area -->
+          <div class="dm-controls-bar">
+            <div class="controls-group">
+              <button class="toggle-btn" id="autoResetToggle">
+                <span id="autoResetText">自动重置</span>
+              </button>
+
+              <div id="history-nav" class="history-container">
+                <button class="hist-btn active" id="btn-live" onclick="viewHistory('live')" title="当前战斗">实时</button>
+                <span class="hist-sep">|</span>
+                <button class="hist-btn disabled" id="btn-hist-0" onclick="viewHistory(0)">1</button>
+                <button class="hist-btn disabled" id="btn-hist-1" onclick="viewHistory(1)">2</button>
+                <button class="hist-btn disabled" id="btn-hist-2" onclick="viewHistory(2)">3</button>
+                <button class="hist-btn disabled" id="btn-hist-3" onclick="viewHistory(3)">4</button>
+                <button class="hist-btn disabled" id="btn-hist-4" onclick="viewHistory(4)">5</button>
+              </div>
+
+              <div style="flex-grow: 1"></div>
+              <button class="export-btn" id="discordBtn" title="Copy Report for Discord" onclick="exportToDiscord()">📋</button>
+              <button class="reset-btn" id="resetBtn">重置</button>
+            </div>
+          </div>
+
+          <!-- SPLIT CONTAINER FOR ALLIES / ENEMIES -->
+          <div id="meter-split-container">
+            <!-- Allies Section -->
+            <div class="meter-half">
+              <div class="half-header header-allies">
+                <div class="header-title-group">
+                  <img src="./assets/img/headers/allies.png" class="header-icon" onerror="this.style.display='none'" />
+                  <span>友方</span>
+                </div>
+                <!-- Independent Expand/Collapse Buttons -->
+                <div class="header-btn-group">
+                  <button class="mini-header-btn" onclick="modifyExpansion('allies', 'expand')">+</button>
+                  <button class="mini-header-btn" onclick="modifyExpansion('allies', 'collapse')">-</button>
+                </div>
+                <span id="allies-total-val" class="header-total">0</span>
+                <span class="header-percent"></span>
+              </div>
+              <div id="list-allies" class="half-list"></div>
+            </div>
+
+            <!-- Separator Line -->
+            <div class="meter-separator"></div>
+
+            <!-- Enemies Section -->
+            <div class="meter-half">
+              <div class="half-header header-enemies">
+                <div class="header-title-group">
+                  <img src="./assets/img/headers/enemies.png" class="header-icon" onerror="this.style.display='none'" />
+                  <span>敌方</span>
+                </div>
+                <!-- Independent Expand/Collapse Buttons -->
+                <div class="header-btn-group">
+                  <button class="mini-header-btn" onclick="modifyExpansion('enemies', 'expand')">+</button>
+                  <button class="mini-header-btn" onclick="modifyExpansion('enemies', 'collapse')">-</button>
+                </div>
+                <span id="enemies-total-val" class="header-total">0</span>
+                <span class="header-percent"></span>
+              </div>
+              <div id="list-enemies" class="half-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Item Tracker -->
+        <div class="tool-panel">
+          <div class="panel-header">
+            <img src="./assets/img/headers/item_tracker.png" class="header-label-icon" onerror="this.style.display='none'" />
+            <span class="header-label">追踪器</span>
+
+            <!-- NEW: Profession Filters -->
+            <div class="tracker-filters">
+              <button class="filter-icon-btn active" id="tf-all" onclick="setTrackerFilter('SHOW_ALL')" title="显示全部">全部</button>
+              <button class="filter-icon-btn" id="tf-farmer" onclick="setTrackerFilter('Farmer')" title="种植">
+                <img src="./assets/img/resources/farmer.png" onerror="this.style.display='none'" />
+              </button>
+              <button class="filter-icon-btn" id="tf-fisherman" onclick="setTrackerFilter('Fisherman')" title="钓鱼">
+                <img src="./assets/img/resources/fisherman.png" onerror="this.style.display='none'" />
+              </button>
+              <button class="filter-icon-btn" id="tf-herbalist" onclick="setTrackerFilter('Herbalist')" title="草药">
+                <img src="./assets/img/resources/herbalist.png" onerror="this.style.display='none'" />
+              </button>
+              <button class="filter-icon-btn" id="tf-lumberjack" onclick="setTrackerFilter('Lumberjack')" title="伐木">
+                <img src="./assets/img/resources/lumberjack.png" onerror="this.style.display='none'" />
+              </button>
+              <button class="filter-icon-btn" id="tf-miner" onclick="setTrackerFilter('Miner')" title="采矿">
+                <img src="./assets/img/resources/miner.png" onerror="this.style.display='none'" />
+              </button>
+              <button class="filter-icon-btn" id="tf-trapper" onclick="setTrackerFilter('Trapper')" title="畜牧">
+                <img src="./assets/img/resources/trapper.png" onerror="this.style.display='none'" />
+              </button>
+            </div>
+
+            <!-- Sort Button (Removed inline margin-left) -->
+            <button class="pip-btn" id="tracker-sort-btn" onclick="sortTrackerItems()" title="按专业排序" style="font-size: 0.8rem; font-weight: bold">↓</button>
+
+                        <button class="filter-icon-btn" id="tracker-loss-toggle" onclick="toggleTrackerLossMode()" title="&#22833;&#21435;&#29289;&#21697;&#26102;&#25187;&#20943;&#36827;&#24230;&#65306;&#20851;&#38381;">&#20943;</button>
+
+<button class="pip-btn" id="btn-toggle-totals" onclick="toggleTrackerTotals()" title="显示或隐藏卡玛总计" style="margin-right: 5px; font-weight: bold; color: #ffd700">₭</button>
+
+            <!-- View Toggle Button -->
+            <button class="pip-btn" id="tracker-view-toggle" onclick="toggleTrackerView()" title="切换网格或列表视图" style="margin-right: 5px">☰</button>
+
+            <!-- PiP Button -->
+            <button class="pip-btn" onclick="togglePiP('tracker-list', '追踪器')" title="画中画">⧉</button>
+          </div>
+          <div class="tracker-controls">
+            <input type="text" id="item-input" list="item-datalist" class="tracker-select" placeholder="搜索物品..." autocomplete="off" />
+            <datalist id="item-datalist"></datalist>
+            <button class="add-track-btn" onclick="addTrackedItem()">添加</button>
+          </div>
+          <div id="tracker-list">
+            <div class="empty-state">添加要追踪的物品...</div>
+          </div>
+
+          <div id="tracker-total-footer" class="tracker-footer" style="display: none">
+            <div class="tf-row">
+              <span class="tf-label">当前：</span>
+              <span id="tf-val-current" class="tf-val">0 ₭</span>
+            </div>
+            <div class="tf-row">
+              <span class="tf-label">目标：</span>
+              <span id="tf-val-target" class="tf-val">0 ₭</span>
+            </div>
+          </div>
+
+          <div id="tracker-notifications"></div>
+        </div>
+
+        <!-- 3. Chat Translator -->
+        <div class="tool-panel">
+          <div class="panel-header">
+            <img src="./assets/img/headers/chat.png" class="header-label-icon" onerror="this.style.display='none'" />
+            <span class="header-label">聊天与翻译</span>
+
+            <div id="chat-cooldown-container" class="chat-header-timers"></div>
+
+            <button
+              id="clearChatBtn"
+              style="
+                padding: 4px 8px;
+                font-size: 0.7em;
+                background: #444;
+                color: #fff;
+                border: none;
+                cursor: pointer;
+                margin-left: auto;
+              ">
+              清空
+            </button>
+            <button class="pip-btn" onclick="openQuickTransModal()" title="&#24555;&#36895;&#32842;&#22825;&#32763;&#35793;&#22120;" style="margin-right: 5px; font-size: 1.1rem">🌐</button>
+            <!-- PiP Button -->
+            <button class="pip-btn" onclick="togglePiP('chat-list', '聊天与翻译')" title="画中画">⧉</button>
+          </div>
+
+          <div class="trans-toolbar">
+            <span class="trans-label">&#33258;&#21160;&#32763;&#35793;&#65306;</span>
+
+            <div class="chat-search-inline">
+              <input type="text" id="chat-text-filter" placeholder="筛选..." oninput="onChatSearchInput(this.value)" />
+              <button class="chat-search-clear" onclick="clearChatSearch()">×</button>
+            </div>
+
+            <button class="lang-btn master-on" id="btnMaster" onclick="toggleMasterSwitch()">&#24050;&#24320;&#21551;</button>
+          </div>
+
+          <div id="chat-list">
+            <div class="empty-state">等待聊天日志...</div>
+          </div>
+
+          <button id="chat-scroll-btn" class="scroll-bottom-btn" onclick="scrollToChatBottom()">↓</button>
+
+          <div class="chat-filters">
+            <button class="filter-btn active" id="filterALL" onclick="setChatFilter('all')">聊天</button>
+            <button class="filter-btn" id="filterLOGS" onclick="setChatFilter('logs')">日志</button>
+            <button class="filter-btn" id="filterGROUP" onclick="setChatFilter('group')">组队</button>
+            <button class="filter-btn" id="filterGUILD" onclick="setChatFilter('guild')">公会</button>
+            <button class="filter-btn" id="filterRECRUIT" onclick="setChatFilter('recruitment')">招募</button>
+            <button class="filter-btn" id="filterCOMM" onclick="setChatFilter('community')">社区</button>
+            <button class="filter-btn" id="filterTRADE" onclick="setChatFilter('trade')">交易</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ??????? Floating Window -->
+    <div id="quick-trans-modal" class="floating-window" style="display: none; left: 50%; top: 20%; transform: translateX(-50%)">
+      <!-- Header is now the drag handle -->
+      <div class="modal-header draggable-header" id="qt-drag-handle">
+        <!-- Icon & Title Group -->
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            pointer-events: none;
+          ">
+          <img src="./assets/img/headers/chat.png" style="width: 24px; height: 24px; object-fit: contain" onerror="this.style.display='none'" />
+          <h3 style="margin: 0; color: var(--accent); font-size: 1.1rem">&#24555;&#36895;&#32842;&#22825;&#32763;&#35793;&#22120;</h3>
+        </div>
+
+        <button class="close-modal" onclick="closeQuickTransModal()">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="input-group">
+          <label>&#25991;&#26412;&#65288;<span id="qt-char-count" style="color: #fff">0</span>/300&#65289;</label>
+          <textarea id="qt-input" class="qt-textarea" maxlength="300" placeholder="&#36755;&#20837;&#35201;&#32763;&#35793;&#30340;&#20869;&#23481;..."></textarea>
+        </div>
+
+        <div class="qt-controls">
+          <span
+            style="
+              font-size: 0.7rem;
+              color: #888;
+              font-weight: bold;
+              letter-spacing: 1px;
+            "
+            >&#30446;&#26631;&#35821;&#35328;&#65306;</span
+          >
+          <div class="qt-lang-group">
+            <button class="qt-lang-btn" onclick="performQuickTrans('en')">英</button>
+            <button class="qt-lang-btn" onclick="performQuickTrans('es')">西</button>
+            <button class="qt-lang-btn" onclick="performQuickTrans('fr')">法</button>
+            <button class="qt-lang-btn" onclick="performQuickTrans('pt')">葡</button>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label>&#32763;&#35793;&#32467;&#26524;</label>
+          <div class="qt-output-container">
+            <div id="qt-output" class="qt-output">...</div>
+            <button class="qt-copy-btn" onclick="copyQuickTrans()" title="&#22797;&#21046;">📋</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LEFT SIDEBAR FOR PROFESSIONS -->
+    <div id="professions-sidebar" class="sidebar left-sidebar">
+      <div class="sidebar-header">
+        <h3>
+          <img src="./assets/img/headers/professions.png" class="sidebar-header-icon" onerror="this.style.display='none'" />
+          生产经验计算
+        </h3>
+        <button class="close-sidebar-btn" onclick="toggleProfSidebar()">×</button>
+      </div>
+
+      <div class="sidebar-content">
+        <!-- Selector with Dynamic Icon -->
+        <div class="prof-select-group prof-header-group">
+          <!-- Image loads blank, src filled by JS -->
+          <img id="prof-logo-img" class="selected-job-icon" src="" alt="Job Icon" />
+
+          <select id="profession-select" class="prof-select" onchange="onProfessionChange()">
+            <option value="" disabled selected>选择专业...</option>
+          </select>
+        </div>
+
+        <!-- Inputs -->
+        <div class="prof-levels">
+          <div class="prof-level-input-group" style="flex: 0.8">
+            <label class="prof-level-label">基础经验</label>
+            <input type="number" id="prof-base-exp" class="prof-level-input" min="1" />
+          </div>
+          <div class="prof-level-input-group">
+            <label class="prof-level-label">起始</label>
+            <input type="number" id="prof-current-lvl" class="prof-level-input" min="0" max="159" value="0" />
+          </div>
+          <div class="prof-level-input-group">
+            <label class="prof-level-label">目标</label>
+            <input type="number" id="prof-target-lvl" class="prof-level-input" min="1" max="160" value="20" />
+          </div>
+        </div>
+
+        <!-- Calculate Button -->
+        <button class="prof-calc-btn" onclick="calculateProfessionResources()">计算所需材料</button>
+
+        <!-- Results -->
+        <div id="profession-results-list" class="prof-results">
+          <div class="empty-state" style="font-size: 0.9em; padding: 20px">选择等级后查看所需材料。</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SIDEBAR FOR MISSIONS & RELICS -->
+    <div id="info-sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <h3>
+          <img src="./assets/img/headers/quick_info.png" class="sidebar-header-icon" />
+          快捷信息
+        </h3>
+        <button class="close-sidebar-btn" onclick="toggleSidebar()">×</button>
+      </div>
+
+      <div class="sidebar-content">
+        <!-- Section 1: Daily Missions -->
+        <div class="sidebar-section" id="sec-daily">
+          <h4 onclick="toggleSidebarSection('sec-daily')">
+            <div class="header-left">
+              <img src="./assets/img/headers/daily_missions.png" class="header-label-icon" onerror="this.style.display='none'" />
+              每日路线
+            </div>
+            <span class="section-arrow">▼</span>
+          </h4>
+
+          <div class="section-content">
+            <div class="route-box">
+              <div class="route-title">完整路线</div>
+              <div class="route-container">
+                <!-- Row 1: Standard Start -->
+                <div class="route-row">
+                  <span class="route-step">公会 Guild</span>
+                  <span class="route-arrow">➜</span>
+                  <span class="route-step">庇护袋 Heaven Bag</span>
+                  <span class="route-arrow">➜</span>
+                  <span class="route-step">新世总部 Neo HQ</span>
+                </div>
+
+                <!-- Row 2: 4 Items -->
+                <div class="route-row">
+                  <span class="route-step" data-tooltip="Lv. 6-20&#10;Lv. 21-35">阿斯特鲁卜下水道 Astrub Sewers</span>
+                  <span class="route-arrow">➜</span>
+                  <span class="route-step" data-tooltip="Lv. 36-50&#10;Lv. 51-65&#10;Lv. 216-230">艾瑞伯利亚 Ereboria</span>
+                  <span class="route-arrow">➜</span>
+                  <span class="route-step" data-tooltip="Lv. 66-80&#10;Lv. 126-140&#10;Lv. 156-170&#10;Lv. 186-200">邦塔 Bonta</span>
+                  <span class="route-arrow">➜</span>
+                  <span class="route-step" data-tooltip="Lv. 81-95&#10;Lv. 141-155">布拉克玛 Brakmar</span>
+                </div>
+
+                <!-- Row 3: 4 Items -->
+                <div class="route-row">
+                  <span class="route-step" data-tooltip="Lv. 96-110&#10;Lv. 111-125">浮冰大陆 Ice Floe</span>
+                  <span class="route-arrow">➜</span>
+                  <span class="route-step" data-tooltip="Lv. 171-185">月岛 Moon</span>
+                  <span class="route-arrow">➜</span>
+                  <span class="route-step" data-tooltip="Lv. 201-215">欧萨莫达神域 Osamosa</span>
+                  <span class="route-arrow">➜</span>
+                  <span class="route-step" data-tooltip="Lv. 231-245">迷雾岛 Misty Isle</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="route-box">
+              <div class="route-title">精简路线</div>
+              <div class="route-container">
+                <!-- Row 1 -->
+                <div class="route-row">
+                  <span class="route-step">公会 Guild</span>
+                  <span class="route-arrow">➜</span>
+                  <span class="route-step">庇护袋 Heaven Bag</span>
+                  <span class="route-arrow">➜</span>
+                  <span class="route-step">新世总部 Neo HQ</span>
+                </div>
+
+                <!-- Row 2: 3 Items -->
+                <div class="route-row">
+                  <span class="route-step" data-tooltip="Lv. 36-50&#10;Lv. 96-110&#10;Lv. 156-170">阿玛克纳 Amakna</span>
+                  <span class="route-arrow">➜</span>
+                  <span class="route-step" data-tooltip="Lv. 111-125">浮冰大陆 Ice Floe</span>
+                  <span class="route-arrow">➜</span>
+                  <span class="route-step" data-tooltip="Lv. 201-215">欧萨莫达神域 Osamosa</span>
+                </div>
+
+                <!-- Row 3: 2 Items -->
+                <div class="route-row">
+                  <span class="route-step" data-tooltip="Lv. 215-230">艾瑞伯利亚 Ereboria</span>
+                  <span class="route-arrow">➜</span>
+                  <span class="route-step" data-tooltip="Lv. 231-245">迷雾岛 Misty Isle</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Relics Table -->
+        <div class="sidebar-section" id="sec-relics">
+          <h4 onclick="toggleSidebarSection('sec-relics')">
+            <div class="header-left">
+              <img src="./assets/img/headers/relic_fragments.png" class="header-label-icon" onerror="this.style.display='none'" />
+              遗物与碎片
+            </div>
+            <span class="section-arrow">▼</span>
+          </h4>
+
+          <div class="section-content">
+            <table class="info-table">
+              <thead>
+                <tr>
+                  <th>遗物</th>
+                  <th>类型</th>
+                  <th>数量</th>
+                  <th>地点</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>可可靴子 Koko's Boots</td>
+                  <td>
+                    <span class="relic-tooltip" data-tooltip="Lvl. 36-50">残缺 Imperfect</span>
+                  </td>
+                  <td>700</td>
+                  <td>艾瑞伯利亚 Ereboria</td>
+                </tr>
+                <tr>
+                  <td>者环王 Gelano</td>
+                  <td>
+                    <span class="relic-tooltip" data-tooltip="Lvl. 96-110">坚固 Solid</span>
+                  </td>
+                  <td>800</td>
+                  <td>喱维萨 Bilbyza</td>
+                </tr>
+                <tr>
+                  <td>菌菇戒指 Kel'Dwa Ring</td>
+                  <td>
+                    <span class="relic-tooltip" data-tooltip="Lvl. 111-125">耐久 Durable</span>
+                  </td>
+                  <td>1000</td>
+                  <td>荒野海滩 Wild Beach</td>
+                </tr>
+                <tr>
+                  <td>晖之印 Dazzling Signet</td>
+                  <td>
+                    <span class="relic-tooltip" data-tooltip="Lvl. 156-170">精致 Exquisite</span>
+                  </td>
+                  <td>1000</td>
+                  <td>阿玛克纳 Amakna</td>
+                </tr>
+                <tr>
+                  <td>穿孔靴 Pierced Boots</td>
+                  <td>
+                    <span class="relic-tooltip" data-tooltip="Lvl. 186-200">永恒 Eternal</span>
+                  </td>
+                  <td>1250</td>
+                  <td>潘达卢西亚 Pandalucia</td>
+                </tr>
+                <tr>
+                  <td>最后之戒 Last Ring</td>
+                  <td>
+                    <span class="relic-tooltip" data-tooltip="Lvl. 201-215">神圣 Divine</span>
+                  </td>
+                  <td>1800</td>
+                  <td>嘘独王国 Shhhudoku</td>
+                </tr>
+                <tr>
+                  <td>盖斯腰带 Ghast's Belt</td>
+                  <td>
+                    <span class="relic-tooltip" data-tooltip="Lvl. 216-230">炼狱 Infernal</span>
+                  </td>
+                  <td>1800</td>
+                  <td>艾瑞伯利亚 Ereboria</td>
+                </tr>
+                <tr>
+                  <td>传送戒指 The Portal</td>
+                  <td>
+                    <span class="relic-tooltip" data-tooltip="Lvl. 150">珠宝 Jeweler</span>
+                  </td>
+                  <td>
+                    <span
+                      class="relic-tooltip"
+                      data-tooltip="Ogrest's Wrath x1&#10;Powder: 1,640&#10;Polished Diamond: 50&#10;Infernal Orb: 16&#10;Ogrest Hairs: 13&#10;Ogrest's Tear: 800&#10;Infernal Gem: 75"
+                      >材料 Mats</span
+                    >
+                  </td>
+                  <td>不适用 N/A</td>
+                </tr>
+                <tr>
+                  <td>瑞艾姆戒指 Reiem Ring</td>
+                  <td>
+                    <span class="relic-tooltip" data-tooltip="Lvl. 231-245">远古 Ancestral</span>
+                  </td>
+                  <td>1800</td>
+                  <td>迷雾岛 Misty Isle</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- NEW: DEDICATED DUNGEON FORECAST SIDEBAR -->
+    <div id="dungeon-sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <h3>
+          <img src="./assets/img/headers/dungeon_forecast.png" class="sidebar-header-icon" onerror="this.style.display='none'" />
+          地下城预报
+        </h3>
+        <button class="close-sidebar-btn" onclick="toggleDungeonSidebar()">×</button>
+      </div>
+
+      <div class="sidebar-content" style="display: flex; flex-direction: column">
+        <div class="forecast-main-container" style="flex: 1; display: flex; flex-direction: column; min-height: 0">
+          <!-- Header (Nav + Tabs) -->
+          <div id="forecast-header-sticky"></div>
+
+          <!-- List -->
+          <div id="forecast-list-scrollable">
+            <div style="text-align: center; padding: 20px; color: #888">加载中...</div>
+          </div>
+        </div>
+
+        <!-- NEW: Language Selector at Bottom -->
+        <div id="forecast-lang-selector" class="fc-lang-container-bottom"></div>
+
+        <div
+          style="
+            margin-top: 5px;
+            text-align: center;
+            font-size: 0.7em;
+            color: #666;
+            font-style: italic;
+          ">
+          数据来源：Narakia 与 Vicky Zweistein
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer for File Tracking Info -->
+    <div id="app-footer">
+      <div class="file-info">
+        <!-- LIVE Indicator -->
+        <span
+          id="live-indicator"
+          style="
+            margin-right: 2px;
+            font-size: 0.8em;
+            color: #0f0;
+            display: none;
+          "
+          >●</span
+        >
+
+        <!-- Tracking Label -->
+        <span style="color: var(--accent); font-weight: bold">追踪文件：</span>
+        <span id="active-filename" style="margin-left: 5px; color: var(--text-muted)">未选择文件</span>
+
+        <!-- Separator -->
+        <span class="footer-separator">|</span>
+
+        <!-- Daily Timer -->
+        <span id="daily-timer-display" title="距离每日重置剩余时间">
+          <span style="color: var(--accent); font-weight: bold">每日重置倒计时：</span>
+          <span id="daily-val" style="color: var(--text-main); font-family: monospace">--:--</span>
+        </span>
+
+        <!-- Separator -->
+        <span class="footer-separator">|</span>
+
+        <!-- Sidebar Toggles -->
+        <span class="footer-btn" onclick="toggleProfSidebar()" style="margin-right: 10px">生产计算</span>
+
+        <!-- Daily Dungeons Button 
+        <span class="footer-btn" onclick="toggleDungeonSidebar()" style="margin-right: 10px">DAILY DUNGEONS</span> -->
+
+        <span class="footer-btn" onclick="toggleSidebar()" style="margin-right: 10px">快捷信息</span>
+
+        <span class="footer-btn" onclick="toggleSessionWindow()">会话总结</span>
+      </div>
+    </div>
+
+    <!-- Session Recap -->
+    <div id="session-window" class="floating-window session-window-init" style="display: none">
+      <div class="modal-header draggable-header" id="session-drag-handle">
+        <div class="session-header-group">
+          <img src="./assets/img/headers/sessionRecap.png" class="sidebar-header-icon" onerror="this.style.display='none'" />
+          <h3>会话总结</h3>
+        </div>
+        <button class="close-modal" onclick="toggleSessionWindow()">×</button>
+      </div>
+
+      <div class="modal-body session-modal-body">
+        <!-- TIMER SECTION -->
+        <div class="session-timer-container">
+          <span class="stat-label">时长：</span>
+          <span id="sess-current-duration" class="stat-val text-accent">00:00:00</span>
+        </div>
+        <!-- XP SECTION -->
+        <div class="session-section">
+          <div class="session-header-row">
+            <img src="assets/img/headers/xp.png" class="session-icon" onerror="this.style.display='none'" />
+            <h4>经验</h4>
+          </div>
+          <div id="session-xp-list">
+            <div class="empty-state-mini">暂无经验记录。</div>
+          </div>
+        </div>
+
+        <!-- KAMAS SECTION -->
+        <div class="session-section">
+          <div class="session-header-row">
+            <img src="assets/img/headers/kamas.png" class="session-icon" onerror="this.style.display='none'" />
+            <h4>卡玛</h4>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">获得：</span>
+            <span id="sess-kamas-earned" class="stat-val positive">0</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">花费：</span>
+            <span id="sess-kamas-spent" class="stat-val negative">0</span>
+          </div>
+          <div class="stat-row net-row">
+            <span class="stat-label">净值：</span>
+            <span id="sess-kamas-net" class="stat-val">0</span>
+          </div>
+        </div>
+
+        <!-- CHALLENGES SECTION -->
+        <div class="session-section">
+          <div class="session-header-row">
+            <img src="assets/img/headers/challenges.png" class="session-icon" onerror="this.style.display='none'" />
+            <h4>挑战</h4>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">完成：</span>
+            <span id="sess-challenges-count" class="stat-val text-accent">0</span>
+          </div>
+        </div>
+
+        <!-- QUESTS SECTION -->
+        <div class="session-section last-section">
+          <div class="session-header-row">
+            <img src="assets/img/headers/quest.png" class="session-icon" onerror="this.style.display='none'" />
+            <h4>任务</h4>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">完成：</span>
+            <span id="sess-quests-count" class="stat-val text-accent">0</span>
+          </div>
+        </div>
+
+        <button onclick="resetSessionStats()" class="add-track-btn session-reset-btn">重置会话</button>
+      </div>
+    </div>
+
+    <!-- Custom Tracker Edit Modal -->
+    <div id="tracker-modal" class="custom-modal" style="display: none">
+      <div class="modal-content">
+        <div class="modal-header">
+          <img id="modal-item-icon" src="" class="resource-icon" />
+          <h3 id="modal-item-name">编辑物品</h3>
+          <button class="close-modal" onclick="closeTrackerModal()">×</button>
+        </div>
+        <div class="modal-body">
+          <!-- Row 1: Counts -->
+          <div class="input-row">
+            <div class="input-group">
+              <label>当前</label>
+              <input type="number" id="modal-input-current" class="t-input modal-field" />
+            </div>
+            <div class="input-group">
+              <label>目标</label>
+              <input type="number" id="modal-input-target" class="t-input modal-field" />
+            </div>
+          </div>
+
+          <!-- Row 2: Price -->
+          <div class="input-group" style="margin-top: 10px">
+            <label>单价（卡玛）</label>
+            <input type="number" id="modal-input-price" class="t-input modal-field" placeholder="0" />
+          </div>
+
+          <!-- Kama Stats Display -->
+          <div class="kama-stats">
+            <div class="kama-stat-row">
+              <span>当前价值：</span>
+              <div class="kama-val-wrapper">
+                <span id="modal-calc-current">0</span>
+              </div>
+            </div>
+            <div class="kama-stat-row">
+              <span>目标价值：</span>
+              <div class="kama-val-wrapper">
+                <span id="modal-calc-target">0</span>
+              </div>
+            </div>
+          </div>
+
+          <button class="add-track-btn save-btn" id="modal-save-btn">保存修改</button>
+          <button
+            class="delete-item-btn"
+            id="modal-delete-btn"
+            style="
+              color: #ff4d4d;
+              margin-top: 10px;
+              cursor: pointer;
+              background: none;
+              border: none;
+              text-decoration: underline;
+            ">
+            删除物品
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Data -->
+    <script src="assets/js/data/database.js"></script>
+    <script src="assets/js/data/items.js"></script>
+    <script src="assets/js/data/item_i18n_map.js"></script>
+    <script src="assets/js/data/wakfu_monsters.js"></script>
+
+    <!-- Modules -->
+    <script src="assets/js/modules/sessionRecap.js"></script>
+    <script src="assets/js/modules/state.js"></script>
+    <script src="assets/js/modules/utils.js"></script>
+    <script src="assets/js/modules/filesystem.js"></script>
+    <script src="assets/js/modules/chat.js"></script>
+    <script src="assets/js/modules/combat.js"></script>
+    <script src="assets/js/modules/tracker.js"></script>
+    <script src="assets/js/modules/forecast.js"></script>
+    <script src="assets/js/modules/ui.js"></script>
+
+    <!-- Core -->
+    <script src="assets/js/core/professions.js"></script>
+    <script src="assets/js/core/main.js"></script>
+  </body>
+</html>

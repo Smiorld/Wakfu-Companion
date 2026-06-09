@@ -1,0 +1,12 @@
+{
+  "name": "wakfu-companion",
+  "version": "1.0.0",
+  "description": "Static site for Wakfu Companion",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve -l $PORT"
+  },
+  "dependencies": {
+    "serve": "^14.0.0"
+  }
+}

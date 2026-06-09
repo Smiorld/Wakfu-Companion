@@ -1,0 +1,793 @@
+let fightStartTime = null;
+let pendingArmorDamage = null;
+
+function isExplicitArmorSpellSource(spellName) {
+  return !!String(spellName || "").trim();
+}
+
+// HELPER CONSTANTS
+const NOISE_WORDS = new Set(["Block!", "Critical", "Critical Hit", "Critical Hit Expert", "Slow Influence", "Backstab", "Sidestab", "Berserk", "Influence", "Dodge", "Lock", "Increased Damage", "格挡！", "暴击", "闪避", "锁定", "最终伤害", "元素抗性"]);
+
+function processFightLog(line) {
+  const hpUnits = "HP|PdV|PV|生命";
+  const armorUnits = "Armor|Armadura|Armure|护甲";
+  const numPattern = "[\\d,.\\s]+";
+
+  const parts = line.split(/\] /);
+  if (parts.length < 2) return;
+  const content = parts[1].trim();
+
+  // Auto Reset Logic
+  if (isAutoResetOn && awaitingNewFight && !content.toLowerCase().includes("over") && !content.includes("战斗结束")) {
+    performReset(true);
+    awaitingNewFight = false;
+  }
+
+  // 1. Turn/Time Carryover - RESET CASTER
+  if (content.includes("carried over") || content.includes("tour suivant") || (content.includes("保留") && content.includes("下一回合"))) {
+    currentCaster = null;
+    currentSpell = "Passive / Indirect";
+    // Flush pending if any (assume Neutral if turn ended)
+    if (pendingArmorDamage) {
+      updateCombatData(fightData, pendingArmorDamage.caster, pendingArmorDamage.spell, pendingArmorDamage.amount, "Neutral");
+      pendingArmorDamage = null;
+    }
+    return;
+  }
+
+  // 2. Cast Detection
+  const castMatch = content.match(/^(.*?) (?:casts|lance(?: le sort)?|lanza(?: el hechizo)?|lança(?: o feitiço)?|施放)\s*[“"]?(.*?)[”"]?(?:\.(?=$|\s[\(（])|(?=\s[\(（])|$)/i);
+  if (castMatch) {
+    // If we have pending armor damage when a NEW spell starts, flush it as Neutral
+    if (pendingArmorDamage) {
+      updateCombatData(fightData, pendingArmorDamage.caster, pendingArmorDamage.spell, pendingArmorDamage.amount, "Neutral");
+      pendingArmorDamage = null;
+    }
+
+    const casterCandidate = castMatch[1].trim();
+    const castSpell = castMatch[2].trim().replace(/^[“"]|[”"]$/g, "");
+
+    if (!nonCombatantList.some((nc) => casterCandidate.includes(nc))) {
+      currentCaster = casterCandidate;
+      currentSpell = castSpell;
+      detectClass(currentCaster, currentSpell);
+    }
+    return;
+  }
+
+  // --- NEW: STATE ACTIVATION DETECTION (Fix for Flaming) ---
+  // Captures "Player: Flaming (Lvl X)" to set context for following damage
+  const stateMatch = content.match(/^([^:]+):\s*(Flaming|Embrasement|Scalded|Echaudé|Poison|Hémorragie|Bleeding|失血)(?:\s*[\(（]|$)/);
+  if (stateMatch) {
+    const sourceName = stateMatch[1].trim();
+    const stateName = stateMatch[2].trim();
+    // Only switch context if it's likely a player
+    if (!nonCombatantList.some((nc) => sourceName.includes(nc))) {
+      stateSources[stateName] = sourceName;
+    }
+  }
+
+  // 3. Action Detection (Damage/Heal/Armor)
+  const actionMatch = content.match(new RegExp(`^(.*?):\\s*([+-])?(${numPattern})\\s*(${hpUnits}|${armorUnits})(.*)`));
+  if (actionMatch) {
+    const target = actionMatch[1].trim();
+    const sign = actionMatch[2] || "";
+    const amount = parseInt(actionMatch[3].replace(/[,.\s]/g, ""), 10);
+    const unit = actionMatch[4];
+    const suffix = actionMatch[5].trim();
+
+    // --- PRE-PROCESSING: Extract Element & Spell Override ---
+    // We do this BEFORE the "amount <= 0" check because we need the element even from 0 HP lines
+    const details = Array.from(suffix.matchAll(/[\(（]([^()（）]+)[\)）]/g), (match) => match[1]);
+
+    let detectedElement = null;
+    let spellOverride = null;
+
+    for (const d of details) {
+      const norm = normalizeElement(d);
+      if (norm) {
+        detectedElement = norm;
+      } else if (!NOISE_WORDS.has(d)) {
+        const knownMatch = Array.from(allKnownSpells).find((s) => d === s || d.includes(s));
+
+        if (knownMatch) {
+          spellOverride = knownMatch;
+        } else {
+          const isPrioritySource = d.includes("Potion") || d.includes("Flask") || d.includes("Flasque") || d.includes("Consumable");
+
+          const isCurrentSpellValid = currentSpell && spellToClassMap[currentSpell];
+
+          if (isPrioritySource || !isCurrentSpellValid) {
+            if (!d.toLowerCase().includes("lost")) {
+              spellOverride = d;
+            }
+          }
+        }
+      }
+    }
+
+    // --- RESOLVE PENDING ARMOR DAMAGE ---
+    // If we have a pending armor hit, this line (usually -0 HP) provides the element
+    if (pendingArmorDamage) {
+      let elementToUse = "Neutral";
+      // Only apply element if targets match. Otherwise, it's a disjointed event.
+      if (target === pendingArmorDamage.target) {
+        elementToUse = detectedElement || "Neutral";
+      }
+
+      updateCombatData(fightData, pendingArmorDamage.caster, pendingArmorDamage.spell, pendingArmorDamage.amount, elementToUse);
+      pendingArmorDamage = null;
+    }
+    // ------------------------------------
+
+    // Now valid amount check (Exit if 0, effectively skipping the -0 HP line itself)
+    if (isNaN(amount) || amount <= 0) return;
+
+    if (!fightStartTime) fightStartTime = Date.now();
+
+    // ATTRIBUTION LOGIC
+    let finalCaster = currentCaster;
+    if (!currentCaster || currentCaster === "Unknown") {
+      finalCaster = target;
+    }
+
+    // 1. Check State Ownership (The Fix)
+    if (spellOverride && stateSources[spellOverride]) {
+      finalCaster = stateSources[spellOverride];
+    }
+    // 2. Specific self-harm check
+    else if (["Burning Armor", "Armadura Ardiente", "Reflect", "Thorns"].some((s) => spellOverride && spellOverride.includes(s))) {
+      finalCaster = target;
+    }
+
+    // HEAL SAFEGUARD & MECHANIC DETECTION
+    if (sign === "+") {
+      const casterIsAlly = finalCaster && isPlayerAlly({ name: finalCaster });
+      const targetIsAlly = isPlayerAlly({ name: target });
+
+      if (casterIsAlly && !targetIsAlly) {
+        finalCaster = target;
+        if (!spellOverride) spellOverride = "Mechanic / Passive";
+      }
+
+      if (!casterIsAlly && !targetIsAlly && finalCaster !== target) {
+        const spellNameToCheck = spellOverride || currentSpell;
+        if (spellNameToCheck && !spellToClassMap[spellNameToCheck]) {
+          finalCaster = target;
+        }
+      }
+    }
+
+    let finalSpell = spellOverride || currentSpell;
+
+    // SIGNATURE REROUTING
+    if (finalSpell && finalSpell !== "Unknown Spell" && finalSpell !== "Passive / Indirect" && finalCaster !== "Dungeon Mechanic") {
+      finalCaster = getSignatureCaster(finalSpell, finalCaster);
+    }
+
+    // Summon Binding
+    if (summonBindings[finalCaster]) {
+      const master = summonBindings[finalCaster];
+      finalSpell = `${finalSpell} (${finalCaster})`;
+      finalCaster = master;
+    }
+
+    const isArmor = unit.match(new RegExp(armorUnits, "i"));
+
+    if (isArmor && sign === "+" && isExplicitArmorSpellSource(spellOverride)) {
+      // Positive armor lines with an explicit source spell in parentheses are
+      // usually self-generated shields in CN logs (for example 地盘术 / 突击).
+      // Attribute them to the shield owner instead of the previous caster context.
+      finalCaster = target;
+    }
+
+    if (isArmor) {
+      if (sign === "-") {
+        // Negative Armor = Damage (Shield Break)
+        // STORE AND WAIT for next line to get Element
+        pendingArmorDamage = {
+          caster: finalCaster,
+          spell: finalSpell,
+          amount: amount,
+          target: target,
+        };
+        return; // Stop here, wait for next loop iteration
+      } else {
+        // Positive Armor = Shielding
+        updateCombatData(armorData, finalCaster, finalSpell, amount, null);
+      }
+    } else if (sign === "+") {
+      updateCombatData(healData, finalCaster, finalSpell, amount, detectedElement || "Neutral");
+    } else {
+      updateCombatData(fightData, finalCaster, finalSpell, amount, detectedElement || "Neutral");
+    }
+
+    lastCombatTime = Date.now();
+    updateWatchdogUI();
+  }
+}
+
+function updateCombatData(dataSet, player, spell, amount, element) {
+  if (!dataSet[player]) dataSet[player] = { name: player, total: 0, spells: {} };
+  dataSet[player].total += amount;
+
+  const spellKey = `${spell}|${element || "neutral"}`;
+  if (!dataSet[player].spells[spellKey]) {
+    dataSet[player].spells[spellKey] = {
+      val: 0,
+      element: element,
+      realName: spell,
+    };
+  }
+  dataSet[player].spells[spellKey].val += amount;
+
+  // Mark as dirty so we know we have data to save
+  hasUnsavedChanges = true;
+}
+
+function detectClass(playerName, spellName) {
+  const lowerName = playerName.toLowerCase().trim();
+
+  // Skip detection if this entity is known to be a monster
+  if (monsterLookup[lowerName]) return;
+
+  if (spellToClassMap[spellName]) {
+    const detected = spellToClassMap[spellName];
+    if (playerClasses[playerName] !== detected) {
+      playerClasses[playerName] = detected;
+      // Clear icon cache so it re-renders with the new class icon
+      delete playerIconCache[playerName];
+    }
+  }
+}
+
+function saveFightToHistory() {
+  // 1. Check if there is data
+  if (Object.keys(fightData).length === 0 && Object.keys(healData).length === 0) return;
+
+  // 2. NEW: Check if we actually have new changes since last save
+  if (!hasUnsavedChanges) return;
+
+  // Create a deep copy of the current state
+  const snapshot = {
+    damage: JSON.parse(JSON.stringify(fightData)),
+    healing: JSON.parse(JSON.stringify(healData)),
+    armor: JSON.parse(JSON.stringify(armorData)),
+    classes: JSON.parse(JSON.stringify(playerClasses)),
+    overrides: JSON.parse(JSON.stringify(manualOverrides)),
+    timestamp: new Date().toLocaleTimeString(),
+  };
+
+  // Add to start of array
+  fightHistory.unshift(snapshot);
+
+  // MEMORY OPTIMIZATION: Limit history to MAX_FIGHT_HISTORY (5)
+  while (fightHistory.length > MAX_FIGHT_HISTORY) {
+    fightHistory.pop();
+  }
+
+  try {
+    localStorage.setItem("wakfu_fight_history", JSON.stringify(fightHistory));
+  } catch (e) {
+    console.error("Failed to save history - Storage full?", e);
+    // If storage is full, clear history to prevent app crash
+    fightHistory = [];
+  }
+
+  // Mark as saved
+  hasUnsavedChanges = false;
+
+  updateHistoryButtons();
+}
+
+function performReset(isAuto = false) {
+  // 1. Save to history before clearing
+  saveFightToHistory();
+
+  // 2. Clear Live Data
+  fightData = {};
+  healData = {};
+  armorData = {};
+
+  // 3. Reset State
+  currentCaster = "Unknown";
+  currentSpell = "Unknown Spell";
+  awaitingNewFight = false;
+  hasUnsavedChanges = false;
+  fightStartTime = null;
+  pendingArmorDamage = null; // Clear any hanging buffer
+  stateSources = {};
+
+  // 4. CLEAR STORAGE
+  localStorage.removeItem("wakfu_live_combat_state");
+
+  // 5. Reset Views
+  currentViewIndex = "live";
+  updateHistoryButtons();
+
+  renderMeter();
+  updateWatchdogUI();
+}
+
+function getFightDuration() {
+  if (!fightStartTime) return "00:00";
+  const end = lastCombatTime > fightStartTime ? lastCombatTime : Date.now();
+  const diff = end - fightStartTime;
+  const minutes = Math.floor(diff / 60000);
+  const seconds = Math.floor((diff % 60000) / 1000);
+  return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function mergeSummonData(summon, master) {
+  // We iterate through all 3 categories: damage, healing, and armor
+  [fightData, healData, armorData].forEach((dataSet) => {
+    if (dataSet[summon]) {
+      // Create master entry if they don't exist in this specific dataset yet
+      if (!dataSet[master]) {
+        dataSet[master] = { name: master, total: 0, spells: {} };
+      }
+
+      // 1. Move the total value
+      dataSet[master].total += dataSet[summon].total;
+
+      // 2. Move and prefix the spells so you know they came from the summon
+      Object.entries(dataSet[summon].spells).forEach(([key, s]) => {
+        const originalName = s.realName || key.split("|")[0];
+        const newSpellName = `${originalName} (${summon})`;
+        const element = s.element || "Neutral";
+        const newKey = `${newSpellName}|${element}`;
+
+        if (!dataSet[master].spells[newKey]) {
+          dataSet[master].spells[newKey] = {
+            val: 0,
+            element: element,
+            realName: newSpellName,
+          };
+        }
+        dataSet[master].spells[newKey].val += s.val;
+      });
+
+      // 3. Remove the summon from the top level so they disappear from the list
+      delete dataSet[summon];
+
+      // 4. Clear icon cache for the master to ensure clean re-render
+      delete playerIconCache[master];
+    }
+  });
+}
+
+function generateSpellMap() {
+  if (typeof classSpells === "undefined") return;
+  spellToClassMap = {};
+  allKnownSpells = new Set(); // Ensure this is initialized
+
+  // Iterate over each class (e.g., "feca", "iop")
+  for (const [className, langData] of Object.entries(classSpells)) {
+    // Handle the new structure: Object with languages { en: [], fr: [] }
+    if (typeof langData === "object" && !Array.isArray(langData)) {
+      // Iterate over each language array
+      for (const spells of Object.values(langData)) {
+        if (Array.isArray(spells)) {
+          spells.forEach((spell) => {
+            spellToClassMap[spell] = className;
+            allKnownSpells.add(spell);
+          });
+        }
+      }
+    }
+    // Fallback for flat structure if data is mixed (e.g. array of strings)
+    else if (Array.isArray(langData)) {
+      langData.forEach((spell) => {
+        spellToClassMap[spell] = className;
+        allKnownSpells.add(spell);
+      });
+    }
+  }
+
+  // --- MANUAL INJECTIONS ---
+
+  // SADIDA TOXINS & DOLL SPELLS
+  const sadidaSpells = [
+    "Harmless Toxin",
+    "Toxine inoffensive",
+    "Toxina inofensiva",
+    "Tetatoxin",
+    "Tétatoxine",
+    "Venomous",
+    "Venimeux",
+    "Liquid Ghoul",
+    // Fix for Task 2: Nettled states
+    "Sadida Nettled",
+    "Nettled",
+  ];
+
+  sadidaSpells.forEach((s) => {
+    spellToClassMap[s] = "sadida";
+    allKnownSpells.add(s);
+  });
+
+  // ECAFLIP
+  spellToClassMap["Blackjack"] = "ecaflip";
+  allKnownSpells.add("Blackjack");
+}
+
+function normalizeElement(el) {
+  if (!el) return null;
+  const low = el.toLowerCase().trim();
+  const elementMap = {
+    // English
+    fire: "Fire",
+    water: "Water",
+    earth: "Earth",
+    air: "Air",
+    stasis: "Stasis",
+    light: "Light",
+    neutral: "Neutral",
+    火系: "Fire",
+    水系: "Water",
+    地系: "Earth",
+    风系: "Air",
+    光系: "Light",
+    中性: "Neutral",
+    创生: "Stasis",
+    创生力: "Stasis",
+    // French
+    feu: "Fire",
+    eau: "Water",
+    terre: "Earth",
+    aire: "Air",
+    stase: "Stasis",
+    lumière: "Light",
+    neutre: "Neutral",
+    // Spanish
+    fuego: "Fire",
+    agua: "Water",
+    tierra: "Earth",
+    aire: "Air",
+    estasis: "Stasis",
+    luz: "Light",
+    neutral: "Neutral",
+    // Portuguese
+    fogo: "Fire",
+    água: "Water",
+    terra: "Earth",
+    ar: "Air",
+    estase: "Stasis",
+    luz: "Light",
+    neutro: "Neutral",
+  };
+  return elementMap[low] || (["Fire", "Water", "Earth", "Air", "Stasis", "Light", "Neutral"].includes(el) ? el : null);
+}
+
+// Entities that should NEVER own subsequent damage procs
+const nonCombatantList = ["Gobgob", "Beacon", "Balise", "Standard-Bearing Puppet", "Microbot", "Cybot", "Dial", "Cadran", "Coney", "Lapino", "刺客分身"];
+
+// Helper for elements normalization
+const elementMap = {
+  aire: "Air",
+  ar: "Air",
+  fuego: "Fire",
+  fogo: "Fire",
+  feu: "Fire",
+  tierra: "Earth",
+  terra: "Earth",
+  terre: "Earth",
+  agua: "Water",
+  água: "Water",
+  eau: "Water",
+  estasis: "Stasis",
+  stase: "Stasis",
+  luz: "Light",
+  lumière: "Light",
+};
+
+// Helper to find a player by their detected class
+function findFirstPlayerByClass(targetClass) {
+  return Object.keys(playerClasses).find((name) => playerClasses[name] === targetClass);
+}
+
+// Helper to ensure damage goes to the rightful class owner
+function getSignatureCaster(spellName, defaultCaster) {
+  const signatureClass = spellToClassMap[spellName];
+  if (!signatureClass) return defaultCaster;
+
+  // Check if the current caster is already the correct class
+  if (playerClasses[defaultCaster] === signatureClass) return defaultCaster;
+
+  // If not, try to find a player in the fight who IS that class
+  const classOwner = findFirstPlayerByClass(signatureClass);
+  return classOwner || defaultCaster;
+}
+
+function routeCombatData(unit, armorUnits, sign, caster, spell, amount, element) {
+  if (unit.match(new RegExp(armorUnits, "i"))) {
+    updateCombatData(armorData, caster, spell, amount, null);
+  } else if (sign === "+") {
+    updateCombatData(healData, caster, spell, amount, element);
+  } else {
+    updateCombatData(fightData, caster, spell, amount, element);
+  }
+}
+
+// Helper: Determine if a player object belongs to Allies or Enemies
+function isPlayerAlly(p, contextClasses = null, contextOverrides = null) {
+  const classesMap = contextClasses || playerClasses;
+  const overridesMap = contextOverrides || manualOverrides;
+  const name = p.name;
+  const lowerName = name.toLowerCase().trim();
+
+  // 1. Manual Overrides (Highest Priority - from Drag & Drop)
+  if (overridesMap[name]) return overridesMap[name] === "ally";
+
+  // 2. Known Monsters & Bosses (Strict Enemy)
+  if (monsterLookup[lowerName]) return false;
+
+  // 3. Enemy Families (Generic Logic)
+  if (typeof wakfuEnemies !== "undefined") {
+    const isEnemy = wakfuEnemies.some((fam) => lowerName.includes(fam.toLowerCase()));
+    if (isEnemy || name.includes("Punchy") || name.includes("Papas")) return false;
+  }
+
+  // 4. Detected Player Classes (Ally)
+  // Only checks this AFTER confirming it's not a known monster
+  if (classesMap[name]) return true;
+
+  // 5. Known Summons (Ally)
+  if (typeof allySummons !== "undefined" && allySummons.includes(name)) return true;
+
+  // 6. Default Fallback -> Enemy
+  return false;
+}
+
+document.getElementById("resetBtn").addEventListener("click", performReset);
+
+let monsterLookup = {};
+let stateSources = {}; // Maps State Name -> Player Name
+
+function initMonsterDatabase() {
+  if (typeof wakfuMonsters === "undefined") return;
+
+  monsterLookup = {};
+
+  // Create Lookup Table
+  const len = wakfuMonsters.length;
+  for (let i = 0; i < len; i++) {
+    const m = wakfuMonsters[i];
+    const img = m.imgId;
+    // Optimization: Low-level assign is faster than forEach on keys
+    if (m.nameEN) monsterLookup[m.nameEN.toLowerCase()] = img;
+    if (m.nameFR) monsterLookup[m.nameFR.toLowerCase()] = img;
+    if (m.nameES) monsterLookup[m.nameES.toLowerCase()] = img;
+    if (m.namePT) monsterLookup[m.namePT.toLowerCase()] = img;
+  }
+
+  // Delete the massive source array from memory
+  wakfuMonsters = null;
+  delete window.wakfuMonsters;
+}
+
+function loadFightHistory() {
+  const stored = localStorage.getItem("wakfu_fight_history");
+  if (stored) {
+    try {
+      fightHistory = JSON.parse(stored);
+      updateHistoryButtons();
+    } catch (e) {
+      console.error("Error loading fight history:", e);
+      fightHistory = []; // Reset on corruption
+    }
+  }
+}
+
+function updateHistoryButtons() {
+  // Update numeric buttons availability
+  for (let i = 0; i < 5; i++) {
+    const btn = document.getElementById(`btn-hist-${i}`);
+    if (btn) {
+      if (fightHistory[i]) {
+        btn.classList.remove("disabled");
+        btn.title = `Fight ended at ${fightHistory[i].timestamp}`;
+      } else {
+        btn.classList.add("disabled");
+        btn.title = "Empty";
+      }
+
+      // Highlight active view
+      if (currentViewIndex === i) btn.classList.add("active");
+      else btn.classList.remove("active");
+    }
+  }
+
+  // Update Live button
+  const liveBtn = document.getElementById("btn-live");
+  if (liveBtn) {
+    if (currentViewIndex === "live") liveBtn.classList.add("active");
+    else liveBtn.classList.remove("active");
+  }
+}
+
+function viewHistory(index) {
+  currentViewIndex = index;
+  updateHistoryButtons();
+  renderMeter();
+}
+
+let permissionStrikeCount = 0; // Counter for transient errors
+
+const LOOT_KEYWORDS = ["picked up", "ramassé", "obtenu", "recogido", "obtenido", "apanhou", "obteve", "你得到了", "你失去了", "配方完成", "回收"];
+
+async function parseFile() {
+  const now = Date.now();
+  if (isReading) {
+    if (window.lastReadTime && now - window.lastReadTime > 2000) {
+      console.warn("[Nexus] Reader was stuck. Forcing unlock.");
+      isReading = false;
+    } else {
+      return;
+    }
+  }
+
+  isReading = true;
+
+  try {
+    const file = await fileHandle.getFile();
+
+    // Success: Reset error counter
+    permissionStrikeCount = 0;
+
+    if (file.size > fileOffset) {
+      const blob = file.slice(fileOffset, file.size);
+      const text = await blob.text();
+
+      // Optimization: Manual split to avoid memory retention issues
+      const lines = text.split(/\r?\n/);
+
+      for (let i = 0; i < lines.length; i++) {
+        // Detach string from memory blob
+        const cleanLine = (" " + lines[i]).slice(1);
+        processLine(cleanLine);
+      }
+
+      lines.length = 0; // Clear array
+      fileOffset = file.size;
+
+      // Batch Update UI
+      renderMeter();
+
+      if (trackerDirty) {
+        saveTrackerState();
+        renderTracker();
+        trackerDirty = false;
+      }
+    }
+  } catch (err) {
+    // --- HANDLE FILE LOCKING ---
+    if (err.name === "NotReadableError") {
+      // This is normal. The game is currently writing to the file. We just skip this tick and try again in 1 second. DO NOT increment permissionStrikeCount.
+      console.warn("[Nexus] File locked by game (busy). Retrying next tick...");
+    }
+    // Handle actual Permission Loss or File Deletion
+    else if (err.name === "NotFoundError" || err.message.includes("permission")) {
+      permissionStrikeCount++;
+      console.error(`[Nexus] Read Error (${permissionStrikeCount}/10):`, err);
+
+      // Only stop if it fails 10 times consecutively (10 seconds of failure)
+      if (permissionStrikeCount >= 10) {
+        console.error("[Nexus] Persistent file error. Stopping reader.");
+        if (typeof parseIntervalId !== "undefined") clearInterval(parseIntervalId);
+
+        // Show Reconnect UI
+        document.getElementById("setup-panel").style.display = "block";
+        document.getElementById("drop-zone").style.display = "none";
+        document.getElementById("reconnect-container").style.display = "block";
+      }
+    } else {
+      console.error("[Nexus] Unexpected Error:", err);
+    }
+  } finally {
+    // Critical: Always unlock the reader so the next interval tick can run
+    isReading = false;
+  }
+}
+
+function processLine(line) {
+  if (!line || line.trim() === "") return;
+
+  const lineLower = line.toLowerCase();
+
+  // EXPLICIT SYSTEM CHECK
+  const systemEndPattens = [
+    { tag: "[fight log]", msg: "fight is over" },
+    { tag: "[information (combat)]", msg: "le combat est terminé" },
+    { tag: "[información (combate)]", msg: "el combate ha terminado" },
+    { tag: "[registro de lutas]", msg: "a luta terminou" },
+    { tag: "[战斗日志]", msg: "战斗结束了" },
+  ];
+
+  const battleJustFinished = systemEndPattens.some((p) => lineLower.includes(p.tag) && lineLower.includes(p.msg));
+
+  if (typeof processSessionLog === "function") {
+    processSessionLog(line);
+  }
+
+  if (battleJustFinished) {
+    saveFightToHistory();
+    awaitingNewFight = true;
+    updateWatchdogUI();
+  }
+
+  if (logLineCache.has(line)) return;
+  logLineCache.add(line);
+  if (logLineCache.size > MAX_CACHE_SIZE) {
+    const firstItem = logLineCache.values().next().value;
+    logLineCache.delete(firstItem);
+  }
+
+  try {
+    const isLoot = LOOT_KEYWORDS.some((kw) => lineLower.includes(kw));
+    const isCombat = lineLower.includes("[fight log]") || lineLower.includes("[information (combat)]") || lineLower.includes("[información (combate)]") || lineLower.includes("[registro de lutas]") || line.includes("[战斗日志]");
+
+    if (isLoot) {
+      processItemLog(line);
+    } else if (isCombat) {
+      processFightLog(line);
+    }
+
+    if (line.match(/^\d{2}:\d{2}:\d{2}/)) {
+      processChatLog(line);
+    }
+  } catch (err) {
+    console.error("Parsing Error:", err);
+  }
+}
+
+function saveLiveCombatState() {
+  if (Object.keys(fightData).length === 0 && Object.keys(healData).length === 0) return;
+
+  const state = {
+    fightData,
+    healData,
+    armorData,
+    playerClasses,
+    manualOverrides,
+    summonBindings,
+    fightStartTime,
+    awaitingNewFight,
+  };
+  localStorage.setItem("wakfu_live_combat_state", JSON.stringify(state));
+}
+
+function loadLiveCombatState() {
+  const raw = localStorage.getItem("wakfu_live_combat_state");
+  if (!raw) return;
+
+  try {
+    const state = JSON.parse(raw);
+
+    fightData = state.fightData || {};
+    healData = state.healData || {};
+    armorData = state.armorData || {};
+    playerClasses = state.playerClasses || {};
+    manualOverrides = state.manualOverrides || {};
+    summonBindings = state.summonBindings || {};
+    fightStartTime = state.fightStartTime || null;
+    awaitingNewFight = state.awaitingNewFight || false;
+
+    if (Object.keys(fightData).length > 0 || Object.keys(healData).length > 0) {
+      window.isRestoredSession = true;
+    }
+
+    if (typeof renderMeter === "function") renderMeter();
+    if (typeof updateWatchdogUI === "function") updateWatchdogUI();
+  } catch (e) {
+    console.error("Failed to restore live combat state", e);
+  }
+}
+
+// Auto-save when closing the page/tab
+window.addEventListener("beforeunload", () => {
+  saveLiveCombatState();
+});
+
+// Export for main.js
+window.loadLiveCombatState = loadLiveCombatState;
