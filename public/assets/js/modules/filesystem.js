@@ -77,3 +77,30 @@ async function checkPreviousFile() {
     }
   }
 }
+
+async function exportBugReportLog() {
+  if (!fileHandle) {
+    alert("请先连接日志文件，再导出反馈日志。");
+    return;
+  }
+
+  try {
+    const file = await fileHandle.getFile();
+    const suggestedName = "把这个发送给薯条.log";
+    const url = URL.createObjectURL(file);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = suggestedName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    alert(
+      "已下载当前日志。\n请把“把这个发送给薯条.log”发给 T2薯条，并描述你遇到的具体问题。\nQQ：1541599745"
+    );
+  } catch (e) {
+    console.error("Export bug report log failed:", e);
+    alert("导出反馈日志失败，请重试。");
+  }
+}

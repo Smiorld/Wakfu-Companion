@@ -11,6 +11,7 @@ const chatList = document.getElementById("chat-list");
 const autoResetBtn = document.getElementById("autoResetToggle");
 const autoResetText = document.getElementById("autoResetText");
 const clearChatBtn = document.getElementById("clearChatBtn");
+const bugReportBtn = document.getElementById("bug-report-btn");
 
 // Reconnect Elements
 const reconnectContainer = document.getElementById("reconnect-container");
@@ -180,6 +181,14 @@ autoResetBtn.addEventListener("click", () => {
   autoResetBtn.classList.toggle("active", isAutoResetOn);
   updateWatchdogUI(); // ui.js
 });
+
+if (bugReportBtn) {
+  bugReportBtn.addEventListener("click", async () => {
+    if (typeof exportBugReportLog === "function") {
+      await exportBugReportLog();
+    }
+  });
+}
 
 window.startSessionTimer = startSessionTimer;
 

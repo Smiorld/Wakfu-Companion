@@ -319,6 +319,11 @@ function getFightDuration() {
 }
 
 function mergeSummonData(summon, master) {
+  const existingMaster = summonBindings[summon];
+  if (existingMaster && existingMaster !== master) {
+    unmergeSingleSummon(summon, existingMaster);
+  }
+
   // We iterate through all 3 categories: damage, healing, and armor
   [fightData, healData, armorData].forEach((dataSet) => {
     if (dataSet[summon]) {
@@ -354,6 +359,74 @@ function mergeSummonData(summon, master) {
       delete playerIconCache[master];
     }
   });
+}
+
+function unmergeSingleSummon(summon, master) {
+  [fightData, healData, armorData].forEach((dataSet) => {
+    const masterEntry = dataSet[master];
+    if (!masterEntry || !masterEntry.spells) return;
+
+    const suffix = ` (${summon})`;
+    const movedSpellKeys = Object.keys(masterEntry.spells).filter((key) => {
+      const spell = masterEntry.spells[key];
+      const realName = spell.realName || key.split("|")[0];
+      return realName.endsWith(suffix);
+    });
+
+    if (movedSpellKeys.length === 0) return;
+
+    if (!dataSet[summon]) {
+      dataSet[summon] = { name: summon, total: 0, spells: {} };
+    }
+
+    movedSpellKeys.forEach((mergedKey) => {
+      const spellData = masterEntry.spells[mergedKey];
+      const mergedRealName = spellData.realName || mergedKey.split("|")[0];
+      const originalName = mergedRealName.slice(0, -suffix.length);
+      const elementKey = mergedKey.split("|").slice(1).join("|") || "neutral";
+      const restoredKey = `${originalName}|${elementKey}`;
+
+      if (!dataSet[summon].spells[restoredKey]) {
+        dataSet[summon].spells[restoredKey] = {
+          val: 0,
+          element: spellData.element,
+          realName: originalName,
+        };
+      }
+
+      dataSet[summon].spells[restoredKey].val += spellData.val;
+      dataSet[summon].total += spellData.val;
+      masterEntry.total -= spellData.val;
+      delete masterEntry.spells[mergedKey];
+    });
+
+    if (masterEntry.total < 0) {
+      masterEntry.total = 0;
+    }
+
+    if (Object.keys(masterEntry.spells).length === 0 && masterEntry.total === 0) {
+      delete dataSet[master];
+    }
+
+    delete playerIconCache[summon];
+    delete playerIconCache[master];
+  });
+}
+
+function clearSummonBindings() {
+  Object.entries(summonBindings).forEach(([summon, master]) => {
+    unmergeSingleSummon(summon, master);
+  });
+  summonBindings = {};
+
+  try {
+    saveLiveCombatState();
+  } catch (e) {
+    console.warn("Failed to persist cleared summon bindings", e);
+  }
+
+  if (typeof lastRenderSignature !== "undefined") lastRenderSignature = "";
+  if (typeof renderMeter === "function") renderMeter();
 }
 
 function generateSpellMap() {
@@ -540,6 +613,9 @@ function isPlayerAlly(p, contextClasses = null, contextOverrides = null) {
 }
 
 document.getElementById("resetBtn").addEventListener("click", performReset);
+document
+  .getElementById("clearSummonBindingsBtn")
+  .addEventListener("click", clearSummonBindings);
 
 let monsterLookup = {};
 let stateSources = {}; // Maps State Name -> Player Name

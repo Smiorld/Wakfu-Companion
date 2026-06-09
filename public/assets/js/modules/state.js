@@ -56,6 +56,8 @@ let playerVariantState = {}; // Stores true/false for gender toggle
 let manualOverrides = JSON.parse(
   localStorage.getItem("wakfu_overrides") || "{}"
 ); // Map player Name -> 'ally' | 'enemy'
+let isMeterDragActive = false;
+let activeMeterDragName = null;
 let activeMeterMode = "damage"; // 'damage', 'healing', 'armor'
 let currentCaster = "Unknown";
 let currentSpell = "Unknown Spell";

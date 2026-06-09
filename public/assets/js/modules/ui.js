@@ -3,6 +3,8 @@
 let lastRenderSignature = "";
 
 function renderMeter() {
+  if (isMeterDragActive) return;
+
   // 1. DETERMINE DATA SOURCE
   let sourceFight, sourceClasses, sourceOverrides;
 
@@ -261,7 +263,10 @@ function setupDragAndDrop() {
   newContainer.addEventListener("dragstart", (e) => {
     const block = e.target.closest(".player-block");
     if (block && block.dataset.name) {
+      isMeterDragActive = true;
+      activeMeterDragName = block.dataset.name;
       e.dataTransfer.setData("text/plain", block.dataset.name);
+      e.dataTransfer.effectAllowed = "move";
       block.style.opacity = "0.5";
     }
   });
@@ -270,6 +275,10 @@ function setupDragAndDrop() {
   newContainer.addEventListener("dragend", (e) => {
     const block = e.target.closest(".player-block");
     if (block) block.style.opacity = "1";
+    isMeterDragActive = false;
+    activeMeterDragName = null;
+    lastRenderSignature = "";
+    renderMeter();
   });
 
   // 4. DRAG OVER / LEAVE / DROP (On the Lists themselves)
@@ -295,6 +304,8 @@ function setupDragAndDrop() {
       localStorage.setItem("wakfu_overrides", JSON.stringify(manualOverrides));
     } catch (e) {}
 
+    isMeterDragActive = false;
+    activeMeterDragName = null;
     // Force render immediately
     lastRenderSignature = "";
     renderMeter();
@@ -337,12 +348,15 @@ function setupDragAndDrop() {
       const targetName = block.dataset.name;
 
       if (draggedName && targetName && draggedName !== targetName) {
-        summonBindings[draggedName] = targetName;
         mergeSummonData(draggedName, targetName);
+        summonBindings[draggedName] = targetName;
+        if (typeof saveLiveCombatState === "function") saveLiveCombatState();
+        isMeterDragActive = false;
+        activeMeterDragName = null;
         lastRenderSignature = "";
         renderMeter();
+        e.stopPropagation(); // Prevent bubbling to the list drop handler
       }
-      e.stopPropagation(); // Prevent bubbling to the list drop handler
     }
   });
 }
