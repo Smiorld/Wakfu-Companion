@@ -97,8 +97,15 @@ let wakfuExternalGlossary = null;
 let wakfuExternalGlossaryPromise = null;
 let wakfuExactTermMap = null;
 let wakfuFuzzyAliasIndex = null;
+let azureGuideHtmlCache = "";
 
-const WAKFU_GLOSSARY_URL = "assets/data/wakfu_term_glossary.json?v=20260610b";
+const WAKFU_GLOSSARY_URL = "assets/data/wakfu_term_glossary.json?v=20260610e";
+const TRANSLATION_CONFIG_STORAGE_KEY = "wakfu_translation_config";
+const AZURE_TRANSLATOR_ENDPOINT =
+  "https://api.cognitive.microsofttranslator.com/translate?api-version=3.0";
+const AZURE_TARGET_LANGUAGE_MAP = {
+  "zh-CN": "zh-Hans",
+};
 const WAKFU_GENERIC_LATIN_ALIAS_WORDS = new Set([
   "all",
   "any",
@@ -232,6 +239,24 @@ function isLowValueLatinAlias(text) {
   return words.every((word) => WAKFU_GENERIC_LATIN_ALIAS_WORDS.has(word));
 }
 
+function shouldIndexForFuzzyMatch(entry, normalizedAlias, normalizedLatin) {
+  if (!normalizedLatin) return false;
+
+  const wordCount = normalizedLatin.split(" ").filter(Boolean).length;
+  if (wordCount < 1 || wordCount > 3) return false;
+  if (normalizedLatin.length < 4 || normalizedLatin.length > 24) return false;
+
+  // Single-word fuzzy matching produces too many false positives in normal chat,
+  // for example "fine" drifting into item terms such as "Fins".
+  // Keep typo tolerance mainly for multi-word game names, and only allow
+  // longer force-protected single words as a narrow exception.
+  if (wordCount === 1) {
+    return Boolean(entry.forceProtect) && normalizedLatin.length >= 6;
+  }
+
+  return true;
+}
+
 function isLikelyStandaloneGlossaryInput(text) {
   const value = normalizeTranslationAlias(text);
   if (!value || value.length > 48) return false;
@@ -363,7 +388,7 @@ async function buildWakfuTranslationAliases() {
 
           if (latin) {
             const wordCount = normalizedLatin ? normalizedLatin.split(" ").filter(Boolean).length : 0;
-            if (wordCount >= 1 && wordCount <= 3 && normalizedLatin.length >= 4 && normalizedLatin.length <= 24) {
+            if (shouldIndexForFuzzyMatch(entry, normalizedAlias, normalizedLatin)) {
               const indexKey = `${wordCount}:${normalizedLatin[0]}`;
               const bucket = fuzzyAliasIndex.get(indexKey) || [];
               bucket.push({
@@ -616,9 +641,235 @@ function restoreWakfuTerms(text, protectedPayload) {
   return restored;
 }
 
+function saveTranslationConfig() {
+  localStorage.setItem(
+    TRANSLATION_CONFIG_STORAGE_KEY,
+    JSON.stringify({
+      enabled: transConfig.enabled,
+      engine: transConfig.engine,
+      azureApiKey: transConfig.azureApiKey,
+      azureRegion: transConfig.azureRegion,
+    })
+  );
+}
+
+function setTranslationStatus(message, tone = "") {
+  const statusEl = getChatElement("translation-test-status");
+  if (!statusEl) return;
+
+  statusEl.textContent = message || "";
+  statusEl.classList.remove("is-success", "is-error");
+  if (tone === "success") statusEl.classList.add("is-success");
+  if (tone === "error") statusEl.classList.add("is-error");
+}
+
+function escapeGuideHtml(text) {
+  return String(text || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function renderGuideInlineMarkdown(text) {
+  return escapeGuideHtml(text)
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(
+      /\[([^\]]+)\]\(([^)]+)\)/g,
+      (_match, label, href) =>
+        `<a href="${resolveGuideAssetUrl(
+          href
+        )}" target="_blank" rel="noopener noreferrer">${label}</a>`
+    );
+}
+
+function resolveGuideAssetUrl(url) {
+  const raw = String(url || "").trim();
+  if (!raw) return raw;
+  if (/^(?:https?:|file:|data:|blob:)/i.test(raw)) return raw;
+
+  const normalized = raw.startsWith("/") ? raw.slice(1) : raw;
+  try {
+    return new URL(normalized, window.location.href).toString();
+  } catch (error) {
+    return raw;
+  }
+}
+
+function renderAzureGuideMarkdown(markdown) {
+  const lines = String(markdown || "").replace(/\r/g, "").split("\n");
+  const html = [];
+  let paragraphLines = [];
+  let listType = null;
+  let listItems = [];
+
+  const flushParagraph = () => {
+    if (!paragraphLines.length) return;
+    html.push(`<p>${renderGuideInlineMarkdown(paragraphLines.join(" "))}</p>`);
+    paragraphLines = [];
+  };
+
+  const flushList = () => {
+    if (!listType || !listItems.length) return;
+    html.push(`<${listType}>${listItems.join("")}</${listType}>`);
+    listType = null;
+    listItems = [];
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd();
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+
+    const headingMatch = trimmed.match(/^(#{1,3})\s+(.+)$/);
+    if (headingMatch) {
+      flushParagraph();
+      flushList();
+      const level = Math.min(3, headingMatch[1].length);
+      html.push(
+        `<h${level}>${renderGuideInlineMarkdown(headingMatch[2])}</h${level}>`
+      );
+      continue;
+    }
+
+    const imageMatch = trimmed.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (imageMatch) {
+      flushParagraph();
+      flushList();
+      html.push(
+        `<figure class="markdown-guide-figure"><img src="${resolveGuideAssetUrl(
+          imageMatch[2]
+        )}" alt="${escapeGuideHtml(
+          imageMatch[1]
+        )}" />${
+          imageMatch[1]
+            ? `<figcaption>${escapeGuideHtml(imageMatch[1])}</figcaption>`
+            : ""
+        }</figure>`
+      );
+      continue;
+    }
+
+    const orderedMatch = trimmed.match(/^\d+\.\s+(.+)$/);
+    if (orderedMatch) {
+      flushParagraph();
+      if (listType && listType !== "ol") flushList();
+      listType = "ol";
+      listItems.push(`<li>${renderGuideInlineMarkdown(orderedMatch[1])}</li>`);
+      continue;
+    }
+
+    const unorderedMatch = trimmed.match(/^-\s+(.+)$/);
+    if (unorderedMatch) {
+      flushParagraph();
+      if (listType && listType !== "ul") flushList();
+      listType = "ul";
+      listItems.push(`<li>${renderGuideInlineMarkdown(unorderedMatch[1])}</li>`);
+      continue;
+    }
+
+    flushList();
+    paragraphLines.push(trimmed);
+  }
+
+  flushParagraph();
+  flushList();
+  return html.join("");
+}
+
+async function ensureAzureGuideRendered() {
+  const container = getChatElement("azure-guide-content");
+  if (!container) return;
+
+  if (azureGuideHtmlCache) {
+    container.innerHTML = azureGuideHtmlCache;
+    return;
+  }
+
+  container.innerHTML =
+    '<div class="translation-provider-note">\u6b63\u5728\u52a0\u8f7d\u6559\u7a0b...</div>';
+
+  try {
+    const markdown =
+      typeof window.AZURE_TRANSLATOR_GUIDE_MARKDOWN === "string"
+        ? window.AZURE_TRANSLATOR_GUIDE_MARKDOWN
+        : "";
+    if (!markdown) {
+      throw new Error("Guide markdown is unavailable.");
+    }
+    azureGuideHtmlCache = renderAzureGuideMarkdown(markdown);
+    container.innerHTML = azureGuideHtmlCache;
+  } catch (error) {
+    container.innerHTML =
+      '<div class="markdown-guide-error">\u6559\u7a0b\u52a0\u8f7d\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002</div>';
+  }
+}
+
+async function openAzureGuideModal() {
+  const modal = getChatElement("azure-guide-modal");
+  if (modal) {
+    modal.style.display = "flex";
+    await ensureAzureGuideRendered();
+  }
+}
+
+function closeAzureGuideModal() {
+  const modal = getChatElement("azure-guide-modal");
+  if (modal) modal.style.display = "none";
+}
+
+function toggleAzureApiKeyVisibility() {
+  const input = getChatElement("azure-api-key-input");
+  const toggleBtn = document.querySelector(".translation-secret-toggle");
+  if (!input) return;
+
+  const isHidden = input.type === "password";
+  input.type = isHidden ? "text" : "password";
+  if (toggleBtn) {
+    toggleBtn.setAttribute(
+      "title",
+      isHidden
+        ? "\u9690\u85cf\u5bc6\u94a5"
+        : "\u663e\u793a\u6216\u9690\u85cf\u5bc6\u94a5"
+    );
+  }
+}
+
+function openTranslationConfigModal() {
+  syncTranslationConfigUI();
+  setTranslationStatus("");
+  const modal = getChatElement("translation-config-modal");
+  if (modal) modal.style.display = "flex";
+}
+
+function closeTranslationConfigModal() {
+  const modal = getChatElement("translation-config-modal");
+  if (modal) modal.style.display = "none";
+}
+
+function mapTargetLanguageForEngine(engine, targetLang) {
+  if (engine === "azure") {
+    return AZURE_TARGET_LANGUAGE_MAP[targetLang] || targetLang;
+  }
+  return targetLang;
+}
+
+function getActiveTranslationEngine() {
+  return transConfig.engine === "azure" ? "azure" : "google";
+}
+
 async function requestGoogleTranslation(text, targetLang) {
   const sourceUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
   const response = await fetch(sourceUrl);
+  if (!response.ok) {
+    throw new Error(`Google translation request failed: ${response.status}`);
+  }
   const data = await response.json();
   if (!data || !data[0]) return null;
 
@@ -628,12 +879,62 @@ async function requestGoogleTranslation(text, targetLang) {
   };
 }
 
+async function requestAzureTranslation(text, targetLang) {
+  const apiKey = String(transConfig.azureApiKey || "").trim();
+  const region = String(transConfig.azureRegion || "").trim();
+
+  if (!apiKey) {
+    throw new Error("Missing Azure API key");
+  }
+
+  const resolvedTarget = mapTargetLanguageForEngine("azure", targetLang);
+  const response = await fetch(
+    `${AZURE_TRANSLATOR_ENDPOINT}&to=${encodeURIComponent(resolvedTarget)}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json; charset=UTF-8",
+        "Ocp-Apim-Subscription-Key": apiKey,
+        ...(region ? { "Ocp-Apim-Subscription-Region": region } : {}),
+      },
+      body: JSON.stringify([{ Text: text }]),
+    }
+  );
+
+  if (!response.ok) {
+    let errorMessage = `Azure translation request failed: ${response.status}`;
+    try {
+      const errorData = await response.json();
+      const details = errorData?.error?.message || errorData?.message;
+      if (details) errorMessage = details;
+    } catch (error) {}
+    throw new Error(errorMessage);
+  }
+
+  const data = await response.json();
+  const firstResult = Array.isArray(data) ? data[0] : null;
+  const firstTranslation = firstResult?.translations?.[0];
+  if (!firstTranslation?.text) return null;
+
+  return {
+    text: firstTranslation.text,
+    lang: firstResult?.detectedLanguage?.language || "",
+  };
+}
+
+async function requestTranslationViaProvider(text, targetLang, engine = getActiveTranslationEngine()) {
+  if (engine === "azure") {
+    return requestAzureTranslation(text, targetLang);
+  }
+  return requestGoogleTranslation(text, targetLang);
+}
+
 async function translateWithProtectedTerms(text, targetLang) {
   const exactMatch = await lookupExactGlossaryTranslation(text, targetLang);
   if (exactMatch) return exactMatch;
 
   const protectedPayload = await protectWakfuTerms(text, targetLang);
-  const translationResult = await requestGoogleTranslation(
+  const translationResult = await requestTranslationViaProvider(
     protectedPayload.protectedText,
     targetLang
   );
@@ -791,7 +1092,7 @@ function addChatMessage(time, channel, author, message, skipAuto = false) {
       <span class="chat-time">${time}</span>
       <span class="chat-channel" style="color:${color}">${channelTag}</span>
       <span class="chat-author" style="color:${color}">${author}</span>
-      <button class="manual-trans-btn" data-tid="${transId}">T</button>
+      <button class="manual-trans-btn" data-tid="${transId}">翻译</button>
     </div>
     <div class="chat-content">${displayMessage}</div>
     <div id="${transId}" class="translated-block" style="display:none;"></div>
@@ -1004,6 +1305,89 @@ async function fetchTranslation(text, targetLang = "zh-CN") {
   }
 }
 
+function syncTranslationConfigUI() {
+  const engineSelect = getChatElement("translation-engine-select");
+  const azureKeyInput = getChatElement("azure-api-key-input");
+  const azureRegionInput = getChatElement("azure-region-input");
+  const googlePanel = getChatElement("translation-provider-google");
+  const azurePanel = getChatElement("translation-provider-azure");
+  const engine = getActiveTranslationEngine();
+
+  if (engineSelect) {
+    engineSelect.value = engine;
+  }
+  if (azureKeyInput) {
+    azureKeyInput.value = transConfig.azureApiKey || "";
+  }
+  if (azureRegionInput) {
+    azureRegionInput.value = transConfig.azureRegion || "";
+  }
+  if (googlePanel) {
+    googlePanel.classList.toggle("hidden", engine !== "google");
+  }
+  if (azurePanel) {
+    azurePanel.classList.toggle("hidden", engine !== "azure");
+  }
+}
+
+function setTranslationEngine(engine) {
+  transConfig.engine = engine === "azure" ? "azure" : "google";
+  saveTranslationConfig();
+  syncTranslationConfigUI();
+  setTranslationStatus(
+    transConfig.engine === "azure"
+      ? "\u5df2\u5207\u6362\u5230 Microsoft Azure \u7ffb\u8bd1\u3002"
+      : "\u5df2\u5207\u6362\u5230\u8c37\u6b4c\u7ffb\u8bd1\u3002"
+  );
+}
+
+function updateAzureTranslationConfig() {
+  const azureKeyInput = getChatElement("azure-api-key-input");
+  const azureRegionInput = getChatElement("azure-region-input");
+
+  transConfig.azureApiKey = String(azureKeyInput?.value || "").trim();
+  transConfig.azureRegion = String(azureRegionInput?.value || "").trim();
+  saveTranslationConfig();
+}
+
+async function testTranslationProvider(engine) {
+  const provider = engine === "azure" ? "azure" : "google";
+  setTranslationStatus(
+    provider === "azure"
+      ? "\u6b63\u5728\u6d4b\u8bd5 Azure \u7ffb\u8bd1\u8fde\u63a5..."
+      : "\u6b63\u5728\u6d4b\u8bd5\u8c37\u6b4c\u7ffb\u8bd1\u8fde\u63a5..."
+  );
+
+  try {
+    if (provider === "azure") {
+      updateAzureTranslationConfig();
+      if (!transConfig.azureApiKey) {
+        throw new Error("\u8bf7\u5148\u586b\u5199 Azure API Key\u3002");
+      }
+    }
+
+    const result = await requestTranslationViaProvider(
+      "Hello from Wakfu Companion",
+      "zh-CN",
+      provider
+    );
+
+    if (!result?.text) {
+      throw new Error("\u672a\u6536\u5230\u53ef\u7528\u7684\u7ffb\u8bd1\u7ed3\u679c\u3002");
+    }
+
+    setTranslationStatus(
+      `${provider === "azure" ? "Azure" : "\u8c37\u6b4c"}\u6d4b\u8bd5\u6210\u529f\uff1a${result.text}`,
+      "success"
+    );
+  } catch (error) {
+    setTranslationStatus(
+      `${provider === "azure" ? "Azure" : "\u8c37\u6b4c"}\u6d4b\u8bd5\u5931\u8d25\uff1a${error.message || error}`,
+      "error"
+    );
+  }
+}
+
 function getCategoryFromChannel(channelName) {
   const lower = channelName.toLowerCase();
   for (const [category, aliases] of Object.entries(CHAT_CHANNEL_ALIASES)) {
@@ -1106,6 +1490,7 @@ function toggleMasterSwitch() {
     translationQueue.length = 0;
     isTranslating = false;
   }
+  saveTranslationConfig();
   updateLangButtons();
 }
 

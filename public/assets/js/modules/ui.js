@@ -642,12 +642,7 @@ function renderTracker() {
     const usageInfo = getItemUsage(item.name);
     const currentCountText = String(item.current);
     const targetCountText = String(item.target);
-    const combinedSlotCountText =
-      item.target > 0 ? `${currentCountText}/${targetCountText}` : currentCountText;
-    const slotCountText =
-      item.target > 0 && combinedSlotCountText.length <= 7
-        ? combinedSlotCountText
-        : currentCountText;
+    const slotCountText = getTrackerSlotCountText(currentCountText, targetCountText);
     const priceInfo = item.price
       ? `\n当前价值：${(item.current * item.price).toLocaleString()} ₭`
       : "";
@@ -734,4 +729,40 @@ function renderTracker() {
       listEl.appendChild(row);
     }
   });
+}
+
+let trackerSlotCountMeasureEl = null;
+
+function getTrackerSlotCountMeasureEl() {
+  if (trackerSlotCountMeasureEl && document.body.contains(trackerSlotCountMeasureEl)) {
+    return trackerSlotCountMeasureEl;
+  }
+
+  const measureEl = document.createElement("span");
+  measureEl.className = "slot-count";
+  measureEl.style.position = "absolute";
+  measureEl.style.visibility = "hidden";
+  measureEl.style.pointerEvents = "none";
+  measureEl.style.right = "auto";
+  measureEl.style.bottom = "auto";
+  measureEl.style.maxWidth = "none";
+  measureEl.style.width = "auto";
+  measureEl.style.left = "-9999px";
+  measureEl.style.top = "-9999px";
+  document.body.appendChild(measureEl);
+  trackerSlotCountMeasureEl = measureEl;
+  return measureEl;
+}
+
+function getTrackerSlotCountText(currentCountText, targetCountText) {
+  const currentText = String(currentCountText ?? "");
+  const targetText = String(targetCountText ?? "");
+  if (!targetText || targetText === "0") return currentText;
+
+  const combinedText = `${currentText}/${targetText}`;
+  const measureEl = getTrackerSlotCountMeasureEl();
+  measureEl.textContent = combinedText;
+
+  const availableWidth = 52;
+  return measureEl.offsetWidth <= availableWidth ? combinedText : currentText;
 }

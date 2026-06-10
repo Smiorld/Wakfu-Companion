@@ -51,6 +51,16 @@ document.addEventListener("DOMContentLoaded", () => {
   if (typeof setupDragAndDrop === "function") setupDragAndDrop();
   if (typeof updateDailyTimer === "function") updateDailyTimer();
   if (typeof updateWatchdogUI === "function") updateWatchdogUI();
+  if (typeof syncTranslationConfigUI === "function") syncTranslationConfigUI();
+  if (typeof updateLangButtons === "function") updateLangButtons();
+  const translationCloseBtn = document.querySelector(
+    '#translation-config-modal .close-modal'
+  );
+  const azureGuideCloseBtn = document.querySelector(
+    '#azure-guide-modal .close-modal'
+  );
+  if (translationCloseBtn) translationCloseBtn.textContent = "×";
+  if (azureGuideCloseBtn) azureGuideCloseBtn.textContent = "×";
 
   // 5. Background Tasks
   setInterval(updateDailyTimer, 60000);
@@ -65,6 +75,18 @@ document.addEventListener("DOMContentLoaded", () => {
   const qtHandle = document.getElementById("qt-drag-handle");
   if (qtWindow && qtHandle) {
     makeDraggable(qtWindow, qtHandle);
+  }
+
+  const translationConfigWindow = document.getElementById("translation-config-modal");
+  const translationConfigHandle = document.getElementById("translation-config-drag-handle");
+  if (translationConfigWindow && translationConfigHandle) {
+    makeDraggable(translationConfigWindow, translationConfigHandle);
+  }
+
+  const azureGuideWindow = document.getElementById("azure-guide-modal");
+  const azureGuideHandle = document.getElementById("azure-guide-drag-handle");
+  if (azureGuideWindow && azureGuideHandle) {
+    makeDraggable(azureGuideWindow, azureGuideHandle);
   }
 
   const sessWindow = document.getElementById("session-window");

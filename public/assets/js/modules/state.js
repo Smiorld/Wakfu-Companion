@@ -71,8 +71,21 @@ let spellToClassMap = {};
 // Chat State
 const translationQueue = [];
 let isTranslating = false;
+const storedTranslationConfig = (() => {
+  try {
+    return JSON.parse(localStorage.getItem("wakfu_translation_config") || "{}");
+  } catch (error) {
+    return {};
+  }
+})();
 const transConfig = {
-  enabled: true,
+  enabled:
+    typeof storedTranslationConfig.enabled === "boolean"
+      ? storedTranslationConfig.enabled
+      : true,
+  engine: storedTranslationConfig.engine === "azure" ? "azure" : "google",
+  azureApiKey: String(storedTranslationConfig.azureApiKey || "").trim(),
+  azureRegion: String(storedTranslationConfig.azureRegion || "").trim(),
 };
 let currentChatFilter = "all";
 

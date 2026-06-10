@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>沃土伴侣 | T2薯条</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=20260610b" />
+    <link rel="stylesheet" href="assets/css/style.css?v=20260610e" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
   </head>
   <body>
@@ -228,14 +228,14 @@
           </div>
 
           <div class="trans-toolbar">
-            <span class="trans-label">&#33258;&#21160;&#32763;&#35793;&#65306;</span>
-
             <div class="chat-search-inline">
               <input type="text" id="chat-text-filter" placeholder="筛选..." oninput="onChatSearchInput(this.value)" />
               <button class="chat-search-clear" onclick="clearChatSearch()">×</button>
             </div>
 
+            <span class="trans-label">&#33258;&#21160;&#32763;&#35793;&#65306;</span>
             <button class="lang-btn master-on" id="btnMaster" onclick="toggleMasterSwitch()">&#24050;&#24320;&#21551;</button>
+            <button class="translation-config-trigger" type="button" onclick="openTranslationConfigModal()" title="&#32763;&#35793;&#24341;&#25806;&#37197;&#32622;">&#9881;</button>
           </div>
 
           <div id="chat-list">
@@ -306,6 +306,67 @@
             <div id="qt-output" class="qt-output">...</div>
             <button class="qt-copy-btn" onclick="copyQuickTrans()" title="&#22797;&#21046;">📋</button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="translation-config-modal" class="floating-window" style="display: none; left: 50%; top: 18%; transform: translateX(-50%); width: 440px">
+      <div class="modal-header draggable-header" id="translation-config-drag-handle">
+        <div style="display: flex; align-items: center; gap: 10px; pointer-events: none">
+          <img src="./assets/img/headers/chat.png" style="width: 24px; height: 24px; object-fit: contain" onerror="this.style.display='none'" />
+          <h3 style="margin: 0; color: var(--accent); font-size: 1.05rem">&#32763;&#35793;&#24341;&#25806;&#37197;&#32622;</h3>
+        </div>
+        <button class="close-modal" onclick="closeTranslationConfigModal()">脳</button>
+      </div>
+
+      <div class="modal-body translation-modal-body">
+        <div class="translation-config-row">
+          <span class="translation-config-label">&#24341;&#25806;</span>
+          <select id="translation-engine-select" class="translation-select" onchange="setTranslationEngine(this.value)">
+            <option value="google">&#35895;&#27468;&#32763;&#35793;</option>
+            <option value="azure">&#24494;&#36719; Azure &#32763;&#35793;</option>
+          </select>
+        </div>
+
+        <div id="translation-provider-google" class="translation-provider-panel">
+          <div class="translation-provider-note">&#35895;&#27468;&#32763;&#35793;&#24403;&#21069;&#26080;&#38656;&#39069;&#22806;&#37197;&#32622;&#12290;</div>
+          <button class="translation-test-btn" type="button" onclick="testTranslationProvider('google')">&#27979;&#35797;&#35895;&#27468;&#32763;&#35793;</button>
+        </div>
+
+        <div id="translation-provider-azure" class="translation-provider-panel">
+          <div class="translation-config-row">
+            <span class="translation-config-label">&#25509;&#21475;&#23494;&#38053;</span>
+            <div class="translation-secret-wrap">
+              <input type="password" id="azure-api-key-input" class="translation-input translation-secret-input" placeholder="&#36755;&#20837; Azure &#25509;&#21475;&#23494;&#38053;" autocomplete="off" oninput="updateAzureTranslationConfig()" />
+              <button class="translation-secret-toggle" type="button" onclick="toggleAzureApiKeyVisibility()" title="&#26174;&#31034;&#25110;&#38544;&#34255;&#23494;&#38053;">&#128065;</button>
+            </div>
+          </div>
+          <div class="translation-config-row">
+            <span class="translation-config-label">&#21306;&#22495;</span>
+            <input type="text" id="azure-region-input" class="translation-input" placeholder="&#36755;&#20837;&#21306;&#22495;&#65288;&#20363;&#22914; eastasia / global&#65289;" autocomplete="off" oninput="updateAzureTranslationConfig()" />
+          </div>
+          <div class="translation-config-row translation-provider-actions">
+            <button class="translation-guide-btn" type="button" onclick="openAzureGuideModal()">&#24494;&#36719; Azure &#32763;&#35793;&#26381;&#21153;&#30003;&#35831;&#19982;&#37197;&#32622;</button>
+            <button class="translation-test-btn" type="button" onclick="testTranslationProvider('azure')">&#27979;&#35797;&#24494;&#36719; Azure &#32763;&#35793;</button>
+          </div>
+        </div>
+
+        <div id="translation-test-status" class="translation-status" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <div id="azure-guide-modal" class="floating-window azure-guide-window" style="display: none; left: 50%; top: 8%; transform: translateX(-50%); width: 760px">
+      <div class="modal-header draggable-header" id="azure-guide-drag-handle">
+        <div style="display: flex; align-items: center; gap: 10px; pointer-events: none">
+          <img src="./assets/img/headers/chat.png" style="width: 24px; height: 24px; object-fit: contain" onerror="this.style.display='none'" />
+          <h3 style="margin: 0; color: var(--accent); font-size: 1.05rem">&#24494;&#36719; Azure &#32763;&#35793;&#26381;&#21153;&#30003;&#35831;&#19982;&#37197;&#32622;</h3>
+        </div>
+        <button class="close-modal" onclick="closeAzureGuideModal()">脳</button>
+      </div>
+
+      <div class="modal-body azure-guide-modal-body">
+        <div id="azure-guide-content" class="markdown-guide-content">
+          <div class="translation-provider-note">&#27491;&#22312;&#21152;&#36733;&#25945;&#31243;...</div>
         </div>
       </div>
     </div>
@@ -781,24 +842,25 @@
     </div>
 
     <!-- Data -->
-    <script src="assets/js/data/database.js?v=20260610b"></script>
-    <script src="assets/js/data/items.js?v=20260610b"></script>
-    <script src="assets/js/data/item_i18n_map.js?v=20260610b"></script>
-    <script src="assets/js/data/wakfu_monsters.js?v=20260610b"></script>
+    <script src="assets/js/data/database.js?v=20260610e"></script>
+    <script src="assets/js/data/items.js?v=20260610e"></script>
+    <script src="assets/js/data/item_i18n_map.js?v=20260610e"></script>
+    <script src="assets/js/data/wakfu_monsters.js?v=20260610e"></script>
 
     <!-- Modules -->
-    <script src="assets/js/modules/sessionRecap.js?v=20260610b"></script>
-    <script src="assets/js/modules/state.js?v=20260610b"></script>
-    <script src="assets/js/modules/utils.js?v=20260610b"></script>
-    <script src="assets/js/modules/filesystem.js?v=20260610b"></script>
-    <script src="assets/js/modules/chat.js?v=20260610b"></script>
-    <script src="assets/js/modules/combat.js?v=20260610b"></script>
-    <script src="assets/js/modules/tracker.js?v=20260610b"></script>
-    <script src="assets/js/modules/forecast.js?v=20260610b"></script>
-    <script src="assets/js/modules/ui.js?v=20260610b"></script>
+    <script src="assets/js/modules/sessionRecap.js?v=20260610e"></script>
+    <script src="assets/js/modules/state.js?v=20260610e"></script>
+    <script src="assets/js/modules/utils.js?v=20260610e"></script>
+    <script src="assets/js/modules/filesystem.js?v=20260610e"></script>
+    <script src="assets/docs/azure-translator-setup-guide.js?v=20260610e"></script>
+    <script src="assets/js/modules/chat.js?v=20260610e"></script>
+    <script src="assets/js/modules/combat.js?v=20260610e"></script>
+    <script src="assets/js/modules/tracker.js?v=20260610e"></script>
+    <script src="assets/js/modules/forecast.js?v=20260610e"></script>
+    <script src="assets/js/modules/ui.js?v=20260610e"></script>
 
     <!-- Core -->
-    <script src="assets/js/core/professions.js?v=20260610b"></script>
-    <script src="assets/js/core/main.js?v=20260610b"></script>
+    <script src="assets/js/core/professions.js?v=20260610e"></script>
+    <script src="assets/js/core/main.js?v=20260610e"></script>
   </body>
 </html>
