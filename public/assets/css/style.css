@@ -444,6 +444,11 @@ button.aux-btn:hover {
   flex-wrap: nowrap;
   overflow: hidden;
 }
+.chat-panel-header {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  min-height: 52px;
+}
 .header-label {
   font-size: 1rem;
   letter-spacing: 1px;

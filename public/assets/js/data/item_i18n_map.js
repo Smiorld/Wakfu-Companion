@@ -1066,7 +1066,7 @@ const ITEM_I18N_MAP = {
     "鱼鳍　Fins"
   ],
   "Fish Bone": [
-    "鱼骨",
+    "鱼骨　Fish Bone",
     "鱼骨　Fish Bone"
   ],
   "Flavored Truffle": [
@@ -1486,7 +1486,7 @@ const ITEM_I18N_MAP = {
     "铁矿　Iron Ore"
   ],
   "Jo-Chlo Vandam": [
-    "翰克罗·范达姆",
+    "乔克罗鱼",
     "乔克罗鱼　Jo-Chlo Vandam"
   ],
   "Jollyflower": [
@@ -1595,10 +1595,7 @@ const ITEM_I18N_MAP = {
     "活塔泥　Living Towpeat"
   ],
   "Loot": [
-    "劫",
-    "掉落",
-    "物品",
-    "赃物",
+    "鲁特鱼",
     "鲁特鱼　Loot"
   ],
   "Luminous Jute": [
@@ -1983,7 +1980,7 @@ const ITEM_I18N_MAP = {
     "卫熊毛发　Plantiguard Tuft"
   ],
   "Poisoned Bone": [
-    "剧毒白骨",
+    "有毒的鱼骨",
     "有毒的骨头",
     "有毒的鱼骨　Poisoned Bone"
   ],
