@@ -7,6 +7,116 @@ function isExplicitArmorSpellSource(spellName) {
 
 // HELPER CONSTANTS
 const NOISE_WORDS = new Set(["Block!", "Critical", "Critical Hit", "Critical Hit Expert", "Slow Influence", "Backstab", "Sidestab", "Berserk", "Influence", "Dodge", "Lock", "Increased Damage", "格挡！", "暴击", "闪避", "锁定", "最终伤害", "元素抗性"]);
+let stateEventOrder = 0;
+
+function normalizeStateKey(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[“”"']/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildStateOwnershipKey(targetName, stateName) {
+  const normalizedTarget = String(targetName || "").toLowerCase().trim();
+  const normalizedState = normalizeStateKey(stateName);
+  return normalizedTarget && normalizedState ? `${normalizedTarget}::${normalizedState}` : "";
+}
+
+function rememberStateOwner(targetName, stateName, ownerName) {
+  const key = buildStateOwnershipKey(targetName, stateName);
+  if (!key || !ownerName) return;
+  stateSources[key] = ownerName;
+  stateOwnershipMeta[key] = {
+    owner: ownerName,
+    target: String(targetName || "").trim(),
+    state: String(stateName || "").trim(),
+    order: ++stateEventOrder,
+  };
+}
+
+function getStateOwner(targetName, stateName) {
+  const key = buildStateOwnershipKey(targetName, stateName);
+  return key ? stateSources[key] || null : null;
+}
+
+function getLatestStateOwner(targetName) {
+  const normalizedTarget = String(targetName || "").toLowerCase().trim();
+  if (!normalizedTarget) return null;
+
+  let latest = null;
+  Object.values(stateOwnershipMeta).forEach((entry) => {
+    if (!entry) return;
+    if (String(entry.target || "").toLowerCase().trim() !== normalizedTarget) return;
+    if (!latest || entry.order > latest.order) {
+      latest = entry;
+    }
+  });
+
+  return latest ? latest.owner : null;
+}
+
+function forgetStateOwner(targetName, stateName) {
+  const key = buildStateOwnershipKey(targetName, stateName);
+  if (!key) return;
+  delete stateSources[key];
+  delete stateOwnershipMeta[key];
+}
+
+function flushPendingIndirectAttribution(ownerOverride = null) {
+  if (!pendingIndirectAttribution) return;
+
+  let finalCaster = ownerOverride || pendingIndirectAttribution.defaultCaster;
+  let finalSpell = pendingIndirectAttribution.spell;
+
+  if (summonBindings[finalCaster]) {
+    const master = summonBindings[finalCaster];
+    finalSpell = `${finalSpell} (${finalCaster})`;
+    finalCaster = master;
+  }
+
+  if (pendingIndirectAttribution.kind === "armor") {
+    updateCombatData(armorData, finalCaster, finalSpell, pendingIndirectAttribution.amount, null);
+  } else if (pendingIndirectAttribution.kind === "heal") {
+    updateCombatData(healData, finalCaster, finalSpell, pendingIndirectAttribution.amount, pendingIndirectAttribution.element);
+  } else {
+    updateCombatData(fightData, finalCaster, finalSpell, pendingIndirectAttribution.amount, pendingIndirectAttribution.element);
+  }
+
+  pendingIndirectAttribution = null;
+}
+
+function extractRemovedState(content) {
+  const removalPatterns = [
+    /^([^:]+):\s*不再受到[“"]([^“”"]+)[”"]的影响/,
+    /^([^:]+):\s*no longer affected by[“"]?([^“”"]+)[”"]?/i,
+    /^([^:]+):\s*n'est plus affect[ée] par[“"]?([^“”"]+)[”"]?/i,
+    /^([^:]+):\s*ya no est[aá] afectado por[“"]?([^“”"]+)[”"]?/i,
+    /^([^:]+):\s*deixou de ser afetado por[“"]?([^“”"]+)[”"]?/i,
+  ];
+
+  for (const pattern of removalPatterns) {
+    const match = content.match(pattern);
+    if (match) {
+      return {
+        target: match[1].trim(),
+        state: match[2].trim(),
+      };
+    }
+  }
+
+  return null;
+}
+
+function shouldUseLatestStateFallback(targetName, spellOverride, currentCasterName) {
+  if (!targetName || !spellOverride) return false;
+
+  if (!currentCasterName || currentCasterName === "Unknown") return true;
+  if (currentCasterName === targetName) return true;
+  if (!isPlayerAlly({ name: currentCasterName })) return true;
+
+  return false;
+}
 
 function processFightLog(line) {
   const hpUnits = "HP|PdV|PV|生命";
@@ -16,6 +126,14 @@ function processFightLog(line) {
   const parts = line.split(/\] /);
   if (parts.length < 2) return;
   const content = parts[1].trim();
+  const removedState = extractRemovedState(content);
+
+  if (pendingIndirectAttribution && removedState && removedState.target === pendingIndirectAttribution.target) {
+    const removedStateOwner = getStateOwner(removedState.target, removedState.state);
+    if (removedStateOwner) {
+      flushPendingIndirectAttribution(removedStateOwner);
+    }
+  }
 
   // Auto Reset Logic
   if (isAutoResetOn && awaitingNewFight && !content.toLowerCase().includes("over") && !content.includes("战斗结束")) {
@@ -25,6 +143,7 @@ function processFightLog(line) {
 
   // 1. Turn/Time Carryover - RESET CASTER
   if (content.includes("carried over") || content.includes("tour suivant") || (content.includes("保留") && content.includes("下一回合"))) {
+    flushPendingIndirectAttribution();
     currentCaster = null;
     currentSpell = "Passive / Indirect";
     // Flush pending if any (assume Neutral if turn ended)
@@ -38,6 +157,7 @@ function processFightLog(line) {
   // 2. Cast Detection
   const castMatch = content.match(/^(.*?) (?:casts|lance(?: le sort)?|lanza(?: el hechizo)?|lança(?: o feitiço)?|施放)\s*[“"]?(.*?)[”"]?(?:\.(?=$|\s[\(（])|(?=\s[\(（])|$)/i);
   if (castMatch) {
+    flushPendingIndirectAttribution();
     // If we have pending armor damage when a NEW spell starts, flush it as Neutral
     if (pendingArmorDamage) {
       updateCombatData(fightData, pendingArmorDamage.caster, pendingArmorDamage.spell, pendingArmorDamage.amount, "Neutral");
@@ -55,21 +175,39 @@ function processFightLog(line) {
     return;
   }
 
-  // --- NEW: STATE ACTIVATION DETECTION (Fix for Flaming) ---
-  // Captures "Player: Flaming (Lvl X)" to set context for following damage
-  const stateMatch = content.match(/^([^:]+):\s*(Flaming|Embrasement|Scalded|Echaudé|Poison|Hémorragie|Bleeding|失血)(?:\s*[\(（]|$)/);
+  if (removedState) {
+    forgetStateOwner(removedState.target, removedState.state);
+  }
+
+  // Status ownership is tracked per target so later indirect effects can be
+  // attributed back to whoever applied the state, even if the damage/heal/armor
+  // line itself has no explicit caster.
+  const stateMatch = content.match(/^([^:]+):\s*([^:+\-\d][^:（）()]*)\s*[\(（]([^()（）]+)[\)）]/);
   if (stateMatch) {
-    const sourceName = stateMatch[1].trim();
+    const stateTarget = stateMatch[1].trim();
     const stateName = stateMatch[2].trim();
-    // Only switch context if it's likely a player
-    if (!nonCombatantList.some((nc) => sourceName.includes(nc))) {
-      stateSources[stateName] = sourceName;
+    const existingOwner = getStateOwner(stateTarget, stateName);
+
+    const hasActiveCaster =
+      currentCaster &&
+      currentCaster !== "Unknown" &&
+      currentSpell &&
+      currentSpell !== "Unknown Spell" &&
+      currentSpell !== "Passive / Indirect";
+
+    const inferredOwner = hasActiveCaster ? currentCaster : existingOwner || getLatestStateOwner(stateTarget) || stateTarget;
+
+    // Only store ownership if it's likely to belong to a combatant/player-side
+    // entity rather than a mechanic label.
+    if (!nonCombatantList.some((nc) => inferredOwner.includes(nc))) {
+      rememberStateOwner(stateTarget, stateName, inferredOwner);
     }
   }
 
   // 3. Action Detection (Damage/Heal/Armor)
   const actionMatch = content.match(new RegExp(`^(.*?):\\s*([+-])?(${numPattern})\\s*(${hpUnits}|${armorUnits})(.*)`));
   if (actionMatch) {
+    flushPendingIndirectAttribution();
     const target = actionMatch[1].trim();
     const sign = actionMatch[2] || "";
     const amount = parseInt(actionMatch[3].replace(/[,.\s]/g, ""), 10);
@@ -132,8 +270,12 @@ function processFightLog(line) {
     }
 
     // 1. Check State Ownership (The Fix)
-    if (spellOverride && stateSources[spellOverride]) {
-      finalCaster = stateSources[spellOverride];
+    const directStateOwner = spellOverride ? getStateOwner(target, spellOverride) : null;
+    const fallbackStateOwner =
+      !directStateOwner && shouldUseLatestStateFallback(target, spellOverride, currentCaster) ? getLatestStateOwner(target) : null;
+
+    if (directStateOwner) {
+      finalCaster = directStateOwner;
     }
     // 2. Specific self-harm check
     else if (["Burning Armor", "Armadura Ardiente", "Reflect", "Thorns"].some((s) => spellOverride && spellOverride.includes(s))) {
@@ -193,12 +335,45 @@ function processFightLog(line) {
         };
         return; // Stop here, wait for next loop iteration
       } else {
+        if (!directStateOwner && fallbackStateOwner && spellOverride) {
+          pendingIndirectAttribution = {
+            kind: "armor",
+            target: target,
+            amount: amount,
+            element: null,
+            spell: finalSpell,
+            defaultCaster: fallbackStateOwner,
+          };
+          return;
+        }
         // Positive Armor = Shielding
         updateCombatData(armorData, finalCaster, finalSpell, amount, null);
       }
     } else if (sign === "+") {
+      if (!directStateOwner && fallbackStateOwner && spellOverride) {
+        pendingIndirectAttribution = {
+          kind: "heal",
+          target: target,
+          amount: amount,
+          element: detectedElement || "Neutral",
+          spell: finalSpell,
+          defaultCaster: fallbackStateOwner,
+        };
+        return;
+      }
       updateCombatData(healData, finalCaster, finalSpell, amount, detectedElement || "Neutral");
     } else {
+      if (!directStateOwner && fallbackStateOwner && spellOverride) {
+        pendingIndirectAttribution = {
+          kind: "damage",
+          target: target,
+          amount: amount,
+          element: detectedElement || "Neutral",
+          spell: finalSpell,
+          defaultCaster: fallbackStateOwner,
+        };
+        return;
+      }
       updateCombatData(fightData, finalCaster, finalSpell, amount, detectedElement || "Neutral");
     }
 
@@ -296,7 +471,10 @@ function performReset(isAuto = false) {
   hasUnsavedChanges = false;
   fightStartTime = null;
   pendingArmorDamage = null; // Clear any hanging buffer
+  pendingIndirectAttribution = null;
   stateSources = {};
+  stateOwnershipMeta = {};
+  stateEventOrder = 0;
 
   // 4. CLEAR STORAGE
   localStorage.removeItem("wakfu_live_combat_state");
@@ -618,7 +796,9 @@ document
   .addEventListener("click", clearSummonBindings);
 
 let monsterLookup = {};
-let stateSources = {}; // Maps State Name -> Player Name
+let stateSources = {}; // Maps "target::state" -> Player Name
+let stateOwnershipMeta = {}; // Maps "target::state" -> { owner, target, state, order }
+let pendingIndirectAttribution = null;
 
 function initMonsterDatabase() {
   if (typeof wakfuMonsters === "undefined") return;
