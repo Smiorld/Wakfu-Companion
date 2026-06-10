@@ -17,6 +17,26 @@ function normalizeStateKey(value) {
     .trim();
 }
 
+function isNonAttributionHint(value) {
+  const normalized = normalizeStateKey(value);
+  if (!normalized) return true;
+
+  return (
+    /^\d+\s*名敌人受影响$/.test(normalized) ||
+    /^\d+\s*enemy(?:ies)?\s*affected$/.test(normalized) ||
+    /^\d+\s*ennemi(?:s)?\s*affect[ée]s?$/.test(normalized) ||
+    /^\d+\s*enemig(?:o|os)\s*afectados$/.test(normalized) ||
+    /^\d+\s*inimig(?:o|os)\s*afetados$/.test(normalized)
+  );
+}
+
+function resolveStateOwnerCandidate(ownerName) {
+  if (!ownerName) return null;
+  if (summonBindings[ownerName]) return summonBindings[ownerName];
+  if (nonCombatantList.some((nc) => ownerName.includes(nc))) return null;
+  return ownerName;
+}
+
 function buildStateOwnershipKey(targetName, stateName) {
   const normalizedTarget = String(targetName || "").toLowerCase().trim();
   const normalizedState = normalizeStateKey(stateName);
@@ -195,11 +215,12 @@ function processFightLog(line) {
       currentSpell !== "Unknown Spell" &&
       currentSpell !== "Passive / Indirect";
 
-    const inferredOwner = hasActiveCaster ? currentCaster : existingOwner || getLatestStateOwner(stateTarget) || stateTarget;
+    const activeOwner = hasActiveCaster ? resolveStateOwnerCandidate(currentCaster) : null;
+    const inferredOwner = activeOwner || existingOwner || getLatestStateOwner(stateTarget) || stateTarget;
 
     // Only store ownership if it's likely to belong to a combatant/player-side
     // entity rather than a mechanic label.
-    if (!nonCombatantList.some((nc) => inferredOwner.includes(nc))) {
+    if (inferredOwner && !nonCombatantList.some((nc) => inferredOwner.includes(nc))) {
       rememberStateOwner(stateTarget, stateName, inferredOwner);
     }
   }
@@ -225,6 +246,8 @@ function processFightLog(line) {
       const norm = normalizeElement(d);
       if (norm) {
         detectedElement = norm;
+      } else if (isNonAttributionHint(d)) {
+        continue;
       } else if (!NOISE_WORDS.has(d)) {
         const knownMatch = Array.from(allKnownSpells).find((s) => d === s || d.includes(s));
 
@@ -274,8 +297,8 @@ function processFightLog(line) {
     const fallbackStateOwner =
       !directStateOwner && shouldUseLatestStateFallback(target, spellOverride, currentCaster) ? getLatestStateOwner(target) : null;
 
-    if (directStateOwner) {
-      finalCaster = directStateOwner;
+    if (directStateOwner || fallbackStateOwner) {
+      finalCaster = directStateOwner || fallbackStateOwner;
     }
     // 2. Specific self-harm check
     else if (["Burning Armor", "Armadura Ardiente", "Reflect", "Thorns"].some((s) => spellOverride && spellOverride.includes(s))) {
