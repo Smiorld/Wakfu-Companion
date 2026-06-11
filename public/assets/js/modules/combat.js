@@ -339,10 +339,12 @@ function processFightLog(line) {
 
     const isArmor = unit.match(new RegExp(armorUnits, "i"));
 
-    if (isArmor && sign === "+" && isExplicitArmorSpellSource(spellOverride)) {
-      // Positive armor lines with an explicit source spell in parentheses are
-      // usually self-generated shields in CN logs (for example 地盘术 / 突击).
-      // Attribute them to the shield owner instead of the previous caster context.
+    if (isArmor && sign !== "-" && isExplicitArmorSpellSource(spellOverride)) {
+      // Positive armor lines in CN logs often omit the "+" sign entirely.
+      // When they still carry an explicit source in parentheses
+      // (for example 地盘术 / 突击), they are usually self-generated shields
+      // and should be attributed to the shield owner rather than the
+      // previously active caster context.
       finalCaster = target;
     }
 
