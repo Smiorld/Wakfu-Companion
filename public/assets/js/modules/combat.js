@@ -360,7 +360,7 @@ function processFightLog(line) {
         };
         return; // Stop here, wait for next loop iteration
       } else {
-        if (!directStateOwner && fallbackStateOwner && spellOverride) {
+        if (!directStateOwner && fallbackStateOwner && spellOverride && finalCaster !== target) {
           pendingIndirectAttribution = {
             kind: "armor",
             target: target,

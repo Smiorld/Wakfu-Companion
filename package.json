@@ -5,7 +5,8 @@
   "main": "index.html",
   "scripts": {
     "start": "npx serve -l $PORT",
-    "build:glossary": "node scripts/build-wakfu-term-glossary.js"
+    "build:glossary": "node scripts/build-wakfu-term-glossary.js",
+    "combat:replay": "node tools/combat/replay-log.js"
   },
   "dependencies": {
     "serve": "^14.0.0"
