@@ -130,12 +130,22 @@ function extractRemovedState(content) {
 
 function shouldUseLatestStateFallback(targetName, spellOverride, currentCasterName) {
   if (!targetName || !spellOverride) return false;
+  if (isStateFallbackUnsafeSpellName(spellOverride)) return false;
 
   if (!currentCasterName || currentCasterName === "Unknown") return true;
   if (currentCasterName === targetName) return true;
   if (!isPlayerAlly({ name: currentCasterName })) return true;
 
   return false;
+}
+
+function isStateFallbackUnsafeSpellName(spellName) {
+  const normalized = String(spellName || "").toLowerCase();
+  if (!normalized) return false;
+
+  return ["burning armor", "armadura ardiente", "reflect", "thorns", "反弹", "棘刺"].some((keyword) =>
+    normalized.includes(String(keyword).toLowerCase())
+  );
 }
 
 function processFightLog(line) {
