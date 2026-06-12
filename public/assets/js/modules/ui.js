@@ -19,7 +19,10 @@ function renderMeter() {
     if (!snapshot) return;
     sourceFight = snapshot.damage;
     sourceClasses = snapshot.classes || {};
-    sourceOverrides = snapshot.overrides || {};
+    sourceOverrides = {
+      ...(snapshot.overrides || {}),
+      ...(manualOverrides || {}),
+    };
     const ind = document.getElementById("live-indicator");
     if (ind) ind.style.color = "#e74c3c";
   }
