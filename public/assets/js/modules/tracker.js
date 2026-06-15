@@ -335,8 +335,9 @@ function addTrackedItem() {
     return;
   }
 
-  let target = prompt("目标数量？", "100");
+  let target = prompt("目标数量？", "0");
   if (target === null) return;
+  const parsedTarget = parseInt(target, 10);
 
   trackedItems.push({
     id: Date.now(),
@@ -344,7 +345,7 @@ function addTrackedItem() {
     displayName: foundItem.displayName,
     chineseAliases: foundItem.chineseAliases,
     current: 0,
-    target: parseInt(target) || 100,
+    target: Number.isNaN(parsedTarget) ? 0 : parsedTarget,
     level: foundItem.level,
     rarity: foundItem.rarity,
     profession: foundItem.profession,

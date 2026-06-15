@@ -130,6 +130,7 @@ function buildProfessionCalculatorLayout() {
 
   ensureInputGroup(levelsContainer, "生产个数", "prof-craft-count", {
     min: "0",
+    step: "1",
     placeholder: "手动填写",
     groupClassName: "prof-mode-manual",
   });
@@ -156,7 +157,7 @@ function buildProfessionCalculatorLayout() {
         </div>
         <div class="prof-output-row">
           <input type="text" id="prof-output-name" class="prof-level-input prof-output-name" value="产物" />
-          <input type="number" id="prof-output-qty" class="prof-level-input prof-output-qty" min="0" step="0.01" placeholder="默认 1" />
+          <input type="number" id="prof-output-qty" class="prof-level-input prof-output-qty" min="0" step="1" placeholder="默认 1" />
           <input type="number" id="prof-output-price" class="prof-level-input prof-output-price" min="0" step="0.01" placeholder="默认 0" />
         </div>
       </div>
@@ -357,11 +358,11 @@ function renderProfessionCalculationResult() {
   const currentLevelExp = parseInteger("prof-base-exp");
   const targetLevel = parseInteger("prof-target-lvl");
   const craftXp = parseOptionalFloat("prof-craft-xp");
-  const manualCraftCount = parseOptionalFloat("prof-craft-count");
+  const manualCraftCount = parseOptionalInteger("prof-craft-count");
   const outputName = (
     document.getElementById("prof-output-name")?.value || "产物"
   ).trim() || "产物";
-  const outputQty = parseOptionalFloat("prof-output-qty", 1);
+  const outputQty = parseOptionalInteger("prof-output-qty", 1);
   const outputPrice = parseOptionalFloat("prof-output-price", 0);
 
   let craftsNeeded = 0;
@@ -373,7 +374,7 @@ function renderProfessionCalculationResult() {
         '<div class="empty-state">请填写不小于 0 的生产个数。</div>';
       return;
     }
-    craftsNeeded = Math.ceil(manualCraftCount);
+    craftsNeeded = manualCraftCount;
   } else {
     if (
       Number.isNaN(currentLevel) ||
@@ -465,7 +466,7 @@ function readProfessionMaterialRows() {
     const priceInput = row.querySelector(".prof-material-price");
 
     const rawName = nameInput?.value?.trim() || "";
-    const qty = parseFloat(qtyInput?.value || "");
+    const qty = parseInt(qtyInput?.value || "", 10);
     const price = parseFloat(priceInput?.value || "");
 
     return {
@@ -619,7 +620,7 @@ function addProfessionMaterialRow(name = "", qty = "", price = "") {
     <input type="text" class="prof-level-input prof-material-name" value="${escapeHtmlAttribute(
       displayName
     )}" />
-    <input type="number" class="prof-level-input prof-material-qty" min="0" step="0.01" placeholder="默认 1" value="${escapeHtmlAttribute(
+    <input type="number" class="prof-level-input prof-material-qty" min="0" step="1" placeholder="默认 1" value="${escapeHtmlAttribute(
       qty
     )}" />
     <input type="number" class="prof-level-input prof-material-price" min="0" step="0.01" placeholder="默认 0" value="${escapeHtmlAttribute(
@@ -760,6 +761,15 @@ function parseOptionalFloat(id, fallback = null) {
     return fallback;
   }
   const parsed = parseFloat(value);
+  return Number.isNaN(parsed) ? fallback : parsed;
+}
+
+function parseOptionalInteger(id, fallback = null) {
+  const value = document.getElementById(id)?.value;
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return fallback;
+  }
+  const parsed = parseInt(value, 10);
   return Number.isNaN(parsed) ? fallback : parsed;
 }
 
