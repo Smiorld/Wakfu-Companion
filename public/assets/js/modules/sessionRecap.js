@@ -28,11 +28,35 @@ let sessionStats = {
 
 let sessionStartTime = null;
 let sessionTimerInterval = null;
-const REGEX_QUEST_SUCCESS_ONLY = /(?:quest finished|quest completed|completed the quest|finished the quest|won the quest|qu锚te termin茅e|termin茅 la qu锚te|mission accomplie|misi贸n cumplida|completado la misi贸n|miss茫o cumprida|completou a miss茫o|\u4f60\u5b8c\u6210\u4e86\u4efb\u52a1|\u4efb\u52a1\u5b8c\u6210|\u5b8c\u6210\u4efb\u52a1|".*?"\u4efb\u52a1(?:\u83b7\u80dc|\u5b8c\u6210))/i;
 
-const REGEX_KAMAS = /(?:won|earned|gained|gagn?|ganado|ganhou|spent|lost|perdu|perdio|gasto|gastou|\u5f97\u5230|\u83b7\u5f97|\u5931\u53bb|\u82b1\u8d39)\S*\s*([\d\s.,\u00A0]+)\s*(?:kamas?|\u5361\u739b)/i;
-const REGEX_KAMAS_SPENT = /(?:spent|lost|perdu|perdio|gasto|gastou|\u5931\u53bb|\u82b1\u8d39)/i;
-const REGEX_XP = /(?:won|earned|gained|gagné|ganado|ganhou|\+|经验\s*\+)\s*([\d\s.,\u00A0]+)\s*(?:xp|经验)?/i;
+const REGEX_QUEST_SUCCESS_ONLY =
+  /(?:quest finished|quest completed|completed the quest|finished the quest|won the quest|quête terminée|terminé la quête|mission accomplie|misión cumplida|completado la misión|missão cumprida|completou a missão|你完成了任务|任务完成|完成任务|".*?"任务(?:获胜|完成))/i;
+const REGEX_KAMAS =
+  /(?:won|earned|gained|gagn(?:é|e)?|ganado|ganhou|spent|lost|perdu|perdio|gasto|gastou|得到|获得|失去|花费)\S*\s*([\d\s.,\u00A0]+)\s*(?:kamas?|卡玛)/i;
+const REGEX_KAMAS_SPENT =
+  /(?:spent|lost|perdu|perdio|gasto|gastou|失去|花费)/i;
+const REGEX_XP =
+  /(?:won|earned|gained|gagn(?:é|e)?|ganado|ganhou|\+|经验\s*\+)\s*([\d\s.,\u00A0]+)\s*(?:xp|经验)?/i;
+const REGEX_XP_CONTEXT =
+  /(?:\bXP\b|经验|next level|prochain niveau|siguiente nivel|pr[oó]ximo n[ií]vel)/i;
+
+const SESSION_ENVIRONMENTAL_CHALLENGE_PREFIXES = [
+  "合作",
+  "竞争",
+  "竞速",
+  "单人",
+  "特殊挑战",
+  "cooperation",
+  "competition",
+  "speed",
+  "solo",
+  "special challenge",
+  "cooperation challenge",
+  "competitive challenge",
+  "speed challenge",
+  "solo challenge",
+];
+
 const PROFESSION_LABEL_MAP = {
   Armorer: "Armorer",
   Baker: "Baker",
@@ -42,6 +66,7 @@ const PROFESSION_LABEL_MAP = {
   "Leather Dealer": "Leather Dealer",
   Tailor: "Tailor",
   "Weapons Master": "Weapons Master",
+  "Weapon Master": "Weapons Master",
   Farmer: "Farmer",
   Fisherman: "Fisherman",
   Herbalist: "Herbalist",
@@ -105,18 +130,14 @@ function loadSessionData() {
 
       if (parsed.xp) {
         for (const key in parsed.xp) {
-          if (
-            key === "Weapon Master" &&
-            sessionStats.xp["Weapons Master"] !== undefined
-          ) {
-            sessionStats.xp["Weapons Master"] += parsed.xp[key];
-          } else if (sessionStats.xp[key] !== undefined) {
-            sessionStats.xp[key] = parsed.xp[key];
+          const canonical = key === "Weapon Master" ? "Weapons Master" : key;
+          if (sessionStats.xp[canonical] !== undefined) {
+            sessionStats.xp[canonical] = parsed.xp[key];
           }
         }
       }
-    } catch (e) {
-      console.error("Failed to load session stats", e);
+    } catch (error) {
+      console.error("Failed to load session stats", error);
     }
   }
 
@@ -161,26 +182,64 @@ function getSessionProfessionCategory(line) {
 }
 
 function extractSessionQuestName(line) {
-  const match =
-    line.match(/任务“([^”]*)”/) ||
-    line.match(/"([^"]*)"任务/) ||
-    line.match(/“([^”]*)”任务/);
-  return match ? match[1].trim() : "";
+  const patterns = [
+    /任务[“"]([^”"]*)[”"]/,
+    /[“"]([^”"]*)[”"]任务/,
+    /quest\s+[“"]([^”"]*)[”"]/i,
+    /[“"]([^”"]*)[”"]\s+quest/i,
+    /qu[êe]te\s+[“"]([^”"]*)[”"]/i,
+    /[“"]([^”"]*)[”"]\s+qu[êe]te/i,
+    /misi[oó]n\s+[“"]([^”"]*)[”"]/i,
+    /[“"]([^”"]*)[”"]\s+misi[oó]n/i,
+    /miss[aã]o\s+[“"]([^”"]*)[”"]/i,
+    /[“"]([^”"]*)[”"]\s+miss[aã]o/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = line.match(pattern);
+    if (match) return match[1].trim();
+  }
+
+  return "";
+}
+
+function normalizeSessionQuestName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[“”"']/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function isEnvironmentalChallengeQuest(name) {
-  return /^(合作|竞争|竞速|单人|特殊挑战)[:：]/.test(name) || name === "特殊挑战";
+  const normalizedName = normalizeSessionQuestName(name);
+  if (!normalizedName) return false;
+
+  if (
+    normalizedName === "特殊挑战" ||
+    normalizedName === "special challenge"
+  ) {
+    return true;
+  }
+
+  return SESSION_ENVIRONMENTAL_CHALLENGE_PREFIXES.some(
+    (prefix) =>
+      normalizedName === prefix ||
+      normalizedName.startsWith(`${prefix}:`) ||
+      normalizedName.startsWith(`${prefix}：`)
+  );
 }
 
 function processSessionLog(line) {
   if (!line) return;
+
   const lower = line.toLowerCase();
   let statChanged = false;
 
   const kamaMatch = line.match(REGEX_KAMAS);
   if (kamaMatch) {
     const amount = parseInt(kamaMatch[1].replace(/[\s.,\u00A0]/g, ""), 10);
-    if (!isNaN(amount)) {
+    if (!Number.isNaN(amount)) {
       if (
         REGEX_KAMAS_SPENT.test(line) ||
         lower.includes("spent") ||
@@ -198,11 +257,13 @@ function processSessionLog(line) {
   }
 
   const xpMatch = line.match(REGEX_XP);
-  if (xpMatch && line.includes("经验")) {
+  if (xpMatch && REGEX_XP_CONTEXT.test(line)) {
     const amount = parseInt(xpMatch[1].replace(/[\s.,\u00A0]/g, ""), 10);
-    if (!isNaN(amount)) {
+    if (!Number.isNaN(amount)) {
       const category = getSessionProfessionCategory(line);
-      if (sessionStats.xp[category] === undefined) sessionStats.xp[category] = 0;
+      if (sessionStats.xp[category] === undefined) {
+        sessionStats.xp[category] = 0;
+      }
       sessionStats.xp[category] += amount;
       statChanged = true;
     }
@@ -240,16 +301,16 @@ function updateSessionUI() {
   const elEarned = document.getElementById("sess-kamas-earned");
   if (!elEarned) return;
 
-  elEarned.textContent = sessionStats.kamas.earned.toLocaleString() + " ₭";
+  elEarned.textContent = `${sessionStats.kamas.earned.toLocaleString()} ₭`;
   elEarned.className = "stat-val gold";
 
   document.getElementById("sess-kamas-spent").textContent =
-    sessionStats.kamas.spent.toLocaleString() + " ₭";
+    `${sessionStats.kamas.spent.toLocaleString()} ₭`;
 
   const net = sessionStats.kamas.earned - sessionStats.kamas.spent;
   const elNet = document.getElementById("sess-kamas-net");
-  elNet.textContent = (net > 0 ? "+" : "") + net.toLocaleString() + " ₭";
-  elNet.className = "stat-val " + (net >= 0 ? "positive" : "negative");
+  elNet.textContent = `${net > 0 ? "+" : ""}${net.toLocaleString()} ₭`;
+  elNet.className = `stat-val ${net >= 0 ? "positive" : "negative"}`;
 
   document.getElementById("sess-quests-count").textContent = sessionStats.quests;
 
@@ -260,7 +321,6 @@ function updateSessionUI() {
   xpContainer.innerHTML = "";
 
   let hasXp = false;
-
   const categories = Object.keys(sessionStats.xp).sort((a, b) => {
     if (a === "Combat") return -1;
     if (b === "Combat") return 1;
@@ -269,33 +329,33 @@ function updateSessionUI() {
 
   categories.forEach((cat) => {
     const val = sessionStats.xp[cat];
-    if (val > 0) {
-      hasXp = true;
-      const row = document.createElement("div");
-      row.className = "stat-row";
+    if (val <= 0) return;
 
-      let iconPath = "";
-      let iconClass = "session-list-icon";
+    hasXp = true;
+    const row = document.createElement("div");
+    row.className = "stat-row";
 
-      if (cat === "Combat") {
-        iconPath = "./assets/img/headers/combat.png";
-        iconClass = "session-combat-icon";
-      } else {
-        let safeName = cat.toLowerCase().replace(/ /g, "_");
-        if (safeName === "weapons_master") safeName = "weapon_master";
-        iconPath = `./assets/img/jobs/${safeName}.png`;
-      }
+    let iconPath = "";
+    let iconClass = "session-list-icon";
 
-      const displayLabel = PROFESSION_DISPLAY_LABELS[cat] || cat;
-      row.innerHTML = `
-        <div class="session-label-group">
-          <img src="${iconPath}" class="${iconClass}" onerror="this.style.display='none'">
-          <span class="stat-label">${displayLabel}:</span>
-        </div>
-        <span class="stat-val text-accent">${val.toLocaleString()} XP</span>
-      `;
-      xpContainer.appendChild(row);
+    if (cat === "Combat") {
+      iconPath = "./assets/img/headers/combat.png";
+      iconClass = "session-combat-icon";
+    } else {
+      let safeName = cat.toLowerCase().replace(/ /g, "_");
+      if (safeName === "weapons_master") safeName = "weapon_master";
+      iconPath = `./assets/img/jobs/${safeName}.png`;
     }
+
+    const displayLabel = PROFESSION_DISPLAY_LABELS[cat] || cat;
+    row.innerHTML = `
+      <div class="session-label-group">
+        <img src="${iconPath}" class="${iconClass}" onerror="this.style.display='none'">
+        <span class="stat-label">${displayLabel}:</span>
+      </div>
+      <span class="stat-val text-accent">${val.toLocaleString()} XP</span>
+    `;
+    xpContainer.appendChild(row);
   });
 
   if (!hasXp) {
@@ -349,13 +409,13 @@ function resetSessionStats() {
   sessionStats.kamas.spent = 0;
   sessionStats.quests = 0;
   sessionStats.challenges = 0;
+
   for (const key in sessionStats.xp) {
     sessionStats.xp[key] = 0;
   }
 
   sessionStartTime = Date.now();
   saveSessionData();
-
   updateSessionUI();
   updateCurrentSessionDuration();
 }

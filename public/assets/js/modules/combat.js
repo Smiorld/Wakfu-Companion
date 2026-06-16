@@ -148,6 +148,55 @@ function isStateFallbackUnsafeSpellName(spellName) {
   );
 }
 
+const COMBAT_CHANNEL_TAGS = [
+  "[fight log]",
+  "[information (combat)]",
+  "[información (combate)]",
+  "[registro de lutas]",
+  "[战斗日志]",
+];
+
+const BATTLE_END_MESSAGES = [
+  "fight is over",
+  "battle is over",
+  "combat is over",
+  "fight ended",
+  "battle ended",
+  "combat ended",
+  "le combat est terminé",
+  "el combate ha terminado",
+  "a luta terminou",
+  "战斗结束了",
+  "战斗结束",
+];
+
+const TURN_CARRYOVER_MARKERS = [
+  "carried over",
+  "tour suivant",
+  "保留",
+  "下一回合",
+];
+
+function isCombatChannelLine(line, lineLower) {
+  const lower = lineLower || String(line || "").toLowerCase();
+  return COMBAT_CHANNEL_TAGS.some((tag) =>
+    /[^\x00-\x7F]/.test(tag) ? String(line || "").includes(tag) : lower.includes(tag)
+  );
+}
+
+function isBattleEndContent(content) {
+  const lower = String(content || "").toLowerCase();
+  return BATTLE_END_MESSAGES.some((marker) => lower.includes(marker.toLowerCase()));
+}
+
+function isTurnCarryoverContent(content) {
+  const value = String(content || "");
+  const lower = value.toLowerCase();
+  return TURN_CARRYOVER_MARKERS.some((marker) =>
+    /[^\x00-\x7F]/.test(marker) ? value.includes(marker) : lower.includes(marker.toLowerCase())
+  );
+}
+
 function processFightLog(line) {
   const hpUnits = "HP|PdV|PV|生命";
   const armorUnits = "Armor|Armadura|Armure|护甲";
@@ -166,13 +215,13 @@ function processFightLog(line) {
   }
 
   // Auto Reset Logic
-  if (isAutoResetOn && awaitingNewFight && !content.toLowerCase().includes("over") && !content.includes("战斗结束")) {
+  if (isAutoResetOn && awaitingNewFight && !isBattleEndContent(content)) {
     performReset(true);
     awaitingNewFight = false;
   }
 
   // 1. Turn/Time Carryover - RESET CASTER
-  if (content.includes("carried over") || content.includes("tour suivant") || (content.includes("保留") && content.includes("下一回合"))) {
+  if (isTurnCarryoverContent(content)) {
     flushPendingIndirectAttribution();
     currentCaster = null;
     currentSpell = "Passive / Indirect";
@@ -986,16 +1035,8 @@ function processLine(line) {
 
   const lineLower = line.toLowerCase();
 
-  // EXPLICIT SYSTEM CHECK
-  const systemEndPattens = [
-    { tag: "[fight log]", msg: "fight is over" },
-    { tag: "[information (combat)]", msg: "le combat est terminé" },
-    { tag: "[información (combate)]", msg: "el combate ha terminado" },
-    { tag: "[registro de lutas]", msg: "a luta terminou" },
-    { tag: "[战斗日志]", msg: "战斗结束了" },
-  ];
-
-  const battleJustFinished = systemEndPattens.some((p) => lineLower.includes(p.tag) && lineLower.includes(p.msg));
+  const battleJustFinished =
+    isCombatChannelLine(line, lineLower) && isBattleEndContent(line);
 
   if (typeof processSessionLog === "function") {
     processSessionLog(line);
@@ -1016,7 +1057,7 @@ function processLine(line) {
 
   try {
     const isLoot = LOOT_KEYWORDS.some((kw) => lineLower.includes(kw));
-    const isCombat = lineLower.includes("[fight log]") || lineLower.includes("[information (combat)]") || lineLower.includes("[información (combate)]") || lineLower.includes("[registro de lutas]") || line.includes("[战斗日志]");
+    const isCombat = isCombatChannelLine(line, lineLower);
 
     if (isLoot) {
       processItemLog(line);

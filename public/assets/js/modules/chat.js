@@ -99,7 +99,7 @@ let wakfuExactTermMap = null;
 let wakfuFuzzyAliasIndex = null;
 let azureGuideHtmlCache = "";
 
-const WAKFU_GLOSSARY_URL = "assets/data/wakfu_term_glossary.json?v=20260615a";
+const WAKFU_GLOSSARY_URL = "assets/data/wakfu_term_glossary.json?v=20260616a";
 const TRANSLATION_CONFIG_STORAGE_KEY = "wakfu_translation_config";
 const AZURE_TRANSLATOR_ENDPOINT =
   "https://api.cognitive.microsofttranslator.com/translate?api-version=3.0";
