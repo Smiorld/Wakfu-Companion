@@ -76,6 +76,22 @@ function getLatestStateOwner(targetName) {
   return latest ? latest.owner : null;
 }
 
+function getLatestStateOwnerByName(stateName) {
+  const normalizedState = normalizeStateKey(stateName);
+  if (!normalizedState) return null;
+
+  let latest = null;
+  Object.values(stateOwnershipMeta).forEach((entry) => {
+    if (!entry) return;
+    if (normalizeStateKey(entry.state) !== normalizedState) return;
+    if (!latest || entry.order > latest.order) {
+      latest = entry;
+    }
+  });
+
+  return latest ? latest.owner : null;
+}
+
 function forgetStateOwner(targetName, stateName) {
   const key = buildStateOwnershipKey(targetName, stateName);
   if (!key) return;
@@ -132,9 +148,11 @@ function shouldUseLatestStateFallback(targetName, spellOverride, currentCasterNa
   if (!targetName || !spellOverride) return false;
   if (isStateFallbackUnsafeSpellName(spellOverride)) return false;
 
+  // Only fall back to "latest state owner" when the parser does not have a
+  // reliable active caster context. If we already know who is acting, using the
+  // target's most recent state owner is too broad and can cross-wire unrelated
+  // debuffs on the same target.
   if (!currentCasterName || currentCasterName === "Unknown") return true;
-  if (currentCasterName === targetName) return true;
-  if (!isPlayerAlly({ name: currentCasterName })) return true;
 
   return false;
 }
@@ -353,11 +371,14 @@ function processFightLog(line) {
 
     // 1. Check State Ownership (The Fix)
     const directStateOwner = spellOverride ? getStateOwner(target, spellOverride) : null;
+    const namedStateOwner = !directStateOwner && spellOverride ? getLatestStateOwnerByName(spellOverride) : null;
     const fallbackStateOwner =
-      !directStateOwner && shouldUseLatestStateFallback(target, spellOverride, currentCaster) ? getLatestStateOwner(target) : null;
+      !directStateOwner && !namedStateOwner && shouldUseLatestStateFallback(target, spellOverride, currentCaster)
+        ? getLatestStateOwner(target)
+        : null;
 
-    if (directStateOwner || fallbackStateOwner) {
-      finalCaster = directStateOwner || fallbackStateOwner;
+    if (directStateOwner || namedStateOwner || fallbackStateOwner) {
+      finalCaster = directStateOwner || namedStateOwner || fallbackStateOwner;
     }
     // 2. Specific self-harm check
     else if (["Burning Armor", "Armadura Ardiente", "Reflect", "Thorns"].some((s) => spellOverride && spellOverride.includes(s))) {
