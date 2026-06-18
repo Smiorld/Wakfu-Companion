@@ -99,7 +99,7 @@ let wakfuExactTermMap = null;
 let wakfuFuzzyAliasIndex = null;
 let azureGuideHtmlCache = "";
 
-const WAKFU_GLOSSARY_URL = "assets/data/wakfu_term_glossary.json?v=20260618b";
+const WAKFU_GLOSSARY_URL = "assets/data/wakfu_term_glossary.json?v=20260618c";
 const TRANSLATION_CONFIG_STORAGE_KEY = "wakfu_translation_config";
 const AZURE_TRANSLATOR_ENDPOINT =
   "https://api.cognitive.microsofttranslator.com/translate?api-version=3.0";
@@ -970,6 +970,22 @@ function scrollToChatBottom() {
 
 window.scrollToChatBottom = scrollToChatBottom;
 
+function preserveChatScrollOnExpand(list, applyChange) {
+  if (!list || typeof applyChange !== "function") return;
+
+  const wasNearBottom =
+    list.scrollHeight - list.scrollTop - list.clientHeight <= 50;
+  const previousScrollHeight = list.scrollHeight;
+  const previousScrollTop = list.scrollTop;
+
+  applyChange();
+
+  const scrollDelta = list.scrollHeight - previousScrollHeight;
+  if (wasNearBottom && scrollDelta > 0) {
+    list.scrollTop = previousScrollTop + scrollDelta;
+  }
+}
+
 const CHAT_COLORS = {
   Vicinity: "#cccccc",
   Private: "#00e1ff",
@@ -1270,9 +1286,8 @@ async function processTranslationQueue() {
     translationQueue.length = 0;
     return;
   }
-
-  isTranslating = true;
   translationQueue.shift();
+  isTranslating = true;
 
   try {
     if (!item.isManual && item.text.length < 3) throw new Error("Short");
@@ -1285,8 +1300,10 @@ async function processTranslationQueue() {
         if (show) {
           const el = getChatElement(item.elementId);
           if (el) {
-            el.style.display = "flex";
-            el.innerHTML = `<span class="trans-icon">译</span> ${result.text}`;
+            preserveChatScrollOnExpand(getChatListNode(), () => {
+              el.style.display = "flex";
+              el.innerHTML = `<span class="trans-icon">译</span> ${result.text}`;
+            });
           }
         }
       }

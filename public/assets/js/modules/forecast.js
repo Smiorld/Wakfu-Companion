@@ -2,45 +2,22 @@ let currentForecastDate = new Date();
 let forecastViewMode = "tab"; // 'tab' or 'grid'
 let activeDungeonTab = "classic"; // 'classic' or 'modular'
 let currentForecastLang = localStorage.getItem("wakfu_forecast_lang") || "en";
-const DAILY_FORECAST_SHEET_URL =
-  "https://docs.google.com/spreadsheets/d/1YXdxmQC9U3Ux7AuNnT8Cm3DR7kp1YYHenWuU3eQ5wbY/gviz/tq?gid=287118977";
-const DAILY_FORECAST_COLUMN_INDEX = 3;
-const DAILY_FORECAST_PREFETCH_DAYS = 7;
-const DAILY_FORECAST_STORAGE_KEY = "wakfu_daily_forecast_weekly_cache";
+const QUICK_DAILY_FORECAST_ROTATION_URL =
+  "assets/data/daily_dungeon_rotation.js";
+const GOOGLE_SHEETS_DATE_EPOCH_UTC_MS = Date.UTC(1899, 11, 30);
 const QUICK_DAILY_FORECAST_NAME_OVERRIDES = {
-  "Lenald Empelol's Temple": "福狸王的宫殿 Lenald Empelol's Temple",
-  Larventura: "变异虫巢穴 Larventura",
-  "Treechnee Dungeon": "树人地下城 Treechnee Dungeon",
-  "The Mineral Tower": "矿石之塔 The Mineral Tower",
-  "Bwork Dungeon": "兽人地下城 Bwork Dungeon",
-  "Abandoned Strichery": "废旧鸵鸟城堡 Abandoned Strichery",
   Miseryum: "迷荫地 Miseryum",
   Miseryeum: "迷荫地 Miseryeum",
-  "Dancehall Arena": "劲舞秀场 Dancehall Arena",
-  "The Whirlway Station": "旋车公路 The Whirlway Station",
-  "Treechnid Dungeon": "树精洞窟 Treechnid Dungeon",
-  "Enurado Dungeon": "埃努卓地下城 Enurado Dungeon",
-  "Elite Riktus Dungeon": "土匪老巢 Elite Riktus Dungeon",
-  "Forbidden City": "紫禁城 Forbidden City",
-  "Dreggons' Sanctuary": "蛋龙庇护地 Dreggons' Sanctuary",
-  "Crabstacean Dungeon": "壳甲地下城 Crabstacean Dungeon",
-  "Horridemon Dungeon": "恐惧地下城 Horridemon Dungeon",
-  "Ferociraptor Dungeon": "猛恐龙地下城 Ferociraptor Dungeon",
-  "Raised Vault": "恐怖地穴 Raised Vault",
-  SrambadDungeon: "斯拉姆地下城 Srambad Dungeon",
+  SrambadDungeon: "斯拉姆地下城 SrambadDungeon",
   "Streye Dungeon?": "巨眼地下城？ Streye Dungeon?",
-  "The Mineral Tower (lvl 215)": "215级矿石之塔 The Mineral Tower (lvl 215)",
   "The Minerall Tower (lvl 200)": "200级矿石之塔 The Minerall Tower (lvl 200)",
-  "Timeless Theater Dungeon": "无尽剧场 Timeless Theater Dungeon",
 };
 
 const quickDailyForecastState = {
   rows: [],
   activeParisDate: "",
   loadedAt: 0,
-  loadingPromise: null,
   isInitialized: false,
-  weeklyCache: null,
 };
 
 async function initForecast() {
@@ -55,9 +32,8 @@ async function initForecast() {
 function initQuickDailyForecast() {
   if (quickDailyForecastState.isInitialized) return;
   quickDailyForecastState.isInitialized = true;
-  renderQuickDailyForecastStatus(
-    "\u70b9\u51fb\u5c55\u5f00\u52a0\u8f7d\u4eca\u5929\u7684\u526f\u672c\u6e05\u5355\u3002"
-  );
+  renderQuickDailyForecastStatus("正在按法国时间推算今天的副本轮换...");
+  void refreshQuickDailyForecast();
 }
 
 function toggleDailyForecastBlock() {
@@ -70,18 +46,30 @@ function toggleDailyForecastBlock() {
   }
 }
 
-async function refreshQuickDailyForecast(force = false) {
+async function refreshQuickDailyForecast() {
   try {
     if (
       typeof DUNGEON_TRANSLATIONS === "undefined" &&
       typeof loadScript === "function"
     ) {
-      await loadScript("assets/js/data/forecast_data.js?v=20260618b");
+      await loadScript("assets/js/data/forecast_data.js?v=20260618c");
     }
-    renderQuickDailyForecastStatus(
-      "\u6b63\u5728\u62c9\u53d6\u4eca\u5929\u7684\u526f\u672c\u6570\u636e..."
-    );
-    const rows = await fetchQuickDailyForecast(force);
+    if (
+      typeof window.WAKFU_DAILY_DUNGEON_ROTATION === "undefined" &&
+      typeof loadScript === "function"
+    ) {
+      await loadScript(`${QUICK_DAILY_FORECAST_ROTATION_URL}?v=20260618c`);
+    }
+
+    renderQuickDailyForecastStatus("正在按本地轮换表推算今天的副本数据...");
+
+    const parisNow = getParisNow();
+    const rows = buildQuickDailyForecastRows(parisNow);
+
+    quickDailyForecastState.rows = rows;
+    quickDailyForecastState.activeParisDate = formatParisDateKey(parisNow);
+    quickDailyForecastState.loadedAt = Date.now();
+
     await renderQuickDailyForecastList(rows);
   } catch (error) {
     console.error("Failed to load quick daily forecast:", error);
@@ -89,81 +77,33 @@ async function refreshQuickDailyForecast(force = false) {
       error && typeof error.message === "string" && error.message
         ? ` (${escapeHtml(error.message)})`
         : "";
-    renderQuickDailyForecastStatus(
-      `\u4eca\u65e5\u526f\u672c\u52a0\u8f7d\u5931\u8d25${detail}\u3002`
-    );
+    renderQuickDailyForecastStatus(`今日副本加载失败${detail}。`);
   }
 }
 
-async function fetchQuickDailyForecast(force = false) {
-  const parisNow = getParisNow();
-  const parisDateKey = formatParisDateKey(parisNow);
-
-  if (!force && quickDailyForecastState.activeParisDate === parisDateKey) {
-    const inMemoryRows = getQuickDailyForecastRowsFromCache(
-      quickDailyForecastState.weeklyCache,
-      parisDateKey
-    );
-    if (inMemoryRows.length > 0) {
-      quickDailyForecastState.rows = inMemoryRows;
-      return inMemoryRows;
-    }
+function buildQuickDailyForecastRows(parisNow) {
+  const rotation = window.WAKFU_DAILY_DUNGEON_ROTATION;
+  if (!Array.isArray(rotation) || rotation.length === 0) {
+    throw new Error("Rotation data unavailable");
   }
 
-  if (!force) {
-    const storedCache = readQuickDailyForecastWeeklyCache();
-    const storedRows = getQuickDailyForecastRowsFromCache(storedCache, parisDateKey);
-    if (storedRows.length > 0) {
-      quickDailyForecastState.weeklyCache = storedCache;
-      quickDailyForecastState.activeParisDate = parisDateKey;
-      quickDailyForecastState.rows = storedRows;
-      quickDailyForecastState.loadedAt = Date.now();
-      return storedRows;
-    }
-  }
+  const sheetSerial = getGoogleSheetsDateSerial(parisNow);
 
-  if (quickDailyForecastState.loadingPromise) {
-    return quickDailyForecastState.loadingPromise;
-  }
+  return rotation
+    .map((entry) => {
+      const type = String(entry?.type || "").trim();
+      const names = Array.isArray(entry?.names)
+        ? entry.names.map((name) => String(name || "").trim()).filter(Boolean)
+        : [];
 
-  quickDailyForecastState.loadingPromise = (async () => {
-    let weeklyCache = null;
+      if (!type || names.length === 0) return null;
 
-    try {
-      const response = await loadQuickDailyForecastJsonp(Date.now());
-      weeklyCache = buildQuickDailyForecastWeeklyCache(response, parisNow);
-    } catch (jsonpError) {
-      console.warn(
-        "Daily forecast JSONP failed, trying stored/fallback data:",
-        jsonpError
-      );
-
-      const storedCache = readQuickDailyForecastWeeklyCache();
-      if (getQuickDailyForecastRowsFromCache(storedCache, parisDateKey).length > 0) {
-        weeklyCache = storedCache;
-      } else if (Array.isArray(window.WAKFU_DAILY_FORECAST_FALLBACK)) {
-        weeklyCache = buildFallbackWeeklyCache(parisDateKey);
-      } else {
-        throw new Error("JSONP script error; fallback unavailable");
-      }
-    }
-
-    const activeRows = getQuickDailyForecastRowsFromCache(weeklyCache, parisDateKey);
-    if (activeRows.length === 0) {
-      throw new Error("No forecast rows available for today's Paris date");
-    }
-
-    quickDailyForecastState.weeklyCache = weeklyCache;
-    quickDailyForecastState.activeParisDate = parisDateKey;
-    quickDailyForecastState.rows = activeRows;
-    quickDailyForecastState.loadedAt = Date.now();
-    persistQuickDailyForecastWeeklyCache(weeklyCache);
-    return activeRows;
-  })().finally(() => {
-    quickDailyForecastState.loadingPromise = null;
-  });
-
-  return quickDailyForecastState.loadingPromise;
+      return {
+        type,
+        name: names[positiveModulo(sheetSerial, names.length)],
+      };
+    })
+    .filter(Boolean);
 }
 
 function getParisNow() {
@@ -179,158 +119,17 @@ function formatParisDateKey(date) {
   return `${year}-${month}-${day}`;
 }
 
-function addDaysToDateKey(dateKey, offset) {
-  const [year, month, day] = String(dateKey)
-    .split("-")
-    .map((value) => Number(value));
-  const date = new Date(year, month - 1, day);
-  date.setDate(date.getDate() + offset);
-  return formatParisDateKey(date);
+function getGoogleSheetsDateSerial(date) {
+  const utcDate = Date.UTC(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate()
+  );
+  return Math.floor((utcDate - GOOGLE_SHEETS_DATE_EPOCH_UTC_MS) / 86400000);
 }
 
-function parseSheetMonthDayLabel(label) {
-  const match = String(label || "").match(/(\d{1,2})-(\d{1,2})/);
-  if (!match) return null;
-  return {
-    month: Number(match[1]),
-    day: Number(match[2]),
-  };
-}
-
-function buildQuickDailyForecastWeeklyCache(response, parisNow) {
-  const rows = Array.isArray(response?.table?.rows) ? response.table.rows : [];
-  if (rows.length === 0) {
-    throw new Error("Sheet returned no rows");
-  }
-
-  const headerRow = rows[0];
-  const headerLabel = String(headerRow?.c?.[DAILY_FORECAST_COLUMN_INDEX]?.v || "").trim();
-  const headerMonthDay = parseSheetMonthDayLabel(headerLabel);
-  const parisMonth = parisNow.getMonth() + 1;
-  const parisDay = parisNow.getDate();
-
-  if (
-    !headerMonthDay ||
-    headerMonthDay.month !== parisMonth ||
-    headerMonthDay.day !== parisDay
-  ) {
-    throw new Error("Sheet today column is not aligned with current Paris date");
-  }
-
-  const startDateKey = formatParisDateKey(parisNow);
-  const days = {};
-
-  for (let offset = 0; offset < DAILY_FORECAST_PREFETCH_DAYS; offset++) {
-    const colIndex = DAILY_FORECAST_COLUMN_INDEX + offset;
-    const dateKey = addDaysToDateKey(startDateKey, offset);
-    const dailyRows = rows
-      .slice(1)
-      .map((row) => ({
-        type: String(row?.c?.[0]?.v || "").trim(),
-        name: String(row?.c?.[colIndex]?.v || "").trim(),
-      }))
-      .filter((row) => row.type.startsWith("DJ") && row.name);
-
-    if (dailyRows.length > 0) {
-      days[dateKey] = dailyRows;
-    }
-  }
-
-  if (!days[startDateKey] || days[startDateKey].length === 0) {
-    throw new Error("Sheet did not provide today's dungeon rows");
-  }
-
-  return {
-    startDateKey,
-    fetchedForParisDate: startDateKey,
-    fetchedAt: Date.now(),
-    days,
-  };
-}
-
-function buildFallbackWeeklyCache(startDateKey) {
-  const rows = window.WAKFU_DAILY_FORECAST_FALLBACK.map((row) => ({
-    type: String(row?.type || "").trim(),
-    name: String(row?.name || "").trim(),
-  })).filter((row) => row.type.startsWith("DJ") && row.name);
-
-  return {
-    startDateKey,
-    fetchedForParisDate: startDateKey,
-    fetchedAt: Date.now(),
-    days: {
-      [startDateKey]: rows,
-    },
-  };
-}
-
-function getQuickDailyForecastRowsFromCache(cache, parisDateKey) {
-  if (!cache || typeof cache !== "object" || !cache.days) return [];
-  const rows = cache.days[parisDateKey];
-  return Array.isArray(rows) ? rows : [];
-}
-
-function readQuickDailyForecastWeeklyCache() {
-  try {
-    const raw = localStorage.getItem(DAILY_FORECAST_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : null;
-  } catch (error) {
-    return null;
-  }
-}
-
-function persistQuickDailyForecastWeeklyCache(cache) {
-  if (!cache || typeof cache !== "object") return;
-  try {
-    localStorage.setItem(DAILY_FORECAST_STORAGE_KEY, JSON.stringify(cache));
-  } catch (error) {
-    console.warn("Failed to persist daily forecast weekly cache:", error);
-  }
-}
-
-function loadQuickDailyForecastJsonp(cacheToken) {
-  return new Promise((resolve, reject) => {
-    const callbackName = `wakfuDailyForecastCallback_${Date.now()}_${Math.random()
-      .toString(36)
-      .slice(2)}`;
-    const script = document.createElement("script");
-    const timeoutId = window.setTimeout(() => {
-      cleanup();
-      reject(new Error("JSONP timeout"));
-    }, 12000);
-
-    const cleanup = () => {
-      window.clearTimeout(timeoutId);
-      if (script.parentNode) {
-        script.parentNode.removeChild(script);
-      }
-      try {
-        delete window[callbackName];
-      } catch (error) {
-        window[callbackName] = undefined;
-      }
-    };
-
-    window[callbackName] = (payload) => {
-      cleanup();
-      resolve(payload);
-    };
-
-    script.onerror = () => {
-      cleanup();
-      reject(new Error("JSONP script error"));
-    };
-
-    const params = new URLSearchParams({
-      tqx: `responseHandler:${callbackName};out:json`,
-      t: String(cacheToken),
-    });
-
-    script.src = `${DAILY_FORECAST_SHEET_URL}&${params.toString()}`;
-    document.body.appendChild(script);
-  });
+function positiveModulo(value, divisor) {
+  return ((value % divisor) + divisor) % divisor;
 }
 
 function renderQuickDailyForecastStatus(message) {
@@ -344,9 +143,7 @@ async function renderQuickDailyForecastList(rows) {
   if (!content) return;
 
   if (!Array.isArray(rows) || rows.length === 0) {
-    renderQuickDailyForecastStatus(
-      "\u4eca\u5929\u6ca1\u6709\u8bfb\u53d6\u5230\u526f\u672c\u6570\u636e\u3002"
-    );
+    renderQuickDailyForecastStatus("今天没有读取到副本数据。");
     return;
   }
 
@@ -369,17 +166,9 @@ async function renderQuickDailyForecastList(rows) {
     })
     .join("");
 
-  const timeLabel = new Date(quickDailyForecastState.loadedAt).toLocaleTimeString(
-    "zh-CN",
-    {
-      hour: "2-digit",
-      minute: "2-digit",
-    }
-  );
-
   content.innerHTML = `
     <div class="daily-forecast-list">${itemsHtml}</div>
-    <div class="daily-forecast-meta">\u6700\u8fd1\u66f4\u65b0 ${timeLabel}</div>
+    <div class="daily-forecast-meta">按法国时间 ${quickDailyForecastState.activeParisDate} 本地推算</div>
   `;
 }
 
@@ -455,6 +244,7 @@ function ensureBilingualQuickDailyName(text, englishName) {
   if (normalizedText.endsWith(normalizedEnglish)) return normalizedText;
   return `${normalizedText} ${normalizedEnglish}`;
 }
+
 function changeForecastDay(days) {
   currentForecastDate.setDate(currentForecastDate.getDate() + days);
   renderForecastUI();
