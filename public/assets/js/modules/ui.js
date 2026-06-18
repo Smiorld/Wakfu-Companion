@@ -404,7 +404,7 @@ async function toggleDungeonSidebar() {
     //  Only load data when opening the sidebar
     if (!sidebar.classList.contains("open")) {
       try {
-        await loadScript("assets/js/data/forecast_data.js");
+        await loadScript("assets/js/data/forecast_data.js?v=20260618b");
         // Re-init forecast now that data exists
         if (typeof initForecast === "function") initForecast();
       } catch (e) {

@@ -1,0 +1,18 @@
+window.WAKFU_DAILY_FORECAST_FALLBACK = [
+  { type: "DJ 6 - 20", name: "Larventura" },
+  { type: "DJ 21 - 35", name: "Treechnee Dungeon" },
+  { type: "DJ 36 - 50", name: "The Mineral Tower" },
+  { type: "DJ 51 - 65", name: "Bwork Dungeon" },
+  { type: "DJ 66 - 80", name: "Abandoned Strichery" },
+  { type: "DJ 81 - 95", name: "Miseryum" },
+  { type: "DJ 96 - 110", name: "Dancehall Arena" },
+  { type: "DJ 111 - 125", name: "The Whirlway Station" },
+  { type: "DJ 126 - 140", name: "Treechnid Dungeon" },
+  { type: "DJ 141 - 155", name: "Enurado Dungeon" },
+  { type: "DJ 156 - 170", name: "Elite Riktus Dungeon" },
+  { type: "DJ 171 - 185", name: "Forbidden City" },
+  { type: "DJ 186 - 200", name: "Dreggons' Sanctuary" },
+  { type: "DJ 201 - 215", name: "Crabstacean Dungeon" },
+  { type: "DJ 216 - 230", name: "Horridemon Dungeon" },
+  { type: "DJ 231 - 245", name: "Ferociraptor Dungeon" },
+];

@@ -1738,6 +1738,73 @@ button.aux-btn:hover {
   z-index: 1010;
 }
 
+.daily-forecast-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+}
+
+.daily-forecast-status {
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #9a9a9a;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.daily-forecast-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.daily-forecast-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid #2e2e2e;
+}
+
+.daily-forecast-item-badge {
+  flex: 0 0 auto;
+  min-width: 82px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 0.69rem;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.daily-forecast-item-name {
+  min-width: 0;
+  color: #f2f2f2;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.daily-forecast-item-name .daily-name-zh {
+  color: #f2f2f2;
+  font-weight: 700;
+}
+
+.daily-forecast-item-name .daily-name-en {
+  color: #9f9f9f;
+}
+
+.daily-forecast-meta {
+  color: #777;
+  font-size: 0.72rem;
+  text-align: right;
+}
+
 /* Info Table */
 .info-table {
   width: 100%;
