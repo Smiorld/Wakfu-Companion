@@ -4,6 +4,10 @@ let trackerCatalog = [];
 let trackerLookup = new Map();
 let trackerDecreaseOnLoss =
   localStorage.getItem("wakfu_tracker_decrease_on_loss") === "true";
+let trackerTransferMode = "export";
+
+const TRACKER_TRANSFER_SCHEMA = "wakfu-tracker";
+const TRACKER_TRANSFER_VERSION = 1;
 
 const PROFESSION_SORT_ORDER = {
   Armorer: 1,
@@ -102,6 +106,15 @@ function getPrimaryChineseLabel(itemName) {
 
 function getTrackerDisplayName(itemName) {
   const chineseName = getPrimaryChineseLabel(itemName);
+  return chineseName ? `${chineseName}  ${itemName}` : itemName;
+}
+
+function getTrackerExportName(itemName, nameMode = "bilingual") {
+  if (nameMode === "english") return itemName;
+
+  const chineseName = getPrimaryChineseLabel(itemName);
+  if (nameMode === "chinese") return chineseName || itemName;
+
   return chineseName ? `${chineseName}  ${itemName}` : itemName;
 }
 
@@ -313,6 +326,192 @@ function loadTrackerState() {
       trackedItems = [];
     }
   }
+}
+
+function buildTrackerExportPayload(nameMode = "bilingual") {
+  return {
+    schema: TRACKER_TRANSFER_SCHEMA,
+    version: TRACKER_TRANSFER_VERSION,
+    nameMode,
+    exportedAt: new Date().toISOString(),
+    items: trackedItems.map((item) => ({
+      name: getTrackerExportName(item.name, nameMode),
+      englishName: item.name,
+      chineseName: getPrimaryChineseLabel(item.name),
+      current: item.current || 0,
+      target: item.target || 0,
+      price: item.price || 0,
+      level: item.level || 0,
+      rarity: item.rarity || "common",
+      profession: item.profession || "ALL",
+    })),
+  };
+}
+
+function getTrackerTransferElements() {
+  return {
+    modal: document.getElementById("tracker-transfer-modal"),
+    title: document.getElementById("tracker-transfer-title"),
+    note: document.getElementById("tracker-transfer-note"),
+    text: document.getElementById("tracker-transfer-text"),
+    copyBtn: document.getElementById("tracker-transfer-copy-btn"),
+    applyBtn: document.getElementById("tracker-transfer-apply-btn"),
+  };
+}
+
+function openTrackerTransferModal(mode = "export") {
+  const { modal, title, note, text, copyBtn, applyBtn } = getTrackerTransferElements();
+  if (!modal || !title || !note || !text || !copyBtn || !applyBtn) return;
+
+  trackerTransferMode = mode === "import" ? "import" : "export";
+
+  if (trackerTransferMode === "export") {
+    title.textContent = "追踪器导出";
+    note.textContent =
+      "导出的是可读可改的 JSON。默认名称使用中英双语；后续如需纯英文输出，现有格式也可以直接兼容。";
+    text.value = JSON.stringify(buildTrackerExportPayload("bilingual"), null, 2);
+    text.readOnly = true;
+    copyBtn.style.display = "inline-flex";
+    applyBtn.style.display = "none";
+  } else {
+    title.textContent = "追踪器导入";
+    note.textContent =
+      "把导出的 JSON 粘贴到这里即可。导入只会合并和更新字符串里出现的物品，不会删除你本地已有但未出现在导入内容里的项目。";
+    text.value = "";
+    text.readOnly = false;
+    copyBtn.style.display = "none";
+    applyBtn.style.display = "inline-flex";
+  }
+
+  modal.style.display = "flex";
+  text.focus();
+  text.select();
+}
+
+function closeTrackerTransferModal() {
+  const { modal } = getTrackerTransferElements();
+  if (modal) modal.style.display = "none";
+}
+
+async function copyTrackerTransferText() {
+  const { text } = getTrackerTransferElements();
+  if (!text || !text.value) return;
+
+  try {
+    await navigator.clipboard.writeText(text.value);
+    showTrackerNotification(null, "追踪器导出内容已复制。", "custom");
+  } catch (error) {
+    text.focus();
+    text.select();
+    alert("复制失败，请手动复制文本框内容。");
+  }
+}
+
+function parseTrackerTransferItems(rawText) {
+  const parsed = JSON.parse(rawText);
+  if (Array.isArray(parsed)) return parsed;
+  if (parsed && Array.isArray(parsed.items)) return parsed.items;
+  throw new Error("未找到可导入的 items 数组。");
+}
+
+function normalizeTrackerImportedNumber(value, fallback = 0) {
+  const parsed = parseInt(value, 10);
+  return Number.isNaN(parsed) ? fallback : parsed;
+}
+
+function findImportedTrackerCatalogItem(entry) {
+  const candidateNames = [
+    entry?.englishName,
+    entry?.english,
+    entry?.en,
+    entry?.chineseName,
+    entry?.chinese,
+    entry?.zh,
+    entry?.displayName,
+    entry?.itemName,
+    entry?.name,
+    entry?.names?.english,
+    entry?.names?.chinese,
+    entry?.names?.display,
+  ].filter(Boolean);
+
+  for (const candidate of candidateNames) {
+    const found = findTrackerCatalogItem(candidate);
+    if (found) return found;
+  }
+
+  return null;
+}
+
+function applyTrackerImport() {
+  const { text } = getTrackerTransferElements();
+  if (!text) return;
+
+  let importedItems;
+  try {
+    importedItems = parseTrackerTransferItems(text.value.trim());
+  } catch (error) {
+    alert(`导入失败：${error.message}`);
+    return;
+  }
+
+  let addedCount = 0;
+  let updatedCount = 0;
+  let skippedCount = 0;
+
+  importedItems.forEach((entry) => {
+    const catalogItem = findImportedTrackerCatalogItem(entry);
+    if (!catalogItem) {
+      skippedCount += 1;
+      return;
+    }
+
+    const existingItem = trackedItems.find(
+      (item) => item.name === catalogItem.name && (item.rarity || "common") === (catalogItem.rarity || "common")
+    );
+
+    const nextCurrent = Math.max(0, normalizeTrackerImportedNumber(entry.current, 0));
+    const nextTarget = Math.max(0, normalizeTrackerImportedNumber(entry.target, 0));
+    const nextPrice = Math.max(0, normalizeTrackerImportedNumber(entry.price, existingItem?.price || 0));
+
+    if (existingItem) {
+      existingItem.displayName = catalogItem.displayName;
+      existingItem.chineseAliases = catalogItem.chineseAliases;
+      existingItem.current = nextCurrent;
+      existingItem.target = nextTarget;
+      existingItem.price = nextPrice;
+      existingItem.level = catalogItem.level;
+      existingItem.rarity = catalogItem.rarity;
+      existingItem.profession = catalogItem.profession;
+      existingItem.imgId = catalogItem.imgId || null;
+      existingItem.imgName = catalogItem.imgName || null;
+      updatedCount += 1;
+      return;
+    }
+
+    trackedItems.push({
+      id: Date.now() + addedCount + updatedCount,
+      name: catalogItem.name,
+      displayName: catalogItem.displayName,
+      chineseAliases: catalogItem.chineseAliases,
+      current: nextCurrent,
+      target: nextTarget,
+      level: catalogItem.level,
+      rarity: catalogItem.rarity,
+      profession: catalogItem.profession,
+      imgId: catalogItem.imgId || null,
+      imgName: catalogItem.imgName || null,
+      price: nextPrice,
+    });
+    addedCount += 1;
+  });
+
+  saveTrackerState();
+  renderTracker();
+  closeTrackerTransferModal();
+
+  const summary = `追踪器导入完成：新增 ${addedCount}，更新 ${updatedCount}，跳过 ${skippedCount}。`;
+  showTrackerNotification(null, summary, "custom");
 }
 
 // --- Actions ---
@@ -738,3 +937,7 @@ function closeTrackerModal() {
 }
 
 window.toggleTrackerLossMode = toggleTrackerLossMode;
+window.openTrackerTransferModal = openTrackerTransferModal;
+window.closeTrackerTransferModal = closeTrackerTransferModal;
+window.copyTrackerTransferText = copyTrackerTransferText;
+window.applyTrackerImport = applyTrackerImport;

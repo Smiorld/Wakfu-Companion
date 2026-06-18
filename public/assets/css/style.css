@@ -775,7 +775,8 @@ button.aux-btn:hover {
   border-bottom: 1px solid #333;
   display: flex;
   gap: 10px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
 }
 .tracker-select {
   background: #333;
@@ -784,15 +785,30 @@ button.aux-btn:hover {
   padding: 6px;
   border-radius: 4px;
   flex-grow: 1;
+  min-width: 0;
 }
 .add-track-btn {
   background: #333;
   color: var(--accent);
   border: 1px solid var(--accent);
+  flex: 0 0 auto;
 }
 .add-track-btn:hover {
   background: var(--accent);
   color: #000;
+}
+.tracker-action-btn {
+  background: #2d2d2d;
+  color: #ddd;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 6px 10px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.tracker-action-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 #tracker-list {
   flex-grow: 1;
@@ -2529,6 +2545,40 @@ body.pip-window .empty-state {
   display: flex;
   flex-direction: column;
   gap: 15px;
+}
+.tracker-transfer-modal-content {
+  width: min(720px, calc(100vw - 32px));
+}
+.tracker-transfer-body {
+  gap: 12px;
+}
+.tracker-transfer-note {
+  color: #bdbdbd;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+.tracker-transfer-textarea {
+  width: 100%;
+  min-height: 360px;
+  resize: vertical;
+  border-radius: 6px;
+  border: 1px solid #555;
+  background: #161616;
+  color: #eee;
+  padding: 12px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+.tracker-transfer-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(0, 209, 255, 0.25);
+}
+.tracker-transfer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .input-group {

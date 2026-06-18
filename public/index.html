@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>沃土伴侣 | T2薯条</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=20260617a" />
+    <link rel="stylesheet" href="assets/css/style.css?v=20260618a" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
   </head>
   <body>
@@ -182,6 +182,8 @@
             <input type="text" id="item-input" list="item-datalist" class="tracker-select" placeholder="搜索物品..." autocomplete="off" />
             <datalist id="item-datalist"></datalist>
             <button class="add-track-btn" onclick="addTrackedItem()">添加</button>
+            <button class="tracker-action-btn" onclick="openTrackerTransferModal('import')">导入</button>
+            <button class="tracker-action-btn" onclick="openTrackerTransferModal('export')">导出</button>
           </div>
           <div id="tracker-list">
             <div class="empty-state">添加要追踪的物品...</div>
@@ -841,26 +843,43 @@
       </div>
     </div>
 
+    <div id="tracker-transfer-modal" class="custom-modal" style="display: none">
+      <div class="modal-content tracker-transfer-modal-content">
+        <div class="modal-header">
+          <h3 id="tracker-transfer-title">追踪器导出</h3>
+          <button class="close-modal" onclick="closeTrackerTransferModal()">×</button>
+        </div>
+        <div class="modal-body tracker-transfer-body">
+          <div class="tracker-transfer-note" id="tracker-transfer-note"></div>
+          <textarea id="tracker-transfer-text" class="tracker-transfer-textarea" spellcheck="false"></textarea>
+          <div class="tracker-transfer-actions">
+            <button id="tracker-transfer-copy-btn" class="tracker-action-btn" onclick="copyTrackerTransferText()">复制</button>
+            <button id="tracker-transfer-apply-btn" class="add-track-btn" onclick="applyTrackerImport()">导入并合并</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Data -->
-    <script src="assets/js/data/database.js?v=20260617a"></script>
-    <script src="assets/js/data/items.js?v=20260617a"></script>
-    <script src="assets/js/data/item_i18n_map.js?v=20260617a"></script>
-    <script src="assets/js/data/wakfu_monsters.js?v=20260617a"></script>
+    <script src="assets/js/data/database.js?v=20260618a"></script>
+    <script src="assets/js/data/items.js?v=20260618a"></script>
+    <script src="assets/js/data/item_i18n_map.js?v=20260618a"></script>
+    <script src="assets/js/data/wakfu_monsters.js?v=20260618a"></script>
 
     <!-- Modules -->
-    <script src="assets/js/modules/sessionRecap.js?v=20260617a"></script>
-    <script src="assets/js/modules/state.js?v=20260617a"></script>
-    <script src="assets/js/modules/utils.js?v=20260617a"></script>
-    <script src="assets/js/modules/filesystem.js?v=20260617a"></script>
-    <script src="assets/docs/azure-translator-setup-guide.js?v=20260617a"></script>
-    <script src="assets/js/modules/chat.js?v=20260617a"></script>
-    <script src="assets/js/modules/combat.js?v=20260617a"></script>
-    <script src="assets/js/modules/tracker.js?v=20260617a"></script>
-    <script src="assets/js/modules/forecast.js?v=20260617a"></script>
-    <script src="assets/js/modules/ui.js?v=20260617a"></script>
+    <script src="assets/js/modules/sessionRecap.js?v=20260618a"></script>
+    <script src="assets/js/modules/state.js?v=20260618a"></script>
+    <script src="assets/js/modules/utils.js?v=20260618a"></script>
+    <script src="assets/js/modules/filesystem.js?v=20260618a"></script>
+    <script src="assets/docs/azure-translator-setup-guide.js?v=20260618a"></script>
+    <script src="assets/js/modules/chat.js?v=20260618a"></script>
+    <script src="assets/js/modules/combat.js?v=20260618a"></script>
+    <script src="assets/js/modules/tracker.js?v=20260618a"></script>
+    <script src="assets/js/modules/forecast.js?v=20260618a"></script>
+    <script src="assets/js/modules/ui.js?v=20260618a"></script>
 
     <!-- Core -->
-    <script src="assets/js/core/professions.js?v=20260617a"></script>
-    <script src="assets/js/core/main.js?v=20260617a"></script>
+    <script src="assets/js/core/professions.js?v=20260618a"></script>
+    <script src="assets/js/core/main.js?v=20260618a"></script>
   </body>
 </html>
