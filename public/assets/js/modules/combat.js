@@ -989,12 +989,24 @@ async function parseFile() {
   }
 
   isReading = true;
+  window.lastReadTime = now;
 
   try {
     const file = await fileHandle.getFile();
 
     // Success: Reset error counter
     permissionStrikeCount = 0;
+
+    if (file.size < fileOffset) {
+      // The log file was truncated, replaced, or recreated while we were
+      // tracking it. Reset the offset so the new tail can be consumed again.
+      console.warn(
+        `[Nexus] Log file size shrank from ${fileOffset} to ${file.size}. Resetting read offset.`
+      );
+      fileOffset = 0;
+      if (typeof logLineCache !== "undefined") logLineCache.clear();
+      if (typeof combatLineCache !== "undefined") combatLineCache.clear();
+    }
 
     if (file.size > fileOffset) {
       const blob = file.slice(fileOffset, file.size);
@@ -1021,6 +1033,8 @@ async function parseFile() {
         trackerDirty = false;
       }
     }
+
+    window.lastReadTime = Date.now();
   } catch (err) {
     // --- HANDLE FILE LOCKING ---
     if (err.name === "NotReadableError") {

@@ -29,6 +29,16 @@ const itemInput = document.getElementById("item-input");
 const itemDatalist = document.getElementById("item-datalist");
 const trackerList = document.getElementById("tracker-list");
 
+function requestImmediateLogCatchup(reason = "") {
+  if (!fileHandle || typeof parseFile !== "function") return;
+
+  Promise.resolve()
+    .then(() => parseFile())
+    .catch((error) => {
+      console.warn(`[Nexus] Immediate log catch-up failed${reason ? ` (${reason})` : ""}:`, error);
+    });
+}
+
 // --- INITIALIZATION ---
 document.addEventListener("DOMContentLoaded", () => {
   // 1. Data Preparation
@@ -211,6 +221,20 @@ if (bugReportBtn) {
     }
   });
 }
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    requestImmediateLogCatchup("visibilitychange");
+  }
+});
+
+window.addEventListener("focus", () => {
+  requestImmediateLogCatchup("focus");
+});
+
+window.addEventListener("pageshow", () => {
+  requestImmediateLogCatchup("pageshow");
+});
 
 window.startSessionTimer = startSessionTimer;
 
