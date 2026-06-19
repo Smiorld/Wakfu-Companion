@@ -52,13 +52,13 @@ async function refreshQuickDailyForecast() {
       typeof DUNGEON_TRANSLATIONS === "undefined" &&
       typeof loadScript === "function"
     ) {
-      await loadScript("assets/js/data/forecast_data.js?v=20260618c");
+      await loadScript("assets/js/data/forecast_data.js?v=20260619a");
     }
     if (
       typeof window.WAKFU_DAILY_DUNGEON_ROTATION === "undefined" &&
       typeof loadScript === "function"
     ) {
-      await loadScript(`${QUICK_DAILY_FORECAST_ROTATION_URL}?v=20260618c`);
+      await loadScript(`${QUICK_DAILY_FORECAST_ROTATION_URL}?v=20260619a`);
     }
 
     renderQuickDailyForecastStatus("正在按本地轮换表推算今天的副本数据...");

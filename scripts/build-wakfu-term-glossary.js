@@ -4,7 +4,7 @@ const { execFileSync } = require("child_process");
 
 const SOURCE_REF =
   process.argv[2] ||
-  "backup-pre-v1-clean-history:artifacts/wakfu-i18n/wakfu_i18n_en_zh.json";
+  "artifacts/wakfu-i18n/wakfu_i18n_en_zh.json";
 const OUTPUT_PATH =
   process.argv[3] ||
   path.join(__dirname, "..", "public", "assets", "data", "wakfu_term_glossary.json");
@@ -389,10 +389,14 @@ function scoreEntry(entry, chinese) {
 }
 
 function loadSourceEntries(ref) {
-  const raw = execFileSync("git", ["show", ref], {
-    encoding: "utf8",
-    maxBuffer: 1024 * 1024 * 64,
-  }).replace(/^\uFEFF/, "");
+  const maybeFilePath = path.isAbsolute(ref) ? ref : path.join(__dirname, "..", ref);
+  const raw = (fs.existsSync(maybeFilePath)
+    ? fs.readFileSync(maybeFilePath, "utf8")
+    : execFileSync("git", ["show", ref], {
+        encoding: "utf8",
+        maxBuffer: 1024 * 1024 * 64,
+      })
+  ).replace(/^\uFEFF/, "");
 
   const parsed = JSON.parse(raw);
   if (!Array.isArray(parsed)) {

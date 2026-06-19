@@ -99,7 +99,7 @@ let wakfuExactTermMap = null;
 let wakfuFuzzyAliasIndex = null;
 let azureGuideHtmlCache = "";
 
-const WAKFU_GLOSSARY_URL = "assets/data/wakfu_term_glossary.json?v=20260618c";
+const WAKFU_GLOSSARY_URL = "assets/data/wakfu_term_glossary.json?v=20260619a";
 const TRANSLATION_CONFIG_STORAGE_KEY = "wakfu_translation_config";
 const AZURE_TRANSLATOR_ENDPOINT =
   "https://api.cognitive.microsofttranslator.com/translate?api-version=3.0";
@@ -158,6 +158,7 @@ const WAKFU_GENERIC_LATIN_ALIAS_WORDS = new Set([
   "rewards",
   "road",
   "score",
+  "safe",
   "sign",
   "signs",
   "spell",
@@ -194,6 +195,51 @@ const WAKFU_LATIN_CONNECTOR_WORDS = new Set([
   "da",
   "do",
   "del",
+]);
+const WAKFU_FUZZY_STOP_WORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "are",
+  "as",
+  "at",
+  "be",
+  "but",
+  "by",
+  "for",
+  "from",
+  "have",
+  "he",
+  "her",
+  "his",
+  "i",
+  "in",
+  "is",
+  "it",
+  "its",
+  "me",
+  "my",
+  "of",
+  "on",
+  "or",
+  "our",
+  "she",
+  "that",
+  "the",
+  "their",
+  "them",
+  "there",
+  "these",
+  "they",
+  "this",
+  "those",
+  "to",
+  "was",
+  "we",
+  "were",
+  "with",
+  "you",
+  "your",
 ]);
 
 function escapeTranslationRegex(text) {
@@ -255,6 +301,30 @@ function shouldIndexForFuzzyMatch(entry, normalizedAlias, normalizedLatin) {
   }
 
   return true;
+}
+
+function shouldProtectLatinAliasInSentence(entry, normalizedAlias, normalizedLatin) {
+  if (!normalizedLatin) return false;
+
+  const words = normalizedLatin.split(" ").filter(Boolean);
+  if (!words.length) return false;
+
+  if (words.length === 1) {
+    if (entry.forceProtect) {
+      return normalizedLatin.length >= 4;
+    }
+
+    if (normalizedLatin.length < 5) return false;
+    if (isLowValueLatinAlias(normalizedAlias)) return false;
+  }
+
+  return true;
+}
+
+function shouldAllowFuzzyLatinCandidate(normalizedCandidate) {
+  const words = String(normalizedCandidate || "").split(" ").filter(Boolean);
+  if (words.length <= 1) return true;
+  return !words.some((word) => WAKFU_FUZZY_STOP_WORDS.has(word));
 }
 
 function isLikelyStandaloneGlossaryInput(text) {
@@ -405,12 +475,14 @@ async function buildWakfuTranslationAliases() {
             entry,
             isLatin: latin,
             pattern: latin
-              ? buildLatinBoundaryPattern(normalizedAlias)
+              ? shouldProtectLatinAliasInSentence(entry, normalizedAlias, normalizedLatin)
+                ? buildLatinBoundaryPattern(normalizedAlias)
+                : null
               : new RegExp(escapeTranslationRegex(normalizedAlias), "g"),
           };
         })
       )
-      .filter(Boolean)
+      .filter((row) => row && row.pattern)
       .sort((a, b) => b.alias.length - a.alias.length);
 
     wakfuExactTermMap = exactTermMap;
@@ -542,6 +614,7 @@ function replaceFuzzyLatinTermsInSegment(segment, placeholders, targetLang) {
       const rawCandidate = segment.slice(start, end);
       const normalizedCandidate = normalizeLatinAlias(rawCandidate);
       if (normalizedCandidate.length < 4) continue;
+      if (!shouldAllowFuzzyLatinCandidate(normalizedCandidate)) continue;
 
       const indexKey = `${wordCount}:${normalizedCandidate[0]}`;
       const bucket = wakfuFuzzyAliasIndex.get(indexKey);

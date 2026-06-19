@@ -5,6 +5,7 @@
   "main": "index.html",
   "scripts": {
     "start": "npx serve -l $PORT",
+    "extract:i18n": "node scripts/extract-wakfu-i18n.js",
     "build:glossary": "node scripts/build-wakfu-term-glossary.js",
     "combat:replay": "node tools/combat/replay-log.js"
   },

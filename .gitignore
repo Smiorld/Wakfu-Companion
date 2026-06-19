@@ -10,6 +10,7 @@ Thumbs.db
 artifacts/
 scripts/*
 !scripts/build-wakfu-term-glossary.js
+!scripts/extract-wakfu-i18n.js
 wakfu_chat.log*.sample
 *.sample
 AGENT.md
