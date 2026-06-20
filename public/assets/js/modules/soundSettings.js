@@ -57,11 +57,11 @@ function getDefaultSoundSettings() {
   return {
     tracker: {
       preset: "default",
-      volume: 5,
+      volume: 20,
     },
     tribe: {
       preset: "default",
-      volume: 5,
+      volume: 20,
     },
   };
 }
