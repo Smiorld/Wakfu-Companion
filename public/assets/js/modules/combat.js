@@ -220,9 +220,10 @@ function processFightLog(line) {
   const armorUnits = "Armor|Armadura|Armure|护甲";
   const numPattern = "[\\d,.\\s]+";
 
-  const parts = line.split(/\] /);
-  if (parts.length < 2) return;
-  const content = parts[1].trim();
+  const contentStart = String(line || "").lastIndexOf("] ");
+  const content =
+    contentStart >= 0 ? String(line || "").slice(contentStart + 2).trim() : String(line || "").trim();
+  if (!content) return;
   const removedState = extractRemovedState(content);
 
   if (pendingIndirectAttribution && removedState && removedState.target === pendingIndirectAttribution.target) {
