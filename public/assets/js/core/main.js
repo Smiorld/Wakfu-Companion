@@ -147,6 +147,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (typeof checkPreviousFile === "function") checkPreviousFile();
   if (typeof loadFightHistory === "function") loadFightHistory();
   if (typeof initForecast === "function") initForecast();
+  if (typeof initSoundSettings === "function") initSoundSettings();
   if (typeof initBroadcastSystem === "function") initBroadcastSystem();
 
   if (typeof loadLiveCombatState === "function") {
@@ -197,6 +198,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const sessHandle = document.getElementById("session-drag-handle");
   if (sessWindow && sessHandle) {
     makeDraggable(sessWindow, sessHandle);
+  }
+
+  const soundSettingsWindow = document.getElementById("sound-settings-modal");
+  const soundSettingsHandle = document.getElementById("sound-settings-drag-handle");
+  if (soundSettingsWindow && soundSettingsHandle) {
+    makeDraggable(soundSettingsWindow, soundSettingsHandle);
   }
 
   if (typeof loadScript === "function") {

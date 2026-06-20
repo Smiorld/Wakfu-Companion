@@ -4007,6 +4007,107 @@ body.pip-window .empty-state {
   padding: 15px;
 }
 
+.sound-settings-window {
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+}
+
+.sound-settings-body {
+  gap: 14px;
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+}
+
+.sound-settings-note {
+  color: #9e9e9e;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  border: 1px solid #333;
+  background: #191919;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.sound-settings-section {
+  border: 1px solid #333;
+  background: #181818;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sound-settings-title {
+  color: var(--accent);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.sound-settings-grid {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 10px 12px;
+  align-items: center;
+}
+
+.sound-settings-grid .translation-select {
+  width: 100%;
+}
+
+.sound-settings-label {
+  color: #bdbdbd;
+  font-size: 0.82rem;
+}
+
+.sound-volume-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sound-volume-slider {
+  flex: 1 1 auto;
+}
+
+.sound-volume-value {
+  min-width: 42px;
+  text-align: right;
+  color: var(--accent);
+  font-family: monospace;
+  font-size: 0.82rem;
+}
+
+.sound-custom-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sound-custom-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: #ddd;
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sound-upload-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.sound-settings-actions,
+.sound-settings-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .session-section.last-section {
   border-bottom: none;
   margin-bottom: 0;

@@ -719,6 +719,8 @@
 
         <span class="footer-btn" onclick="toggleSessionWindow()" style="margin-right: 10px">会话总结</span>
 
+        <span class="footer-btn" onclick="openSoundSettingsModal()" style="margin-right: 10px">声音设置</span>
+
       </div>
     </div>
 
@@ -879,6 +881,80 @@
 
     <div id="broadcast-modal" class="floating-window broadcast-window" style="display: none"></div>
 
+    <div id="sound-settings-modal" class="floating-window sound-settings-window" style="display: none; left: 50%; top: 16%; transform: translateX(-50%); width: 520px">
+      <div class="modal-header draggable-header" id="sound-settings-drag-handle">
+        <div class="session-header-group">
+          <h3>声音设置</h3>
+        </div>
+        <button class="close-modal" type="button" onclick="closeSoundSettingsModal()">×</button>
+      </div>
+      <div class="modal-body sound-settings-body">
+        <div class="sound-settings-note">
+          项目内现有通知音频只有 1 个，另外补了 3 个内建提示音。可分别给追踪区和部族通知配置，并支持导入你自己的本地音频。
+        </div>
+
+        <div class="sound-settings-section">
+          <div class="sound-settings-title">追踪区完成提示</div>
+          <div class="sound-settings-grid">
+            <label class="sound-settings-label">音效</label>
+            <select id="sound-preset-tracker" class="translation-select" onchange="updateSoundPreset('tracker', this.value)"></select>
+
+            <label class="sound-settings-label">音量</label>
+            <div class="sound-volume-row">
+              <input id="sound-volume-tracker" class="sound-volume-slider" type="range" min="0" max="100" step="1" oninput="updateSoundVolume('tracker', this.value)" />
+              <span id="sound-volume-value-tracker" class="sound-volume-value">0%</span>
+            </div>
+
+            <label class="sound-settings-label">自定义</label>
+            <div class="sound-custom-row">
+              <span id="sound-custom-name-tracker" class="sound-custom-name">未导入自定义音频</span>
+              <label class="tracker-action-btn sound-upload-btn">
+                导入
+                <input type="file" accept="audio/*" onchange="importCustomSound('tracker', this)" hidden />
+              </label>
+              <button class="tracker-action-btn" type="button" onclick="clearCustomSound('tracker')">清除</button>
+            </div>
+          </div>
+          <div class="sound-settings-actions">
+            <button class="tracker-action-btn" type="button" onclick="previewNotificationSound('tracker')">预览</button>
+            <button class="tracker-action-btn" type="button" onclick="resetSoundChannel('tracker')">恢复默认</button>
+          </div>
+        </div>
+
+        <div class="sound-settings-section">
+          <div class="sound-settings-title">部族通知提示</div>
+          <div class="sound-settings-grid">
+            <label class="sound-settings-label">音效</label>
+            <select id="sound-preset-tribe" class="translation-select" onchange="updateSoundPreset('tribe', this.value)"></select>
+
+            <label class="sound-settings-label">音量</label>
+            <div class="sound-volume-row">
+              <input id="sound-volume-tribe" class="sound-volume-slider" type="range" min="0" max="100" step="1" oninput="updateSoundVolume('tribe', this.value)" />
+              <span id="sound-volume-value-tribe" class="sound-volume-value">0%</span>
+            </div>
+
+            <label class="sound-settings-label">自定义</label>
+            <div class="sound-custom-row">
+              <span id="sound-custom-name-tribe" class="sound-custom-name">未导入自定义音频</span>
+              <label class="tracker-action-btn sound-upload-btn">
+                导入
+                <input type="file" accept="audio/*" onchange="importCustomSound('tribe', this)" hidden />
+              </label>
+              <button class="tracker-action-btn" type="button" onclick="clearCustomSound('tribe')">清除</button>
+            </div>
+          </div>
+          <div class="sound-settings-actions">
+            <button class="tracker-action-btn" type="button" onclick="previewNotificationSound('tribe')">预览</button>
+            <button class="tracker-action-btn" type="button" onclick="resetSoundChannel('tribe')">恢复默认</button>
+          </div>
+        </div>
+
+        <div class="sound-settings-footer">
+          <button class="tracker-action-btn" type="button" onclick="resetAllSoundSettings()">全部复位</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Data -->
     <script src="assets/js/data/database.js?v=20260619b"></script>
     <script src="assets/js/data/items.js?v=20260619b"></script>
@@ -892,6 +968,7 @@
     <script src="assets/js/modules/state.js?v=20260619b"></script>
     <script src="assets/js/modules/utils.js?v=20260619b"></script>
     <script src="assets/js/modules/filesystem.js?v=20260619b"></script>
+    <script src="assets/js/modules/soundSettings.js?v=20260620a"></script>
     <script src="assets/docs/azure-translator-setup-guide.js?v=20260619b"></script>
     <script src="assets/js/modules/chat.js?v=20260619b"></script>
     <script src="assets/js/modules/broadcast.js?v=20260620a"></script>

@@ -281,9 +281,9 @@ function processItemLog(line) {
           showTrackerNotification(null, item.displayName || item.name, true);
         }, 200);
 
-        const goalSound = new Audio("./assets/sfx/tracking_completed.mp3");
-        goalSound.volume = 0.05;
-        goalSound.play().catch((e) => {});
+        if (typeof playNotificationSound === "function") {
+          playNotificationSound("tracker");
+        }
       }
     }
   });

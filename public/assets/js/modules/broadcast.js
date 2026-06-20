@@ -1,7 +1,6 @@
 const BROADCAST_STORAGE_KEY = "wakfu_tribe_broadcast_state_v3";
 const BROADCAST_ROOM_ID = "wakfu-companion-tribe-main-v1";
 const BROADCAST_MODULE_URL = "https://esm.sh/@rtco/client@0.3.6?bundle";
-const BROADCAST_SOUND_URL = "./assets/sfx/tracking_completed.mp3";
 const TRIBE_NOTICE_DURATION_MS = 30 * 60 * 1000;
 const BROADCAST_REFRESH_MS = 1000;
 const BROADCAST_MAX_RECORDS = 200;
@@ -267,10 +266,9 @@ function sendBroadcastSync(targetPeerId) {
 }
 
 function playBroadcastTribeSound() {
-  try {
-    const goalSound = new Audio(BROADCAST_SOUND_URL);
-    goalSound.play().catch(() => {});
-  } catch (error) {}
+  if (typeof playNotificationSound === "function") {
+    playNotificationSound("tribe");
+  }
 }
 
 function showBroadcastToast(record) {
