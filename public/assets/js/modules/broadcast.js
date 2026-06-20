@@ -1,13 +1,10 @@
 const BROADCAST_STORAGE_KEY = "wakfu_tribe_broadcast_state_v3";
-const BROADCAST_ROOM_ID = "wakfu-companion-tribe-main-v1";
-const BROADCAST_MODULE_URL = "https://esm.sh/@rtco/client@0.3.6?bundle";
+const BROADCAST_SERVICE_URL = "wss://wakfu-tribe-sync.q1541599745.workers.dev/connect";
 const TRIBE_NOTICE_DURATION_MS = 30 * 60 * 1000;
 const BROADCAST_REFRESH_MS = 1000;
 const BROADCAST_MAX_RECORDS = 200;
 
-let broadcastRuntimePromise = null;
-let broadcastPeer = null;
-let broadcastRoom = null;
+let broadcastSocket = null;
 let broadcastPeerId = "";
 let broadcastRefreshTimer = null;
 let broadcastReconnectTimer = null;
@@ -19,7 +16,6 @@ let broadcastConnection = {
   message: "部族通知网络未启动。",
   peerCount: 0,
 };
-const broadcastConnectedPeers = new Set();
 
 function loadBroadcastState() {
   try {
@@ -191,23 +187,6 @@ function updateBroadcastConnection(status, message) {
   renderBroadcastHistory();
 }
 
-function syncBroadcastPeerCount() {
-  const selfCount = broadcastPeerId ? 1 : 0;
-  broadcastConnection.peerCount = selfCount + broadcastConnectedPeers.size;
-}
-
-function rememberBroadcastPeer(peerId) {
-  if (!peerId || peerId === broadcastPeerId) return;
-  broadcastConnectedPeers.add(String(peerId));
-  syncBroadcastPeerCount();
-}
-
-function forgetBroadcastPeer(peerId) {
-  if (!peerId) return;
-  broadcastConnectedPeers.delete(String(peerId));
-  syncBroadcastPeerCount();
-}
-
 function scheduleBroadcastReconnect(delayMs = 10000) {
   if (broadcastReconnectTimer) return;
   broadcastReconnectTimer = setTimeout(() => {
@@ -216,53 +195,28 @@ function scheduleBroadcastReconnect(delayMs = 10000) {
   }, delayMs);
 }
 
-async function loadBroadcastRuntime() {
-  if (!broadcastRuntimePromise) {
-    broadcastRuntimePromise = import(BROADCAST_MODULE_URL);
-  }
-  return broadcastRuntimePromise;
-}
-
-function makeBroadcastPayload(type, payload) {
-  return JSON.stringify({
-    app: "wakfu-companion-tribe",
-    version: 1,
-    type,
-    payload,
-  });
-}
-
-function parseBroadcastPayload(raw) {
+function parseBroadcastMessage(raw) {
   try {
-    const parsed = JSON.parse(raw);
-    if (parsed?.app !== "wakfu-companion-tribe" || parsed?.version !== 1) {
-      return null;
-    }
-    return parsed;
+    return JSON.parse(raw);
   } catch (error) {
     return null;
   }
 }
 
-function sendBroadcastMessage(type, payload, targetPeerId) {
-  if (!broadcastRoom) return false;
+function sendBroadcastMessage(type, payload) {
+  if (!broadcastSocket || broadcastSocket.readyState !== WebSocket.OPEN) return false;
   try {
-    broadcastRoom.send(makeBroadcastPayload(type, payload), targetPeerId);
+    broadcastSocket.send(
+      JSON.stringify({
+        type,
+        ...payload,
+      })
+    );
     return true;
   } catch (error) {
     console.warn("[Broadcast] send failed:", error);
     return false;
   }
-}
-
-function sendBroadcastSync(targetPeerId) {
-  sendBroadcastMessage(
-    "sync",
-    {
-      tribes: Object.values(broadcastState.tribes || {}),
-    },
-    targetPeerId
-  );
 }
 
 function playBroadcastTribeSound() {
@@ -419,9 +373,8 @@ function resolveBroadcastTribe(input) {
   const resolved = resolveBroadcastTribeLocal(input);
   if (!resolved) return false;
 
-  sendBroadcastMessage("tribe-resolved", {
-    name: input?.challengeName || input?.name || "",
-    challengeId: String(input?.challengeId || ""),
+  sendBroadcastMessage("tribe-resolve", {
+    key: getTribeRecordKey(input?.challengeName || input?.name || ""),
     resolvedAt: Number(input?.resolvedAt || Date.now()),
   });
   return true;
@@ -580,110 +533,101 @@ function ensureBroadcastModalStructure() {
 }
 
 async function connectBroadcastNetwork() {
-  if (broadcastRoom || broadcastPeer) return;
+  if (broadcastSocket) return;
   if (broadcastReconnectTimer) {
     clearTimeout(broadcastReconnectTimer);
     broadcastReconnectTimer = null;
   }
 
   updateBroadcastConnection("loading", "正在连接...");
-  syncBroadcastPeerCount();
 
   try {
-    const { Artico, SocketSignaling } = await loadBroadcastRuntime();
-    broadcastPeer = new Artico({
-      signaling: new SocketSignaling({
-        url: "https://0.artico.dev:443",
-      }),
+    broadcastSocket = new WebSocket(BROADCAST_SERVICE_URL);
+
+    broadcastSocket.addEventListener("open", () => {
+      updateBroadcastConnection("loading", "已连接服务，正在同步...");
+      sendBroadcastMessage("sync-request", {});
     });
 
-    broadcastPeer.on("open", (peerId) => {
-      broadcastPeerId = peerId;
-      syncBroadcastPeerCount();
-      updateBroadcastConnection("loading", "已接入信令，正在加入房间...");
+    broadcastSocket.addEventListener("message", (event) => {
+      const message = parseBroadcastMessage(event.data);
+      if (!message) return;
 
-      broadcastRoom = broadcastPeer.join(BROADCAST_ROOM_ID);
-
-      broadcastRoom.on("join", (joinedPeerId) => {
-        rememberBroadcastPeer(joinedPeerId);
-        updateBroadcastConnection("ready", "已连接");
-        setTimeout(() => sendBroadcastSync(joinedPeerId), 150);
-      });
-
-      broadcastRoom.on("leave", (leftPeerId) => {
-        forgetBroadcastPeer(leftPeerId);
-        updateBroadcastConnection("ready", "已连接");
-      });
-
-      broadcastRoom.on("message", (raw, remotePeerId) => {
-        rememberBroadcastPeer(remotePeerId);
-        const message = parseBroadcastPayload(raw);
-        if (!message) return;
-
-        if (message.type === "tribe-detected" && message.payload?.record) {
-          const record = buildTribeRecord(message.payload.record);
-          if (!record) return;
-          record.senderPeerId = remotePeerId || record.senderPeerId;
-          mergeTribeRecord(record, {
-            persist: true,
-            notify: record.senderPeerId !== broadcastPeerId,
-          });
-        } else if (message.type === "tribe-resolved") {
-          resolveBroadcastTribeLocal({
-            name: message.payload?.name || "",
-            challengeId: message.payload?.challengeId || "",
-            resolvedAt: Number(message.payload?.resolvedAt || Date.now()),
-          });
-        } else if (message.type === "sync" && Array.isArray(message.payload?.tribes)) {
-          let changed = false;
-          message.payload.tribes.forEach((item) => {
+      if (message.type === "welcome") {
+        broadcastPeerId = String(message.sessionId || "");
+        if (message.state?.tribes && typeof message.state.tribes === "object") {
+          Object.values(message.state.tribes).forEach((item) => {
             const record = buildTribeRecord(item);
             if (!record) return;
-            if (
-              mergeTribeRecord(record, {
-                persist: false,
-                notify: false,
-              })
-            ) {
-              changed = true;
-            }
+            mergeTribeRecord(record, {
+              persist: false,
+              notify: false,
+            });
           });
-          if (changed) saveBroadcastState();
-        } else if (message.type === "sync-request") {
-          sendBroadcastSync(remotePeerId);
+          saveBroadcastState();
         }
-      });
+        updateBroadcastConnection("ready", "已连接");
+        return;
+      }
 
-      updateBroadcastConnection("ready", "已连接");
-      sendBroadcastMessage("sync-request", { peerId });
+      if (message.type === "presence") {
+        broadcastConnection.peerCount = Math.max(1, Number(message.onlineCount || 0));
+        renderBroadcastStrip();
+        renderBroadcastHistory();
+        return;
+      }
+
+      if (message.type === "sync" && message.state?.tribes && typeof message.state.tribes === "object") {
+        Object.values(message.state.tribes).forEach((item) => {
+          const record = buildTribeRecord(item);
+          if (!record) return;
+          mergeTribeRecord(record, {
+            persist: false,
+            notify: false,
+          });
+        });
+        saveBroadcastState();
+        updateBroadcastConnection("ready", "已连接");
+        return;
+      }
+
+      if (message.type === "tribe-upsert" && message.record) {
+        const record = buildTribeRecord(message.record);
+        if (!record) return;
+        record.senderPeerId = String(message.record.senderPeerId || record.senderPeerId || "");
+        mergeTribeRecord(record, {
+          persist: true,
+          notify: record.senderPeerId !== broadcastPeerId,
+        });
+        return;
+      }
+
+      if (message.type === "tribe-resolve" && message.record) {
+        resolveBroadcastTribeLocal({
+          name: message.record.name || "",
+          challengeId: message.record.challengeId || "",
+          resolvedAt: Number(message.record.dismissedAt || message.serverTime || Date.now()),
+        });
+      }
     });
 
-    broadcastPeer.on("close", () => {
-      broadcastRoom = null;
-      broadcastPeer = null;
+    broadcastSocket.addEventListener("close", () => {
+      broadcastSocket = null;
       broadcastPeerId = "";
-      broadcastConnectedPeers.clear();
-      syncBroadcastPeerCount();
+      broadcastConnection.peerCount = 0;
       updateBroadcastConnection("error", "连接已断开");
       scheduleBroadcastReconnect();
     });
 
-    broadcastPeer.on("error", (error) => {
+    broadcastSocket.addEventListener("error", (error) => {
       console.warn("[Broadcast] network error:", error);
-      broadcastRoom = null;
-      broadcastPeer = null;
-      broadcastPeerId = "";
-      broadcastConnectedPeers.clear();
-      syncBroadcastPeerCount();
       updateBroadcastConnection("error", "连接失败");
-      scheduleBroadcastReconnect();
     });
   } catch (error) {
-    console.warn("[Broadcast] runtime load failed:", error);
+    console.warn("[Broadcast] socket init failed:", error);
     broadcastPeerId = "";
-    broadcastConnectedPeers.clear();
-    syncBroadcastPeerCount();
-    updateBroadcastConnection("error", "网络加载失败，请检查连接");
+    broadcastConnection.peerCount = 0;
+    updateBroadcastConnection("error", "通知服务不可用");
     scheduleBroadcastReconnect(15000);
   }
 }
@@ -704,7 +648,7 @@ function registerTribeChallengeDetection(input) {
   });
 
   if (shouldAnnounce) {
-    sendBroadcastMessage("tribe-detected", { record });
+    sendBroadcastMessage("tribe-upsert", { record });
   }
 
   return shouldAnnounce;
