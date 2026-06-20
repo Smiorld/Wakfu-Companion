@@ -136,9 +136,38 @@ function requestImmediateLogCatchup(reason = "") {
     });
 }
 
+function disablePasswordManagerPrompts() {
+  const selector = [
+    "input:not([type='file']):not([type='checkbox']):not([type='radio']):not([type='range'])",
+    "textarea",
+    "select",
+  ].join(", ");
+
+  document.querySelectorAll(selector).forEach((element) => {
+    if (!element) return;
+
+    if (!element.getAttribute("autocomplete")) {
+      element.setAttribute("autocomplete", "off");
+    }
+
+    if (element instanceof HTMLInputElement && element.type === "password") {
+      element.setAttribute("autocomplete", "new-password");
+    }
+
+    element.setAttribute("autocorrect", "off");
+    element.setAttribute("autocapitalize", "off");
+    element.setAttribute("spellcheck", "false");
+    element.setAttribute("data-form-type", "other");
+    element.setAttribute("data-lpignore", "true");
+    element.setAttribute("data-1p-ignore", "true");
+    element.setAttribute("data-bwignore", "true");
+  });
+}
+
 // --- INITIALIZATION ---
 document.addEventListener("DOMContentLoaded", () => {
   initializeDualFilePromptUI();
+  disablePasswordManagerPrompts();
 
   if (typeof initMonsterDatabase === "function") initMonsterDatabase();
   if (typeof generateSpellMap === "function") generateSpellMap();

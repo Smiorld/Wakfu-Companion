@@ -1175,7 +1175,7 @@ function processAreaChallengeLine(line) {
 }
 
 function processAreaChallengeResolutionLine(line) {
-  const match = String(line || "").match(/"合作[:：]\s*([^"]+?部族)"任务(?:失败|获胜|完成)[。.]?/);
+  const match = String(line || "").match(/"合作[:：]\s*([^"]+?部族)"任务(?:获胜|完成)[。.]?/);
   if (!match) return;
 
   if (typeof resolveBroadcastTribe === "function") {

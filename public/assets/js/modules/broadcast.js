@@ -144,14 +144,32 @@ function normalizeLedgerState(input) {
   return next;
 }
 
-function replaceBroadcastLedger(state) {
-  broadcastState = normalizeLedgerState(state);
+function replaceBroadcastLedger(state, options = {}) {
+  const { notify = false } = options;
+  const previousRecords = { ...(broadcastState.tribes || {}) };
+  const nextState = normalizeLedgerState(state);
+  const nextRecords = Object.values(nextState.tribes || {});
+
+  broadcastState = nextState;
   pruneBroadcastState();
   pruneBroadcastViewState();
   saveBroadcastState();
   saveBroadcastViewState();
   renderBroadcastStrip();
   renderBroadcastHistory();
+
+  if (!notify) return;
+
+  nextRecords.forEach((record) => {
+    const previous = previousRecords[record.key];
+    const shouldNotify =
+      String(record.senderPeerId || "") !== broadcastPeerId &&
+      shouldNotifyForActivatedRecord(previous, record);
+
+    if (!shouldNotify) return;
+    playBroadcastTribeSound();
+    showBroadcastToast(record);
+  });
 }
 
 function pruneBroadcastState() {
@@ -233,6 +251,25 @@ function canRestoreRecord(record) {
 
 function isRecordVisibleActive(record) {
   return isRecordWithinWindow(record) && !isRecordEnded(record) && !isLocallyDismissed(record.key);
+}
+
+function recordsShareBroadcastWindow(left, right) {
+  const leftActivatedAt = Number(left?.activatedAt || 0);
+  const rightActivatedAt = Number(right?.activatedAt || 0);
+  const leftExpiresAt = Number(left?.expiresAt || leftActivatedAt + TRIBE_NOTICE_DURATION_MS);
+  const rightExpiresAt = Number(right?.expiresAt || rightActivatedAt + TRIBE_NOTICE_DURATION_MS);
+  return leftActivatedAt <= rightExpiresAt && rightActivatedAt <= leftExpiresAt;
+}
+
+function shouldNotifyForActivatedRecord(existing, incoming) {
+  if (!isRecordWithinWindow(incoming) || isRecordEnded(incoming)) return false;
+  if (!existing) return true;
+  if (!isRecordWithinWindow(existing)) return true;
+
+  const sameWindow = recordsShareBroadcastWindow(existing, incoming);
+  if (!sameWindow) return true;
+
+  return isRecordEnded(existing);
 }
 
 function getActiveBroadcastRecords() {
@@ -322,11 +359,7 @@ function applyServerRecord(record, options = {}) {
 
   const existing = broadcastState.tribes[normalized.key];
   const changed = JSON.stringify(existing || null) !== JSON.stringify(normalized);
-  const shouldNotify =
-    notify &&
-    (!existing ||
-      (!isRecordVisibleActive(existing) && isRecordVisibleActive(normalized)) ||
-      Number(normalized.activatedAt || 0) > Number(existing.activatedAt || 0));
+  const shouldNotify = notify && shouldNotifyForActivatedRecord(existing, normalized);
 
   broadcastState.tribes[normalized.key] = normalized;
   pruneBroadcastState();
@@ -590,7 +623,7 @@ async function connectBroadcastNetwork() {
       if (message.type === "welcome" || message.type === "sync") {
         broadcastPeerId = String(message.sessionId || broadcastPeerId || "");
         if (message.state) {
-          replaceBroadcastLedger(message.state);
+          replaceBroadcastLedger(message.state, { notify: true });
         }
         updateBroadcastConnection("ready", "已连接");
         return;
@@ -656,6 +689,11 @@ function updateBroadcastFilter(value) {
 function registerTribeChallengeDetection(input) {
   const record = buildStartRecord(input);
   if (!record) return false;
+
+  const existing = broadcastState.tribes?.[record.key];
+  if (existing && recordsShareBroadcastWindow(existing, record) && !isRecordEnded(existing)) {
+    return false;
+  }
 
   record.senderPeerId = broadcastPeerId;
   applyServerRecord(record, { notify: true });

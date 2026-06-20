@@ -179,7 +179,7 @@
             </div>
           </div>
           <div class="tracker-controls">
-            <input type="text" id="item-input" list="item-datalist" class="tracker-select" placeholder="搜索物品..." autocomplete="off" />
+            <input type="text" id="item-input" name="tracker-item-search" list="item-datalist" class="tracker-select" placeholder="搜索物品..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" />
             <datalist id="item-datalist"></datalist>
             <button class="add-track-btn" onclick="addTrackedItem()">添加</button>
             <button class="tracker-action-btn" onclick="openTrackerTransferModal('import')">导入</button>
@@ -339,13 +339,13 @@
           <div class="translation-config-row">
             <span class="translation-config-label">&#25509;&#21475;&#23494;&#38053;</span>
             <div class="translation-secret-wrap">
-              <input type="password" id="azure-api-key-input" class="translation-input translation-secret-input" placeholder="&#36755;&#20837; Azure &#25509;&#21475;&#23494;&#38053;" autocomplete="off" oninput="updateAzureTranslationConfig()" />
+              <input type="password" id="azure-api-key-input" name="azure-translation-api-key" class="translation-input translation-secret-input" placeholder="&#36755;&#20837; Azure &#25509;&#21475;&#23494;&#38053;" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" oninput="updateAzureTranslationConfig()" />
               <button class="translation-secret-toggle" type="button" onclick="toggleAzureApiKeyVisibility()" title="&#26174;&#31034;&#25110;&#38544;&#34255;&#23494;&#38053;">&#128065;</button>
             </div>
           </div>
           <div class="translation-config-row">
             <span class="translation-config-label">&#21306;&#22495;</span>
-            <input type="text" id="azure-region-input" class="translation-input" placeholder="&#36755;&#20837;&#21306;&#22495;&#65288;&#20363;&#22914; eastasia / global&#65289;" autocomplete="off" oninput="updateAzureTranslationConfig()" />
+            <input type="text" id="azure-region-input" name="azure-translation-region" class="translation-input" placeholder="&#36755;&#20837;&#21306;&#22495;&#65288;&#20363;&#22914; eastasia / global&#65289;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" oninput="updateAzureTranslationConfig()" />
           </div>
           <div class="translation-config-row translation-provider-actions">
             <button class="translation-guide-btn" type="button" onclick="openAzureGuideModal()">&#24494;&#36719; Azure &#32763;&#35793;&#26381;&#21153;&#30003;&#35831;&#19982;&#37197;&#32622;</button>
@@ -971,14 +971,14 @@
     <script src="assets/js/modules/soundSettings.js?v=20260620a"></script>
     <script src="assets/docs/azure-translator-setup-guide.js?v=20260619b"></script>
     <script src="assets/js/modules/chat.js?v=20260619b"></script>
-    <script src="assets/js/modules/broadcast.js?v=20260620c"></script>
-    <script src="assets/js/modules/combat.js?v=20260619b"></script>
+    <script src="assets/js/modules/broadcast.js?v=20260620d"></script>
+    <script src="assets/js/modules/combat.js?v=20260620a"></script>
     <script src="assets/js/modules/tracker.js?v=20260619b"></script>
     <script src="assets/js/modules/forecast.js?v=20260619b"></script>
     <script src="assets/js/modules/ui.js?v=20260619b"></script>
 
     <!-- Core -->
     <script src="assets/js/core/professions.js?v=20260619b"></script>
-    <script src="assets/js/core/main.js?v=20260619b"></script>
+    <script src="assets/js/core/main.js?v=20260620a"></script>
   </body>
 </html>
