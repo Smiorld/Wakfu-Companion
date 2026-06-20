@@ -1,4 +1,5 @@
 const BROADCAST_STORAGE_KEY = "wakfu_tribe_broadcast_state_v3";
+const BROADCAST_VIEW_STORAGE_KEY = "wakfu_tribe_broadcast_view_v1";
 const BROADCAST_SERVICE_URL = "wss://wakfu-tribe-sync.q1541599745.workers.dev/connect";
 const TRIBE_NOTICE_DURATION_MS = 30 * 60 * 1000;
 const BROADCAST_REFRESH_MS = 1000;
@@ -10,6 +11,7 @@ let broadcastRefreshTimer = null;
 let broadcastReconnectTimer = null;
 let broadcastFilterText = "";
 let broadcastState = loadBroadcastState();
+let broadcastViewState = loadBroadcastViewState();
 let broadcastPreviewTribes = {};
 let broadcastConnection = {
   status: "idle",
@@ -20,12 +22,7 @@ let broadcastConnection = {
 function loadBroadcastState() {
   try {
     const parsed = JSON.parse(localStorage.getItem(BROADCAST_STORAGE_KEY) || "{}");
-    return {
-      tribes:
-        parsed && typeof parsed.tribes === "object" && !Array.isArray(parsed.tribes)
-          ? parsed.tribes
-          : {},
-    };
+    return normalizeLedgerState(parsed);
   } catch (error) {
     return { tribes: {} };
   }
@@ -33,6 +30,24 @@ function loadBroadcastState() {
 
 function saveBroadcastState() {
   localStorage.setItem(BROADCAST_STORAGE_KEY, JSON.stringify(broadcastState));
+}
+
+function loadBroadcastViewState() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(BROADCAST_VIEW_STORAGE_KEY) || "{}");
+    return {
+      dismissed:
+        parsed && typeof parsed.dismissed === "object" && !Array.isArray(parsed.dismissed)
+          ? parsed.dismissed
+          : {},
+    };
+  } catch (error) {
+    return { dismissed: {} };
+  }
+}
+
+function saveBroadcastViewState() {
+  localStorage.setItem(BROADCAST_VIEW_STORAGE_KEY, JSON.stringify(broadcastViewState));
 }
 
 function getBroadcastElement(id) {
@@ -94,42 +109,79 @@ function formatRemainingDuration(expiresAt) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-function isTribeRecordInDuration(record) {
-  return Number(record?.expiresAt || 0) > Date.now();
+function normalizeLedgerRecord(record) {
+  if (!record) return null;
+  const name = normalizeTribeName(record.name || record.challengeName || "");
+  const key = String(record.key || getTribeRecordKey(name)).trim().toLowerCase();
+  if (!name || !key) return null;
+
+  const activatedAt = Number(record.activatedAt || record.detectedAt || Date.now());
+  const expiresAt = Number(record.expiresAt || activatedAt + TRIBE_NOTICE_DURATION_MS);
+  const endedAt = Number(record.endedAt || 0);
+
+  return {
+    key,
+    name,
+    challengeId: String(record.challengeId || ""),
+    activatedAt,
+    expiresAt,
+    updatedAt: Number(record.updatedAt || Math.max(activatedAt, endedAt || 0) || Date.now()),
+    endedAt,
+    senderPeerId: String(record.senderPeerId || ""),
+  };
 }
 
-function isTribeRecordDismissed(record) {
-  return (
-    Number(record?.dismissedAt || 0) > 0 &&
-    Number(record.dismissedAt || 0) >= Number(record.activatedAt || 0)
-  );
+function normalizeLedgerState(input) {
+  const next = { tribes: {} };
+  const source = input && typeof input.tribes === "object" && !Array.isArray(input.tribes) ? input.tribes : {};
+
+  Object.values(source).forEach((record) => {
+    const normalized = normalizeLedgerRecord(record);
+    if (!normalized) return;
+    next.tribes[normalized.key] = normalized;
+  });
+
+  return next;
 }
 
-function isTribeRecordVisibleActive(record) {
-  return isTribeRecordInDuration(record) && !isTribeRecordDismissed(record);
+function replaceBroadcastLedger(state) {
+  broadcastState = normalizeLedgerState(state);
+  pruneBroadcastState();
+  pruneBroadcastViewState();
+  saveBroadcastState();
+  saveBroadcastViewState();
+  renderBroadcastStrip();
+  renderBroadcastHistory();
 }
 
 function pruneBroadcastState() {
   const nextTribes = {};
   const records = Object.values(broadcastState.tribes || {})
-    .filter((record) => record && record.key && record.name && record.activatedAt)
-    .sort((left, right) => Number(right.activatedAt || 0) - Number(left.activatedAt || 0))
+    .map(normalizeLedgerRecord)
+    .filter(Boolean)
+    .sort((left, right) => Number(right.updatedAt || 0) - Number(left.updatedAt || 0))
     .slice(0, BROADCAST_MAX_RECORDS);
 
   records.forEach((record) => {
-    nextTribes[record.key] = {
-      key: String(record.key),
-      name: String(record.name),
-      challengeId: String(record.challengeId || ""),
-      activatedAt: Number(record.activatedAt || Date.now()),
-      expiresAt: Number(record.expiresAt || Date.now() + TRIBE_NOTICE_DURATION_MS),
-      senderPeerId: String(record.senderPeerId || ""),
-      updatedAt: Number(record.updatedAt || record.activatedAt || Date.now()),
-      dismissedAt: Number(record.dismissedAt || 0),
-    };
+    nextTribes[record.key] = record;
   });
 
   broadcastState.tribes = nextTribes;
+}
+
+function pruneBroadcastViewState() {
+  const nextDismissed = {};
+
+  Object.entries(broadcastViewState.dismissed || {}).forEach(([key, dismissedAt]) => {
+    const record = broadcastState.tribes?.[key];
+    if (!record) return;
+    if (!canRestoreRecord(record) && !isLocallyDismissed(key)) return;
+    if (canRestoreRecord(record)) {
+      nextDismissed[key] = Number(dismissedAt || 0);
+    }
+  });
+
+  broadcastViewState.dismissed = nextDismissed;
 }
 
 function pruneBroadcastPreviewState() {
@@ -140,17 +192,8 @@ function pruneBroadcastPreviewState() {
     .slice(0, BROADCAST_MAX_RECORDS);
 
   records.forEach((record) => {
-    if (!isTribeRecordInDuration(record)) return;
-    nextTribes[record.key] = {
-      key: String(record.key),
-      name: String(record.name),
-      challengeId: String(record.challengeId || ""),
-      activatedAt: Number(record.activatedAt || Date.now()),
-      expiresAt: Number(record.expiresAt || Date.now() + TRIBE_NOTICE_DURATION_MS),
-      senderPeerId: String(record.senderPeerId || ""),
-      updatedAt: Number(record.updatedAt || record.activatedAt || Date.now()),
-      dismissedAt: Number(record.dismissedAt || 0),
-    };
+    if (!isRecordWithinWindow(record)) return;
+    nextTribes[record.key] = record;
   });
 
   broadcastPreviewTribes = nextTribes;
@@ -165,15 +208,39 @@ function getBroadcastRecords() {
       if (!filterValue) return true;
       return String(record.name || "").toLowerCase().includes(filterValue);
     })
-    .sort((left, right) => Number(right.activatedAt || 0) - Number(left.activatedAt || 0));
+    .sort((left, right) => {
+      const leftValue = Number(left.updatedAt || left.activatedAt || 0);
+      const rightValue = Number(right.updatedAt || right.activatedAt || 0);
+      return rightValue - leftValue;
+    });
+}
+
+function isRecordWithinWindow(record) {
+  return Number(record?.expiresAt || 0) > Date.now();
+}
+
+function isRecordEnded(record) {
+  return Number(record?.endedAt || 0) > 0;
+}
+
+function isLocallyDismissed(recordKey) {
+  return Number(broadcastViewState.dismissed?.[recordKey] || 0) > 0;
+}
+
+function canRestoreRecord(record) {
+  return !!record && isRecordWithinWindow(record) && !isRecordEnded(record);
+}
+
+function isRecordVisibleActive(record) {
+  return isRecordWithinWindow(record) && !isRecordEnded(record) && !isLocallyDismissed(record.key);
 }
 
 function getActiveBroadcastRecords() {
-  return getBroadcastRecords().filter((record) => isTribeRecordVisibleActive(record));
+  return getBroadcastRecords().filter((record) => isRecordVisibleActive(record));
 }
 
 function getInactiveBroadcastRecords() {
-  return getBroadcastRecords().filter((record) => !isTribeRecordVisibleActive(record));
+  return getBroadcastRecords().filter((record) => !isRecordVisibleActive(record));
 }
 
 function getLatestActiveBroadcastRecord() {
@@ -231,119 +298,68 @@ function showBroadcastToast(record) {
   }
 }
 
-function buildTribeRecord(input) {
+function buildStartRecord(input) {
   const normalizedName = normalizeTribeName(input?.challengeName || input?.name || "");
   if (!normalizedName) return null;
 
   const activatedAt = Number(input?.activatedAt || input?.detectedAt || Date.now());
-  const expiresAt = Number(input?.expiresAt || activatedAt + TRIBE_NOTICE_DURATION_MS);
   return {
     key: getTribeRecordKey(normalizedName),
     name: normalizedName,
     challengeId: String(input?.challengeId || ""),
     activatedAt,
-    expiresAt,
-    senderPeerId: String(input?.senderPeerId || ""),
+    expiresAt: Number(input?.expiresAt || activatedAt + TRIBE_NOTICE_DURATION_MS),
     updatedAt: Number(input?.updatedAt || activatedAt),
-    dismissedAt: Number(input?.dismissedAt || 0),
+    endedAt: Number(input?.endedAt || 0),
+    senderPeerId: String(input?.senderPeerId || ""),
   };
 }
 
-function recordsShareBroadcastWindow(left, right) {
-  const leftActivatedAt = Number(left?.activatedAt || 0);
-  const rightActivatedAt = Number(right?.activatedAt || 0);
-  const leftExpiresAt = Number(left?.expiresAt || leftActivatedAt + TRIBE_NOTICE_DURATION_MS);
-  const rightExpiresAt = Number(right?.expiresAt || rightActivatedAt + TRIBE_NOTICE_DURATION_MS);
-  return leftActivatedAt <= rightExpiresAt && rightActivatedAt <= leftExpiresAt;
-}
+function applyServerRecord(record, options = {}) {
+  const { notify = false } = options;
+  const normalized = normalizeLedgerRecord(record);
+  if (!normalized) return false;
 
-function mergeTribeRecord(record, options = {}) {
-  const { persist = true, notify = false } = options;
-  if (!record || !record.key) return false;
+  const existing = broadcastState.tribes[normalized.key];
+  const changed = JSON.stringify(existing || null) !== JSON.stringify(normalized);
+  const shouldNotify =
+    notify &&
+    (!existing ||
+      (!isRecordVisibleActive(existing) && isRecordVisibleActive(normalized)) ||
+      Number(normalized.activatedAt || 0) > Number(existing.activatedAt || 0));
 
-  const existing = broadcastState.tribes[record.key];
-  let changed = false;
-  let shouldNotify = false;
-
-  if (!existing) {
-    broadcastState.tribes[record.key] = record;
-    changed = true;
-    shouldNotify = isTribeRecordVisibleActive(record);
-  } else {
-    const existingActivatedAt = Number(existing.activatedAt || 0);
-    const incomingActivatedAt = Number(record.activatedAt || 0);
-    const sameWindow = recordsShareBroadcastWindow(existing, record);
-    let nextRecord = existing;
-
-    if (sameWindow) {
-      const mergedActivatedAt = Math.min(existingActivatedAt, incomingActivatedAt);
-      const mergedUpdatedAt = Math.max(
-        Number(existing.updatedAt || existingActivatedAt || 0),
-        Number(record.updatedAt || incomingActivatedAt || 0)
-      );
-      const mergedDismissedAt = Math.max(
-        Number(existing.dismissedAt || 0),
-        Number(record.dismissedAt || 0)
-      );
-
-      nextRecord = {
-        ...existing,
-        ...record,
-        activatedAt: mergedActivatedAt,
-        expiresAt: mergedActivatedAt + TRIBE_NOTICE_DURATION_MS,
-        updatedAt: mergedUpdatedAt,
-        dismissedAt: mergedDismissedAt >= mergedActivatedAt ? mergedDismissedAt : 0,
-        challengeId: record.challengeId || existing.challengeId,
-        senderPeerId: record.senderPeerId || existing.senderPeerId,
-      };
-    } else if (incomingActivatedAt >= existingActivatedAt) {
-      nextRecord = {
-        ...record,
-        dismissedAt: Number(record.dismissedAt || 0) >= incomingActivatedAt ? Number(record.dismissedAt || 0) : 0,
-      };
-    }
-
-    if (JSON.stringify(nextRecord) !== JSON.stringify(existing)) {
-      broadcastState.tribes[record.key] = nextRecord;
-      changed = true;
-      shouldNotify =
-        isTribeRecordVisibleActive(nextRecord) &&
-        (!isTribeRecordVisibleActive(existing) || incomingActivatedAt > existingActivatedAt);
-    }
-  }
-
-  if (!changed) return false;
-
+  broadcastState.tribes[normalized.key] = normalized;
   pruneBroadcastState();
-  if (persist) saveBroadcastState();
+  pruneBroadcastViewState();
+  saveBroadcastState();
+  saveBroadcastViewState();
   renderBroadcastStrip();
   renderBroadcastHistory();
 
-  if (notify && shouldNotify) {
+  if (changed && shouldNotify) {
     playBroadcastTribeSound();
-    showBroadcastToast(broadcastState.tribes[record.key]);
+    showBroadcastToast(normalized);
   }
 
-  return shouldNotify;
-}
-
-function getBroadcastStripName(name) {
-  return String(name || "")
-    .replace(/^合作[:：]?\s*/, "")
-    .replace(/部族$/, "")
-    .trim();
+  return changed;
 }
 
 function dismissBroadcastTribe(recordKey) {
   const record = broadcastState.tribes?.[recordKey];
-  if (!record || !isTribeRecordInDuration(record)) return false;
+  if (!canRestoreRecord(record)) return false;
 
-  broadcastState.tribes[recordKey] = {
-    ...record,
-    dismissedAt: Date.now(),
-    updatedAt: Date.now(),
-  };
-  saveBroadcastState();
+  broadcastViewState.dismissed[recordKey] = Date.now();
+  saveBroadcastViewState();
+  renderBroadcastStrip();
+  renderBroadcastHistory();
+  return true;
+}
+
+function restoreBroadcastTribe(recordKey) {
+  const record = broadcastState.tribes?.[recordKey];
+  if (!canRestoreRecord(record)) return false;
+  delete broadcastViewState.dismissed[recordKey];
+  saveBroadcastViewState();
   renderBroadcastStrip();
   renderBroadcastHistory();
   return true;
@@ -354,30 +370,49 @@ function resolveBroadcastTribeLocal(input) {
   if (!recordKey) return false;
 
   const record = broadcastState.tribes?.[recordKey];
-  if (!record || !isTribeRecordInDuration(record)) return false;
+  if (!record) return false;
   const resolvedAt = Number(input?.resolvedAt || Date.now());
   if (resolvedAt < Number(record.activatedAt || 0)) return false;
 
-  broadcastState.tribes[recordKey] = {
-    ...record,
-    dismissedAt: resolvedAt,
-    updatedAt: Math.max(Number(record.updatedAt || 0), resolvedAt),
-  };
-  saveBroadcastState();
-  renderBroadcastStrip();
-  renderBroadcastHistory();
-  return true;
+  return applyServerRecord(
+    {
+      ...record,
+      endedAt: resolvedAt,
+      updatedAt: Math.max(Number(record.updatedAt || 0), resolvedAt),
+    },
+    { notify: false }
+  );
 }
 
 function resolveBroadcastTribe(input) {
-  const resolved = resolveBroadcastTribeLocal(input);
-  if (!resolved) return false;
+  const recordKey = getTribeRecordKey(input?.challengeName || input?.name || "");
+  if (!recordKey) return false;
 
-  sendBroadcastMessage("tribe-resolve", {
-    key: getTribeRecordKey(input?.challengeName || input?.name || ""),
-    resolvedAt: Number(input?.resolvedAt || Date.now()),
+  const record = broadcastState.tribes?.[recordKey];
+  if (!record) return false;
+
+  const resolvedAt = Number(input?.resolvedAt || Date.now());
+  applyServerRecord(
+    {
+      ...record,
+      endedAt: resolvedAt,
+      updatedAt: Math.max(Number(record.updatedAt || 0), resolvedAt),
+    },
+    { notify: false }
+  );
+
+  sendBroadcastMessage("tribe-end", {
+    key: recordKey,
+    resolvedAt,
   });
   return true;
+}
+
+function getBroadcastStripName(name) {
+  return String(name || "")
+    .replace(/^合作[:：]?\s*/, "")
+    .replace(/部族$/, "")
+    .trim();
 }
 
 function renderBroadcastStrip() {
@@ -411,6 +446,13 @@ function renderBroadcastStrip() {
   strip.title = `${latestRecord.name}\n首次记录：${formatBroadcastTime(latestRecord.activatedAt)}`;
 }
 
+function buildInactiveRecordNote(record) {
+  if (record.__preview) return "预览测试消息";
+  if (isRecordEnded(record)) return `已结束：${formatBroadcastTime(record.endedAt)}`;
+  if (isLocallyDismissed(record.key) && canRestoreRecord(record)) return "已手动取消激活";
+  return `最近记录：${formatBroadcastTime(record.activatedAt)}`;
+}
+
 function renderBroadcastList(target, records, emptyText, activeMode = false) {
   if (!target) return;
 
@@ -423,14 +465,13 @@ function renderBroadcastList(target, records, emptyText, activeMode = false) {
     .map((record) => {
       const timeLabel = activeMode
         ? `剩余 ${formatRemainingDuration(record.expiresAt)}`
-        : `距今 ${formatDurationFromNow(record.activatedAt)}`;
+        : isRecordEnded(record)
+          ? `距今 ${formatDurationFromNow(record.endedAt || record.updatedAt)}`
+          : `距今 ${formatDurationFromNow(record.activatedAt)}`;
       const footer = activeMode
         ? `首次记录：${formatBroadcastTime(record.activatedAt)}`
-        : `最近记录：${formatBroadcastTime(record.activatedAt)}`;
-      const dismissedText =
-        !activeMode && isTribeRecordDismissed(record)
-          ? `<span class="broadcast-muted-note">已手动取消激活</span>`
-          : "";
+        : buildInactiveRecordNote(record);
+      const canRestore = !activeMode && !record.__preview && canRestoreRecord(record) && isLocallyDismissed(record.key);
 
       return `
         <div class="broadcast-history-item ${activeMode ? "active" : "inactive"}">
@@ -442,7 +483,6 @@ function renderBroadcastList(target, records, emptyText, activeMode = false) {
           <div class="broadcast-history-footer">
             <span>${escapeBroadcastHtml(footer)}</span>
             <span class="broadcast-history-actions">
-              ${dismissedText}
               ${
                 record.challengeId
                   ? `<span class="broadcast-muted-note">ID ${escapeBroadcastHtml(
@@ -455,7 +495,11 @@ function renderBroadcastList(target, records, emptyText, activeMode = false) {
                   ? `<button class="tracker-action-btn" type="button" onclick="dismissBroadcastTribe('${escapeBroadcastHtml(
                       record.key
                     )}')">取消激活</button>`
-                  : ""
+                  : canRestore
+                    ? `<button class="tracker-action-btn" type="button" onclick="restoreBroadcastTribe('${escapeBroadcastHtml(
+                        record.key
+                      )}')">恢复激活</button>`
+                    : ""
               }
             </span>
           </div>
@@ -483,18 +527,8 @@ function renderBroadcastHistory() {
     filterInput.value = broadcastFilterText;
   }
 
-  renderBroadcastList(
-    activeList,
-    getActiveBroadcastRecords(),
-    "当前没有激活的部族通知。",
-    true
-  );
-  renderBroadcastList(
-    historyList,
-    getInactiveBroadcastRecords(),
-    "暂无历史记录。",
-    false
-  );
+  renderBroadcastList(activeList, getActiveBroadcastRecords(), "当前没有激活的部族通知。", true);
+  renderBroadcastList(historyList, getInactiveBroadcastRecords(), "暂无历史记录。", false);
 }
 
 function ensureBroadcastModalStructure() {
@@ -519,7 +553,7 @@ function ensureBroadcastModalStructure() {
           placeholder="筛选部族中文名..."
           oninput="updateBroadcastFilter(this.value)" />
       </div>
-      <div class="broadcast-modal-note">通知完全由 wakfu.log 中识别到的部族挑战自动触发。30 分钟内同名部族只保留第一次记录。手动取消激活只会释放当前占位，不会删除最近出现时间。</div>
+      <div class="broadcast-modal-note">中心服务持有唯一正式账本。开始/结束事件都会同步到所有在线客户端；手动取消激活/恢复激活仅影响你自己的显示，不会同步给其他人。</div>
       <div class="broadcast-history-section">
         <div class="broadcast-history-title">正在激活</div>
         <div id="broadcast-active-list" class="broadcast-history-list"></div>
@@ -553,18 +587,10 @@ async function connectBroadcastNetwork() {
       const message = parseBroadcastMessage(event.data);
       if (!message) return;
 
-      if (message.type === "welcome") {
-        broadcastPeerId = String(message.sessionId || "");
-        if (message.state?.tribes && typeof message.state.tribes === "object") {
-          Object.values(message.state.tribes).forEach((item) => {
-            const record = buildTribeRecord(item);
-            if (!record) return;
-            mergeTribeRecord(record, {
-              persist: false,
-              notify: false,
-            });
-          });
-          saveBroadcastState();
+      if (message.type === "welcome" || message.type === "sync") {
+        broadcastPeerId = String(message.sessionId || broadcastPeerId || "");
+        if (message.state) {
+          replaceBroadcastLedger(message.state);
         }
         updateBroadcastConnection("ready", "已连接");
         return;
@@ -577,36 +603,26 @@ async function connectBroadcastNetwork() {
         return;
       }
 
-      if (message.type === "sync" && message.state?.tribes && typeof message.state.tribes === "object") {
-        Object.values(message.state.tribes).forEach((item) => {
-          const record = buildTribeRecord(item);
-          if (!record) return;
-          mergeTribeRecord(record, {
-            persist: false,
-            notify: false,
-          });
-        });
-        saveBroadcastState();
-        updateBroadcastConnection("ready", "已连接");
-        return;
-      }
-
-      if (message.type === "tribe-upsert" && message.record) {
-        const record = buildTribeRecord(message.record);
+      if ((message.type === "tribe-start" || message.type === "tribe-upsert") && message.record) {
+        const record = normalizeLedgerRecord(message.record);
         if (!record) return;
-        record.senderPeerId = String(message.record.senderPeerId || record.senderPeerId || "");
-        mergeTribeRecord(record, {
-          persist: true,
-          notify: record.senderPeerId !== broadcastPeerId,
+        applyServerRecord(record, {
+          notify: String(record.senderPeerId || "") !== broadcastPeerId,
         });
         return;
       }
 
-      if (message.type === "tribe-resolve" && message.record) {
-        resolveBroadcastTribeLocal({
-          name: message.record.name || "",
-          challengeId: message.record.challengeId || "",
-          resolvedAt: Number(message.record.dismissedAt || message.serverTime || Date.now()),
+      if ((message.type === "tribe-end" || message.type === "tribe-resolve") && message.record) {
+        const record = normalizeLedgerRecord(message.record);
+        if (!record) return;
+        applyServerRecord(record, { notify: false });
+        return;
+      }
+
+      if (message.type === "test-ping" && message.record) {
+        showNetworkBroadcastTestNotice({
+          ...message.record,
+          senderPeerId: String(message.record.senderPeerId || ""),
         });
       }
     });
@@ -638,37 +654,30 @@ function updateBroadcastFilter(value) {
 }
 
 function registerTribeChallengeDetection(input) {
-  const record = buildTribeRecord(input);
+  const record = buildStartRecord(input);
   if (!record) return false;
 
   record.senderPeerId = broadcastPeerId;
-  const shouldAnnounce = mergeTribeRecord(record, {
-    persist: true,
-    notify: true,
-  });
-
-  if (shouldAnnounce) {
-    sendBroadcastMessage("tribe-upsert", { record });
-  }
-
-  return shouldAnnounce;
+  applyServerRecord(record, { notify: true });
+  sendBroadcastMessage("tribe-start", { record });
+  return true;
 }
 
 function showLocalFakeTribeNotice(input = {}) {
-  const fakeRecord = buildTribeRecord({
-    challengeId: input.challengeId || "-1932",
-    challengeName: input.challengeName || "合作：潘达拉幽灵部族",
-    detectedAt: Number(input.detectedAt || Date.now()),
-    expiresAt: Number(
-      input.expiresAt ||
-        Number(input.detectedAt || Date.now()) + TRIBE_NOTICE_DURATION_MS
-    ),
-    dismissedAt: Number(input.dismissedAt || 0),
-    updatedAt: Number(input.updatedAt || input.detectedAt || Date.now()),
+  const fakeRecord = {
+    ...buildStartRecord({
+      challengeId: input.challengeId || "-1932",
+      challengeName: input.challengeName || "合作：潘达拉幽灵部族",
+      detectedAt: Number(input.detectedAt || Date.now()),
+      expiresAt: Number(
+        input.expiresAt || Number(input.detectedAt || Date.now()) + TRIBE_NOTICE_DURATION_MS
+      ),
+    }),
     senderPeerId: "local-preview",
-  });
-  if (!fakeRecord) return false;
+    __preview: true,
+  };
 
+  if (!fakeRecord) return false;
   broadcastPreviewTribes[fakeRecord.key] = fakeRecord;
   pruneBroadcastPreviewState();
   renderBroadcastStrip();
@@ -676,9 +685,46 @@ function showLocalFakeTribeNotice(input = {}) {
   return true;
 }
 
+function showNetworkBroadcastTestNotice(input = {}) {
+  const fakeRecord = {
+    ...buildStartRecord({
+      challengeId: input.challengeId || "TEST-NET",
+      challengeName: input.challengeName || "合作：网络测试部族",
+      detectedAt: Number(input.detectedAt || Date.now()),
+      expiresAt: Number(input.expiresAt || Date.now() + 3 * 60 * 1000),
+    }),
+    senderPeerId: String(input.senderPeerId || "network-test"),
+    __preview: true,
+  };
+
+  if (!fakeRecord) return false;
+  broadcastPreviewTribes[fakeRecord.key] = fakeRecord;
+  pruneBroadcastPreviewState();
+  renderBroadcastStrip();
+  renderBroadcastHistory();
+  return true;
+}
+
+function sendNetworkBroadcastTest(input = {}) {
+  const payload = {
+    challengeId: input.challengeId || "TEST-NET",
+    challengeName: input.challengeName || "合作：网络测试部族",
+    detectedAt: Number(input.detectedAt || Date.now()),
+    expiresAt: Number(input.expiresAt || Date.now() + 3 * 60 * 1000),
+    senderPeerId: broadcastPeerId || "network-test",
+  };
+
+  showNetworkBroadcastTestNotice(payload);
+  return sendBroadcastMessage("test-ping", {
+    record: payload,
+  });
+}
+
 function clearBroadcastNotices() {
   broadcastState.tribes = {};
+  broadcastViewState.dismissed = {};
   saveBroadcastState();
+  saveBroadcastViewState();
   renderBroadcastStrip();
   renderBroadcastHistory();
 }
@@ -699,7 +745,10 @@ function initBroadcastRefreshTimer() {
   if (broadcastRefreshTimer) clearInterval(broadcastRefreshTimer);
   broadcastRefreshTimer = setInterval(() => {
     pruneBroadcastState();
+    pruneBroadcastViewState();
+    pruneBroadcastPreviewState();
     saveBroadcastState();
+    saveBroadcastViewState();
     renderBroadcastStrip();
     renderBroadcastHistory();
   }, BROADCAST_REFRESH_MS);
@@ -708,7 +757,9 @@ function initBroadcastRefreshTimer() {
 function initBroadcastSystem() {
   ensureBroadcastModalStructure();
   pruneBroadcastState();
+  pruneBroadcastViewState();
   saveBroadcastState();
+  saveBroadcastViewState();
   renderBroadcastStrip();
   renderBroadcastHistory();
   initBroadcastRefreshTimer();
@@ -724,4 +775,6 @@ window.registerTribeChallengeDetection = registerTribeChallengeDetection;
 window.resolveBroadcastTribeLocal = resolveBroadcastTribeLocal;
 window.resolveBroadcastTribe = resolveBroadcastTribe;
 window.showLocalFakeTribeNotice = showLocalFakeTribeNotice;
+window.sendNetworkBroadcastTest = sendNetworkBroadcastTest;
 window.dismissBroadcastTribe = dismissBroadcastTribe;
+window.restoreBroadcastTribe = restoreBroadcastTribe;
