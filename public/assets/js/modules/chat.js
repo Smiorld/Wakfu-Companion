@@ -1,7 +1,6 @@
 // CHAT MODULE: Handles Chat, Logs, Formatting, and Translation
 const chatListEl = document.getElementById("chat-list");
 const scrollBtn = document.getElementById("chat-scroll-btn");
-const REGEX_WAIT = /(?:wait (\d+) seconds|保留\s+(\d+)\s+秒到下一回合|等待[:：]?\s*(\d+)\s*秒?)/i;
 
 const CHAT_CHANNEL_ALIASES = {
   logs: [
@@ -487,6 +486,9 @@ async function buildWakfuTranslationAliases() {
 
     wakfuExactTermMap = exactTermMap;
     wakfuFuzzyAliasIndex = fuzzyAliasIndex;
+    // The processed indices above are enough for runtime matching.
+    // Release the raw glossary array to reduce long-session memory pressure.
+    wakfuExternalGlossary = null;
     return wakfuTranslationAliases;
   })().finally(() => {
     wakfuTranslationAliasPromise = null;
@@ -1035,8 +1037,8 @@ function scrollToChatBottom() {
   const list = getChatListNode();
   if (list) {
     list.scrollTop = list.scrollHeight;
-    if (typeof parseFile === "function") {
-      parseFile();
+    if (typeof parseTrackedFiles === "function") {
+      parseTrackedFiles();
     }
   }
 }
@@ -1118,12 +1120,6 @@ function addChatMessage(time, channel, author, message, skipAuto = false) {
 
   const emptyState = list.querySelector(".empty-state");
   if (emptyState) list.innerHTML = "";
-
-  const waitMatch = message.match(REGEX_WAIT);
-  if (waitMatch) {
-    const seconds = parseInt(waitMatch[1] || waitMatch[2] || waitMatch[3], 10);
-    if (!Number.isNaN(seconds)) triggerChatCooldown(seconds);
-  }
 
   while (list.children.length >= MAX_CHAT_HISTORY) {
     list.removeChild(list.firstChild);
@@ -1596,34 +1592,3 @@ function updateLangButtons() {
   }
 }
 
-function triggerChatCooldown(seconds) {
-  const container = getChatElement("chat-cooldown-container");
-  if (!container) return;
-
-  if (container.children.length >= 2) {
-    container.removeChild(container.firstElementChild);
-  }
-
-  const pill = document.createElement("div");
-  pill.className = "cooldown-pill";
-
-  const timerId = Date.now() + Math.random();
-  pill.innerHTML = `<span class="cooldown-icon">⏳</span> <span id="cd-${timerId}">${seconds}s</span>`;
-  container.appendChild(pill);
-
-  let remaining = seconds;
-  const span = pill.querySelector(`#cd-${timerId}`);
-
-  const interval = setInterval(() => {
-    remaining--;
-    if (span) span.textContent = `${remaining}s`;
-
-    if (remaining <= 0) {
-      clearInterval(interval);
-      pill.style.animation = "fadeOutRight 0.3s ease forwards";
-      setTimeout(() => {
-        if (pill.parentNode) pill.parentNode.removeChild(pill);
-      }, 300);
-    }
-  }, 1000);
-}

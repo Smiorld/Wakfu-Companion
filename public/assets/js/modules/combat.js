@@ -530,11 +530,11 @@ function saveFightToHistory() {
 
   // Create a deep copy of the current state
   const snapshot = {
-    damage: JSON.parse(JSON.stringify(fightData)),
-    healing: JSON.parse(JSON.stringify(healData)),
-    armor: JSON.parse(JSON.stringify(armorData)),
-    classes: JSON.parse(JSON.stringify(playerClasses)),
-    overrides: JSON.parse(JSON.stringify(manualOverrides)),
+    damage: cloneSerializableState(fightData),
+    healing: cloneSerializableState(healData),
+    armor: cloneSerializableState(armorData),
+    classes: cloneSerializableState(playerClasses),
+    overrides: cloneSerializableState(manualOverrides),
     timestamp: new Date().toLocaleTimeString(),
   };
 
@@ -580,6 +580,13 @@ function performReset(isAuto = false) {
   stateSources = {};
   stateOwnershipMeta = {};
   stateEventOrder = 0;
+  playerClasses = {};
+  summonBindings = {};
+  playerIconCache = {};
+  playerVariantState = {};
+  expandedPlayers.clear();
+  if (typeof logLineCache !== "undefined") logLineCache.clear();
+  if (typeof combatLineCache !== "undefined") combatLineCache.clear();
 
   // 4. CLEAR STORAGE
   localStorage.removeItem("wakfu_live_combat_state");
@@ -974,6 +981,7 @@ function viewHistory(index) {
 }
 
 let permissionStrikeCount = 0; // Counter for transient errors
+let chatPermissionStrikeCount = 0;
 
 const LOOT_KEYWORDS = ["picked up", "ramassé", "obtenu", "recogido", "obtenido", "apanhou", "obteve", "你得到了", "你失去了", "配方完成", "回收"];
 
@@ -992,6 +1000,8 @@ async function parseFile() {
   window.lastReadTime = now;
 
   try {
+    if (!fileHandle) return;
+
     const file = await fileHandle.getFile();
 
     // Success: Reset error counter
@@ -1065,6 +1075,116 @@ async function parseFile() {
   }
 }
 
+async function parseChatFile() {
+  const now = Date.now();
+  if (isReadingChat) {
+    if (window.lastChatReadTime && now - window.lastChatReadTime > 2000) {
+      console.warn("[Nexus] Chat reader was stuck. Forcing unlock.");
+      isReadingChat = false;
+    } else {
+      return;
+    }
+  }
+
+  isReadingChat = true;
+  window.lastChatReadTime = now;
+
+  try {
+    if (!chatFileHandle) return;
+
+    const file = await chatFileHandle.getFile();
+    chatPermissionStrikeCount = 0;
+
+    if (file.size < chatFileOffset) {
+      console.warn(
+        `[Nexus] Chat log size shrank from ${chatFileOffset} to ${file.size}. Resetting read offset.`
+      );
+      chatFileOffset = 0;
+      if (typeof chatLineCache !== "undefined") chatLineCache.clear();
+    }
+
+    if (file.size > chatFileOffset) {
+      const blob = file.slice(chatFileOffset, file.size);
+      const text = await blob.text();
+      const lines = text.split(/\r?\n/);
+
+      for (let index = 0; index < lines.length; index += 1) {
+        const cleanLine = (" " + lines[index]).slice(1);
+        if (!cleanLine || chatLineCache.has(cleanLine)) continue;
+        chatLineCache.add(cleanLine);
+        if (chatLineCache.size > MAX_CACHE_SIZE) {
+          const firstItem = chatLineCache.values().next().value;
+          chatLineCache.delete(firstItem);
+        }
+        processChatLog(cleanLine);
+      }
+
+      lines.length = 0;
+      chatFileOffset = file.size;
+    }
+
+    window.lastChatReadTime = Date.now();
+  } catch (err) {
+    if (err.name === "NotReadableError") {
+      console.warn("[Nexus] Chat file locked by game (busy). Retrying next tick...");
+    } else if (err.name === "NotFoundError" || err.message.includes("permission")) {
+      chatPermissionStrikeCount += 1;
+      console.error(`[Nexus] Chat read error (${chatPermissionStrikeCount}/10):`, err);
+
+      if (chatPermissionStrikeCount >= 10) {
+        console.error("[Nexus] Persistent chat file error. Stopping reader.");
+        if (typeof parseIntervalId !== "undefined") clearInterval(parseIntervalId);
+        document.getElementById("setup-panel").style.display = "block";
+        document.getElementById("drop-zone").style.display = "none";
+        document.getElementById("reconnect-container").style.display = "block";
+      }
+    } else {
+      console.error("[Nexus] Unexpected chat error:", err);
+    }
+  } finally {
+    isReadingChat = false;
+  }
+}
+
+async function parseTrackedFiles() {
+  await Promise.allSettled([parseFile(), parseChatFile()]);
+}
+
+function processAreaChallengeLine(line) {
+  const match = String(line || "").match(/Challenge courant : (-?\d+) \(dans \d+s\)/);
+  if (!match) return;
+
+  const challengeId = match[1];
+  if (challengeId === "-1") return;
+
+  const challengeName =
+    typeof getAreaChallengeChineseName === "function"
+      ? getAreaChallengeChineseName(challengeId)
+      : "";
+
+  if (!challengeName || !challengeName.includes("部族")) return;
+
+  if (typeof registerTribeChallengeDetection === "function") {
+    registerTribeChallengeDetection({
+      challengeId,
+      challengeName,
+      detectedAt: Date.now(),
+    });
+  }
+}
+
+function processAreaChallengeResolutionLine(line) {
+  const match = String(line || "").match(/"合作[:：]\s*([^"]+?部族)"任务(?:失败|获胜|完成)[。.]?/);
+  if (!match) return;
+
+  if (typeof resolveBroadcastTribe === "function") {
+    resolveBroadcastTribe({
+      challengeName: match[1],
+      resolvedAt: Date.now(),
+    });
+  }
+}
+
 function processLine(line) {
   if (!line || line.trim() === "") return;
 
@@ -1076,6 +1196,9 @@ function processLine(line) {
   if (typeof processSessionLog === "function") {
     processSessionLog(line);
   }
+
+  processAreaChallengeLine(line);
+  processAreaChallengeResolutionLine(line);
 
   if (battleJustFinished) {
     saveFightToHistory();
@@ -1100,9 +1223,6 @@ function processLine(line) {
       processFightLog(line);
     }
 
-    if (line.match(/^\d{2}:\d{2}:\d{2}/)) {
-      processChatLog(line);
-    }
   } catch (err) {
     console.error("Parsing Error:", err);
   }
@@ -1112,16 +1232,23 @@ function saveLiveCombatState() {
   if (Object.keys(fightData).length === 0 && Object.keys(healData).length === 0) return;
 
   const state = {
-    fightData,
-    healData,
-    armorData,
-    playerClasses,
-    manualOverrides,
-    summonBindings,
+    fightData: cloneSerializableState(fightData),
+    healData: cloneSerializableState(healData),
+    armorData: cloneSerializableState(armorData),
+    playerClasses: cloneSerializableState(playerClasses),
+    manualOverrides: cloneSerializableState(manualOverrides),
+    summonBindings: cloneSerializableState(summonBindings),
     fightStartTime,
     awaitingNewFight,
   };
   localStorage.setItem("wakfu_live_combat_state", JSON.stringify(state));
+}
+
+function cloneSerializableState(value) {
+  if (typeof structuredClone === "function") {
+    return structuredClone(value);
+  }
+  return JSON.parse(JSON.stringify(value));
 }
 
 function loadLiveCombatState() {
@@ -1158,3 +1285,4 @@ window.addEventListener("beforeunload", () => {
 
 // Export for main.js
 window.loadLiveCombatState = loadLiveCombatState;
+window.parseTrackedFiles = parseTrackedFiles;

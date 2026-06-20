@@ -2,14 +2,18 @@
 // CONFIG & STATE
 // ==========================================
 let fileHandle,
+  chatFileHandle = null,
   fileOffset = 0,
-  isReading = false;
+  chatFileOffset = 0,
+  isReading = false,
+  isReadingChat = false;
 let parseIntervalId = null,
   watchdogIntervalId = null;
 let pipWindow = null;
 let trackerViewMode = "grid";
 let combatLineCache = new Set();
 let logLineCache = new Set();
+let chatLineCache = new Set();
 let allKnownSpells = new Set();
 const MAX_CACHE_SIZE = 200;
 const MAX_CHAT_HISTORY = 500;

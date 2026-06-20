@@ -772,6 +772,12 @@ function showTrackerNotification(qty, itemName, type = "pickup") {
       toast.style.color = "#2ecc71";
       toast.style.boxShadow = "0 0 10px rgba(46, 204, 113, 0.4)";
       toast.style.fontSize = "0.95rem";
+    } else if (type === "tribe") {
+      toast.innerHTML = `<strong>部族通知：</strong> ${itemName}`;
+      toast.style.borderColor = "#2ecc71";
+      toast.style.color = "#d9ffe7";
+      toast.style.boxShadow = "0 0 10px rgba(46, 204, 113, 0.4)";
+      toast.style.fontSize = "0.95rem";
     } else if (type === "custom") {
       // CUSTOM MESSAGE STYLE (For Professions Calc, etc)
       toast.textContent = itemName; // itemName holds the full message
