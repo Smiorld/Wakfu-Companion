@@ -1188,7 +1188,7 @@ function processAreaChallengeLine(line) {
       ? getAreaChallengeChineseName(challengeId)
       : "";
 
-  if (!challengeName || !challengeName.includes("部族")) return;
+  if (!challengeName) return;
 
   if (typeof registerTribeChallengeDetection === "function") {
     registerTribeChallengeDetection({
@@ -1200,7 +1200,7 @@ function processAreaChallengeLine(line) {
 }
 
 function processAreaChallengeResolutionLine(line) {
-  const match = String(line || "").match(/"合作[:：]\s*([^"]+?部族)"任务(?:获胜|完成)[。.]?/);
+  const match = String(line || "").match(/"合作[:：]\s*([^"]+)"任务(?:获胜|完成)[。.]?/);
   if (!match) return;
 
   if (typeof resolveBroadcastTribe === "function") {
