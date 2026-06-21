@@ -16,7 +16,7 @@
             <h2 style="margin: 0; color: var(--accent, #00e1ff); font-size: 1.6rem">沃土伴侣</h2>
             <p style="margin: 6px 0 0; color: #bbb; font-size: 0.9rem">T2薯条</p>
           </div>
-          <h3>把 `wakfu_chat.log` 拖到这里</h3>
+          <h3>把 `wakfu` 和 `wakfu_chat` 这两个日志文件拖到这里</h3>
           <p style="color: #aaa; margin-bottom: 5px">默认路径（可复制到资源管理器）：</p>
 
           <!-- Cleaned Path Container -->
@@ -24,7 +24,7 @@
             <code id="log-path" class="log-path-code">%AppData%\zaap\gamesLogs\wakfu\logs\</code>
             <button id="copy-path-btn" class="copy-path-btn">复制</button>
           </div>
-          <p>直接从文件夹把日志拖进来即可开始。</p>
+          <p>若系统显示扩展名，通常会看到 `wakfu.log` 和 `wakfu_chat.log`；若系统隐藏扩展名，则可能只看到 `wakfu` 和 `wakfu_chat`。</p>
           <div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid #333; color: #aaa; font-size: 0.85rem; line-height: 1.7">
             <div>原作者：Nexus-Hub <a href="https://github.com/Nexus-Hub/Wakfu-Companion" target="_blank" rel="noopener noreferrer" style="color: var(--accent, #00e1ff)">GitHub</a></div>
             <div>汉化、修复版作者：T2薯条 | QQ：1541599745</div>
@@ -34,14 +34,14 @@
         <!-- Cleaned Reconnect Container -->
         <div id="reconnect-container" class="reconnect-container">
           <p class="prev-file-label">发现上次使用的文件：</p>
-          <h3 id="prev-filename" class="prev-filename">wakfu-chat.log</h3>
+          <h3 id="prev-filename" class="prev-filename">主日志：wakfu<br />聊天日志：wakfu_chat</h3>
 
           <button id="reconnect-btn" class="add-track-btn reconnect-action-btn">重新连接</button>
 
           <p class="browser-warning">（浏览器会再次确认权限）</p>
 
           <div class="new-file-wrapper">
-            <button id="new-file-btn" class="new-file-link">选择其他文件</button>
+            <button id="new-file-btn" class="new-file-link">选择其他日志文件</button>
           </div>
           <div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid #333; color: #aaa; font-size: 0.85rem; line-height: 1.7">
             <div>原作者：Nexus-Hub <a href="https://github.com/Nexus-Hub/Wakfu-Companion" target="_blank" rel="noopener noreferrer" style="color: var(--accent, #00e1ff)">GitHub</a></div>
@@ -967,11 +967,11 @@
     <script src="assets/js/modules/sessionRecap.js?v=20260619b"></script>
     <script src="assets/js/modules/state.js?v=20260619b"></script>
     <script src="assets/js/modules/utils.js?v=20260619b"></script>
-    <script src="assets/js/modules/filesystem.js?v=20260619b"></script>
+    <script src="assets/js/modules/filesystem.js?v=20260621d"></script>
     <script src="assets/js/modules/soundSettings.js?v=20260620a"></script>
     <script src="assets/docs/azure-translator-setup-guide.js?v=20260619b"></script>
     <script src="assets/js/modules/chat.js?v=20260619b"></script>
-    <script src="assets/js/modules/broadcast.js?v=20260621b"></script>
+    <script src="assets/js/modules/broadcast.js?v=20260621d"></script>
     <script src="assets/js/modules/combat.js?v=20260621b"></script>
     <script src="assets/js/modules/tracker.js?v=20260619b"></script>
     <script src="assets/js/modules/forecast.js?v=20260619b"></script>
@@ -979,6 +979,6 @@
 
     <!-- Core -->
     <script src="assets/js/core/professions.js?v=20260619b"></script>
-    <script src="assets/js/core/main.js?v=20260621b"></script>
+    <script src="assets/js/core/main.js?v=20260621d"></script>
   </body>
 </html>

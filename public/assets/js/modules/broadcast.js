@@ -1,49 +1,60 @@
-const BROADCAST_STORAGE_KEY = "wakfu_tribe_broadcast_state_v4";
-const BROADCAST_VIEW_STORAGE_KEY = "wakfu_tribe_broadcast_view_v2";
+const BROADCAST_STORAGE_KEY = "wakfu_tribe_broadcast_state_v5";
+const BROADCAST_VIEW_STORAGE_KEY = "wakfu_tribe_broadcast_view_v3";
+const BROADCAST_LEGACY_STORAGE_KEYS = ["wakfu_tribe_broadcast_state_v4"];
+const BROADCAST_LEGACY_VIEW_KEYS = ["wakfu_tribe_broadcast_view_v2"];
 const BROADCAST_SERVER_KEY_STORAGE = "wakfu_tribe_current_server_v1";
-const BROADCAST_ENDPOINT_CACHE_KEY = "wakfu_tribe_broadcast_endpoint_v1";
+const BROADCAST_CLIENT_ID_STORAGE_KEY = "wakfu_tribe_broadcast_client_id_v1";
+const BROADCAST_ENDPOINT_CACHE_KEY = "wakfu_tribe_broadcast_endpoint_v2";
 const BROADCAST_ENDPOINT_CACHE_TTL_MS = 5 * 60 * 1000;
-const BROADCAST_SERVICE_CANDIDATES = [
-  {
-    id: "oracle",
-    label: "Oracle",
-    health: "http://168.110.57.124.sslip.io/health",
-    socket: "ws://168.110.57.124.sslip.io/connect",
-    secureOnly: false,
-  },
-  {
-    id: "cloudflare",
-    label: "Cloudflare",
-    health: "https://wakfu-tribe-sync.q1541599745.workers.dev/health",
-    socket: "wss://wakfu-tribe-sync.q1541599745.workers.dev/connect",
-    secureOnly: true,
-  },
-];
-const TRIBE_NOTICE_DURATION_MS = 30 * 60 * 1000;
 const BROADCAST_REFRESH_MS = 1000;
+const BROADCAST_POLL_INTERVAL_MS = 10 * 1000;
+const BROADCAST_HEARTBEAT_INTERVAL_MS = 30 * 1000;
+const BROADCAST_REQUEST_TIMEOUT_MS = 6000;
 const BROADCAST_MAX_RECORDS = 200;
+const TRIBE_NOTICE_DURATION_MS = 30 * 60 * 1000;
 const KNOWN_BROADCAST_SERVERS = new Set(["ogrest", "rubilax", "pandora"]);
 const BROADCAST_SERVER_OPTIONS = [
   { value: "ogrest", label: "Ogrest" },
   { value: "rubilax", label: "Rubilax" },
   { value: "pandora", label: "Pandora" },
 ];
+const BROADCAST_SERVICE_CANDIDATES = [
+  {
+    id: "oracle",
+    label: "Oracle HTTP",
+    baseUrl: "http://168.110.57.124.sslip.io/api/broadcast",
+  },
+  {
+    id: "cloudflare",
+    label: "Cloudflare HTTP",
+    baseUrl: "https://wakfu-tribe-sync.q1541599745.workers.dev/api/broadcast",
+  },
+];
 
-let broadcastSocket = null;
-let broadcastPeerId = "";
 let broadcastRefreshTimer = null;
-let broadcastReconnectTimer = null;
+let broadcastPollTimer = null;
+let broadcastHeartbeatTimer = null;
 let broadcastFilterText = "";
 let currentBroadcastServerKey = loadBroadcastServerKey();
 let broadcastState = loadBroadcastState();
 let broadcastViewState = loadBroadcastViewState();
 let broadcastPreviewTribes = {};
-let broadcastServiceEndpoint = null;
+let broadcastClientId = loadBroadcastClientId();
+let broadcastCursor = 0;
+let broadcastTransportStatus = {
+  endpoint: null,
+  lastSnapshotAt: 0,
+  lastPollAt: 0,
+  lastHeartbeatAt: 0,
+};
 let broadcastConnection = {
   status: "idle",
   message: "部族通知网络未启动。",
   peerCount: 0,
 };
+let broadcastSnapshotInFlight = null;
+let broadcastPollInFlight = null;
+let broadcastHeartbeatInFlight = null;
 
 function normalizeBroadcastServerKey(serverKey) {
   const normalized = String(serverKey || "").trim().toLowerCase();
@@ -77,6 +88,22 @@ function createEmptyBroadcastViewServerState() {
   return { dismissed: {} };
 }
 
+function loadBroadcastClientId() {
+  try {
+    const existing = String(localStorage.getItem(BROADCAST_CLIENT_ID_STORAGE_KEY) || "").trim();
+    if (existing) return existing;
+    const nextId =
+      "client-" +
+      Math.random().toString(36).slice(2, 10) +
+      "-" +
+      Date.now().toString(36);
+    localStorage.setItem(BROADCAST_CLIENT_ID_STORAGE_KEY, nextId);
+    return nextId;
+  } catch (error) {
+    return "client-" + Date.now().toString(36);
+  }
+}
+
 function getBroadcastServerOptionsMarkup(selectedServerKey = getCurrentBroadcastServerKey()) {
   const normalizedSelected = normalizeBroadcastServerKey(selectedServerKey);
   return BROADCAST_SERVER_OPTIONS.map(
@@ -104,19 +131,21 @@ function notifyBroadcastServerChanged(serverKey) {
   }
 }
 
-function getBroadcastServerLabel(serverKey = getCurrentBroadcastServerKey()) {
-  const normalized = normalizeBroadcastServerKey(serverKey);
-  if (normalized === "unknown") return "未识别";
-  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+function loadStoredJson(keys, fallbackFactory) {
+  const allKeys = Array.isArray(keys) ? keys : [keys];
+  for (const key of allKeys) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      return JSON.parse(raw);
+    } catch (error) {}
+  }
+  return fallbackFactory();
 }
 
 function loadBroadcastState() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(BROADCAST_STORAGE_KEY) || "{}");
-    return normalizeLedgerState(parsed);
-  } catch (error) {
-    return { servers: {} };
-  }
+  const parsed = loadStoredJson([BROADCAST_STORAGE_KEY, ...BROADCAST_LEGACY_STORAGE_KEYS], () => ({}));
+  return normalizeLedgerState(parsed);
 }
 
 function saveBroadcastState() {
@@ -124,36 +153,20 @@ function saveBroadcastState() {
 }
 
 function loadBroadcastViewState() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(BROADCAST_VIEW_STORAGE_KEY) || "{}");
-    return normalizeBroadcastViewState(parsed);
-  } catch (error) {
-    return { servers: {} };
-  }
+  const parsed = loadStoredJson([BROADCAST_VIEW_STORAGE_KEY, ...BROADCAST_LEGACY_VIEW_KEYS], () => ({}));
+  return normalizeBroadcastViewState(parsed);
 }
 
 function saveBroadcastViewState() {
   localStorage.setItem(BROADCAST_VIEW_STORAGE_KEY, JSON.stringify(broadcastViewState));
 }
 
-function isSecureBroadcastContext() {
-  return window.location.protocol === "https:";
-}
-
-function getAvailableBroadcastCandidates() {
-  return BROADCAST_SERVICE_CANDIDATES.filter((candidate) => {
-    if (!isSecureBroadcastContext()) return true;
-    return candidate.secureOnly;
-  });
-}
-
 function loadCachedBroadcastEndpoint() {
   try {
     const cached = JSON.parse(sessionStorage.getItem(BROADCAST_ENDPOINT_CACHE_KEY) || "null");
-    if (!cached || !cached.id || !cached.socket || !cached.cachedAt) return null;
+    if (!cached || !cached.id || !cached.baseUrl || !cached.cachedAt) return null;
     if (Date.now() - Number(cached.cachedAt || 0) > BROADCAST_ENDPOINT_CACHE_TTL_MS) return null;
-    const candidate = getAvailableBroadcastCandidates().find((item) => item.id === cached.id);
-    return candidate || null;
+    return getAvailableBroadcastCandidates().find((candidate) => candidate.id === cached.id) || null;
   } catch (error) {
     return null;
   }
@@ -165,7 +178,7 @@ function saveCachedBroadcastEndpoint(candidate) {
     BROADCAST_ENDPOINT_CACHE_KEY,
     JSON.stringify({
       id: candidate.id,
-      socket: candidate.socket,
+      baseUrl: candidate.baseUrl,
       cachedAt: Date.now(),
     })
   );
@@ -175,67 +188,11 @@ function clearCachedBroadcastEndpoint() {
   sessionStorage.removeItem(BROADCAST_ENDPOINT_CACHE_KEY);
 }
 
-function probeBroadcastEndpoint(candidate, timeoutMs = 2500) {
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    let socket = null;
-    const startedAt = performance.now();
-    const timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      try {
-        if (socket) socket.close();
-      } catch (error) {}
-      reject(new Error(`Probe timeout for ${candidate.id}`));
-    }, timeoutMs);
-
-    try {
-      socket = new WebSocket(candidate.socket);
-    } catch (error) {
-      clearTimeout(timer);
-      reject(error);
-      return;
-    }
-
-    const finish = (ok, error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      try {
-        if (socket) socket.close();
-      } catch (closeError) {}
-      if (ok) {
-        resolve({
-          candidate,
-          latency: Math.round(performance.now() - startedAt),
-        });
-        return;
-      }
-      reject(error || new Error(`Probe failed for ${candidate.id}`));
-    };
-
-    socket.addEventListener("open", () => finish(true));
-    socket.addEventListener("error", () => finish(false, new Error(`Probe failed for ${candidate.id}`)));
+function getAvailableBroadcastCandidates() {
+  return BROADCAST_SERVICE_CANDIDATES.filter((candidate) => {
+    if (window.location.protocol !== "https:") return true;
+    return candidate.baseUrl.startsWith("https://");
   });
-}
-
-async function selectBroadcastEndpoint() {
-  const cached = loadCachedBroadcastEndpoint();
-  if (cached) return cached;
-
-  const candidates = getAvailableBroadcastCandidates();
-  if (!candidates.length) throw new Error("No broadcast candidate available");
-
-  const results = await Promise.allSettled(candidates.map((candidate) => probeBroadcastEndpoint(candidate)));
-  const success = results
-    .filter((result) => result.status === "fulfilled")
-    .map((result) => result.value)
-    .sort((left, right) => left.latency - right.latency);
-
-  if (!success.length) throw new Error("No broadcast endpoint reachable");
-
-  saveCachedBroadcastEndpoint(success[0].candidate);
-  return success[0].candidate;
 }
 
 function getBroadcastElement(id) {
@@ -326,14 +283,6 @@ function formatDurationFromNow(timestamp) {
   return `${minutes}分钟`;
 }
 
-function formatRemainingDuration(expiresAt) {
-  const remainingMs = Math.max(0, Number(expiresAt || 0) - Date.now());
-  const totalSeconds = Math.ceil(remainingMs / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-}
-
 function formatElapsedDuration(timestamp) {
   const elapsedMs = Math.max(0, Date.now() - Number(timestamp || 0));
   const totalSeconds = Math.floor(elapsedMs / 1000);
@@ -363,7 +312,7 @@ function normalizeLedgerRecord(record) {
     expiresAt,
     updatedAt: Number(record.updatedAt || Math.max(activatedAt, endedAt || 0) || Date.now()),
     endedAt,
-    senderPeerId: String(record.senderPeerId || ""),
+    senderClientId: String(record.senderClientId || ""),
   };
 }
 
@@ -375,6 +324,7 @@ function normalizeLedgerState(input) {
   if (sourceServers) {
     Object.entries(sourceServers).forEach(([serverKey, serverState]) => {
       const normalizedServerKey = normalizeBroadcastServerKey(serverKey);
+      if (normalizedServerKey === "unknown") return;
       const nextServerState = createEmptyBroadcastServerState();
       const sourceTribes =
         serverState && typeof serverState.tribes === "object" && !Array.isArray(serverState.tribes)
@@ -417,13 +367,12 @@ function normalizeBroadcastViewState(input) {
   if (sourceServers) {
     Object.entries(sourceServers).forEach(([serverKey, serverState]) => {
       const normalizedServerKey = normalizeBroadcastServerKey(serverKey);
+      if (normalizedServerKey === "unknown") return;
       const dismissed =
         serverState && typeof serverState.dismissed === "object" && !Array.isArray(serverState.dismissed)
           ? serverState.dismissed
           : {};
-      next.servers[normalizedServerKey] = {
-        dismissed,
-      };
+      next.servers[normalizedServerKey] = { dismissed };
     });
     return next;
   }
@@ -431,9 +380,7 @@ function normalizeBroadcastViewState(input) {
   const legacyDismissed =
     input && typeof input.dismissed === "object" && !Array.isArray(input.dismissed) ? input.dismissed : {};
   if (Object.keys(legacyDismissed).length) {
-    next.servers[getCurrentBroadcastServerKey()] = {
-      dismissed: legacyDismissed,
-    };
+    next.servers[getCurrentBroadcastServerKey()] = { dismissed: legacyDismissed };
   }
   return next;
 }
@@ -442,12 +389,8 @@ function replaceBroadcastLedger(state, options = {}) {
   const { notify = false } = options;
   const serverKey = getCurrentBroadcastServerKey();
   const previousRecords = { ...(getCurrentBroadcastServerState().tribes || {}) };
-  const normalizedInput =
-    state && typeof state.servers === "object"
-      ? normalizeLedgerState(state)
-      : { servers: { [serverKey]: normalizeLedgerState({ servers: { [serverKey]: state } }).servers[serverKey] } };
-  const nextServerState =
-    normalizedInput.servers?.[serverKey] || createEmptyBroadcastServerState();
+  const normalizedInput = normalizeLedgerState(state || {});
+  const nextServerState = normalizedInput.servers?.[serverKey] || createEmptyBroadcastServerState();
   const nextRecords = Object.values(nextServerState.tribes || {});
 
   broadcastState.servers[serverKey] = nextServerState;
@@ -463,9 +406,8 @@ function replaceBroadcastLedger(state, options = {}) {
   nextRecords.forEach((record) => {
     const previous = previousRecords[record.key];
     const shouldNotify =
-      String(record.senderPeerId || "") !== broadcastPeerId &&
+      String(record.senderClientId || "") !== broadcastClientId &&
       shouldNotifyForActivatedRecord(previous, record);
-
     if (!shouldNotify) return;
     playBroadcastTribeSound();
     showBroadcastToast(record);
@@ -526,6 +468,7 @@ function getBroadcastRecords() {
   const serverState = getCurrentBroadcastServerState();
   const currentServerKey = getCurrentBroadcastServerKey();
   const filterValue = broadcastFilterText.trim().toLowerCase();
+
   return [
     ...Object.values(serverState.tribes || {}),
     ...Object.values(broadcastPreviewTribes || {}).filter(
@@ -601,38 +544,6 @@ function updateBroadcastConnection(status, message) {
   renderBroadcastHistory();
 }
 
-function scheduleBroadcastReconnect(delayMs = 10000) {
-  if (broadcastReconnectTimer) return;
-  broadcastReconnectTimer = setTimeout(() => {
-    broadcastReconnectTimer = null;
-    connectBroadcastNetwork();
-  }, delayMs);
-}
-
-function parseBroadcastMessage(raw) {
-  try {
-    return JSON.parse(raw);
-  } catch (error) {
-    return null;
-  }
-}
-
-function sendBroadcastMessage(type, payload) {
-  if (!broadcastSocket || broadcastSocket.readyState !== WebSocket.OPEN) return false;
-  try {
-    broadcastSocket.send(
-      JSON.stringify({
-        type,
-        ...payload,
-      })
-    );
-    return true;
-  } catch (error) {
-    console.warn("[Broadcast] send failed:", error);
-    return false;
-  }
-}
-
 function playBroadcastTribeSound() {
   if (typeof playNotificationSound === "function") {
     playNotificationSound("tribe");
@@ -645,23 +556,123 @@ function showBroadcastToast(record) {
   }
 }
 
-function buildStartRecord(input) {
-  const normalizedName = normalizeTribeName(input?.challengeName || input?.name || "");
-  if (!normalizedName) return null;
+async function fetchJsonWithTimeout(url, options = {}, timeoutMs = BROADCAST_REQUEST_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        Accept: "application/json",
+        ...(options.headers || {}),
+      },
+    });
+    const text = await response.text();
+    let payload = null;
+    try {
+      payload = text ? JSON.parse(text) : null;
+    } catch (error) {
+      payload = null;
+    }
+    if (!response.ok) {
+      throw new Error(
+        payload?.error || payload?.message || `${response.status} ${response.statusText}`.trim()
+      );
+    }
+    return payload;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
-  const activatedAt = Number(input?.activatedAt || input?.detectedAt || Date.now());
-  const serverKey = normalizeBroadcastServerKey(input?.serverKey || getCurrentBroadcastServerKey());
+async function probeBroadcastEndpoint(candidate, timeoutMs = 2500) {
+  const startedAt = performance.now();
+  await fetchJsonWithTimeout(`${candidate.baseUrl}/health`, { method: "GET", cache: "no-store" }, timeoutMs);
   return {
-    key: getTribeRecordKey(normalizedName),
-    serverKey,
-    name: normalizedName,
-    challengeId: String(input?.challengeId || ""),
-    activatedAt,
-    expiresAt: Number(input?.expiresAt || activatedAt + TRIBE_NOTICE_DURATION_MS),
-    updatedAt: Number(input?.updatedAt || activatedAt),
-    endedAt: Number(input?.endedAt || 0),
-    senderPeerId: String(input?.senderPeerId || ""),
+    candidate,
+    latency: Math.round(performance.now() - startedAt),
   };
+}
+
+async function selectBroadcastEndpoint(forceRefresh = false) {
+  if (!forceRefresh) {
+    const cached = loadCachedBroadcastEndpoint();
+    if (cached) return cached;
+  }
+
+  const candidates = getAvailableBroadcastCandidates();
+  if (!candidates.length) throw new Error("没有可用的部族通知服务地址。");
+
+  const results = await Promise.allSettled(candidates.map((candidate) => probeBroadcastEndpoint(candidate)));
+  const success = results
+    .filter((result) => result.status === "fulfilled")
+    .map((result) => result.value)
+    .sort((left, right) => left.latency - right.latency);
+
+  if (!success.length) throw new Error("没有可达的部族通知服务。");
+
+  saveCachedBroadcastEndpoint(success[0].candidate);
+  return success[0].candidate;
+}
+
+async function getSelectedBroadcastEndpoint(forceRefresh = false) {
+  if (broadcastTransportStatus.endpoint && !forceRefresh) {
+    return broadcastTransportStatus.endpoint;
+  }
+  const endpoint = await selectBroadcastEndpoint(forceRefresh);
+  broadcastTransportStatus.endpoint = endpoint;
+  return endpoint;
+}
+
+function buildBroadcastApiUrl(baseUrl, path, params) {
+  const url = new URL(baseUrl + path);
+  if (params && typeof params === "object") {
+    Object.entries(params).forEach(([key, value]) => {
+      if (value == null || value === "") return;
+      url.searchParams.set(key, String(value));
+    });
+  }
+  return url.toString();
+}
+
+function clearBroadcastEndpointSelection() {
+  broadcastTransportStatus.endpoint = null;
+  clearCachedBroadcastEndpoint();
+}
+
+async function callBroadcastApi(path, options = {}) {
+  const { method = "GET", params = null, body = null, forceEndpointRefresh = false } = options;
+  let endpoint = await getSelectedBroadcastEndpoint(forceEndpointRefresh);
+  let lastError = null;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const url = buildBroadcastApiUrl(endpoint.baseUrl, path, params);
+      return await fetchJsonWithTimeout(
+        url,
+        {
+          method,
+          cache: "no-store",
+          headers: body ? { "Content-Type": "application/json" } : {},
+          body: body ? JSON.stringify(body) : undefined,
+        },
+        BROADCAST_REQUEST_TIMEOUT_MS
+      );
+    } catch (error) {
+      lastError = error;
+      clearBroadcastEndpointSelection();
+      endpoint = await getSelectedBroadcastEndpoint(true);
+    }
+  }
+
+  throw lastError || new Error("部族通知请求失败。");
+}
+
+function setBroadcastPeerCount(count) {
+  broadcastConnection.peerCount = Math.max(1, Number(count || 0));
+  renderBroadcastStrip();
+  renderBroadcastHistory();
 }
 
 function applyServerRecord(record, options = {}) {
@@ -691,6 +702,182 @@ function applyServerRecord(record, options = {}) {
   return changed;
 }
 
+function applyBroadcastEvents(events = []) {
+  let changed = false;
+
+  events.forEach((event) => {
+    if (!event || typeof event !== "object") return;
+
+    const eventCursor = Number(event.cursor || 0);
+    if (eventCursor > broadcastCursor) {
+      broadcastCursor = eventCursor;
+    }
+
+    if (event.type === "presence-summary") {
+      setBroadcastPeerCount(event.onlineCount);
+      return;
+    }
+
+    if ((event.type === "tribe-upsert" || event.type === "tribe-start") && event.record) {
+      changed =
+        applyServerRecord(event.record, {
+          notify: String(event.record.senderClientId || "") !== broadcastClientId,
+        }) || changed;
+      return;
+    }
+
+    if ((event.type === "tribe-end" || event.type === "tribe-resolve") && event.record) {
+      changed = applyServerRecord(event.record, { notify: false }) || changed;
+    }
+  });
+
+  return changed;
+}
+
+async function refreshBroadcastSnapshot(options = {}) {
+  if (broadcastSnapshotInFlight) return broadcastSnapshotInFlight;
+
+  const { notify = false, reason = "snapshot" } = options;
+  broadcastSnapshotInFlight = (async () => {
+    updateBroadcastConnection("loading", `正在同步账本（${reason}）...`);
+
+    const response = await callBroadcastApi("/tribes/snapshot", {
+      params: { server: getCurrentBroadcastServerKey() },
+    });
+
+    if (response?.serverKey) {
+      const normalized = normalizeBroadcastServerKey(response.serverKey);
+      if (normalized !== "unknown" && normalized !== getCurrentBroadcastServerKey()) {
+        currentBroadcastServerKey = normalized;
+        saveBroadcastServerKey();
+        notifyBroadcastServerChanged(normalized);
+      }
+    }
+
+    if (response?.state) {
+      replaceBroadcastLedger(response.state, { notify });
+    }
+    if (Number(response?.cursor || 0) > 0) {
+      broadcastCursor = Number(response.cursor || 0);
+    }
+    if (response?.onlineCount != null) {
+      setBroadcastPeerCount(response.onlineCount);
+    }
+
+    broadcastTransportStatus.lastSnapshotAt = Date.now();
+    const label = broadcastTransportStatus.endpoint?.label || "HTTP";
+    updateBroadcastConnection("ready", `已连接 ${label}`);
+    return response;
+  })()
+    .catch((error) => {
+      updateBroadcastConnection("error", `同步失败：${error.message || error}`);
+      throw error;
+    })
+    .finally(() => {
+      broadcastSnapshotInFlight = null;
+    });
+
+  return broadcastSnapshotInFlight;
+}
+
+async function pollBroadcastUpdates(reason = "poll") {
+  if (broadcastPollInFlight) return broadcastPollInFlight;
+
+  broadcastPollInFlight = (async () => {
+    try {
+      const response = await callBroadcastApi("/tribes/updates", {
+        params: {
+          server: getCurrentBroadcastServerKey(),
+          since: broadcastCursor,
+        },
+      });
+
+      if (response?.serverKey) {
+        const normalized = normalizeBroadcastServerKey(response.serverKey);
+        if (normalized !== "unknown" && normalized !== getCurrentBroadcastServerKey()) {
+          currentBroadcastServerKey = normalized;
+          saveBroadcastServerKey();
+          notifyBroadcastServerChanged(normalized);
+        }
+      }
+
+      if (Array.isArray(response?.events)) {
+        applyBroadcastEvents(response.events);
+      }
+      if (Number(response?.cursor || 0) > broadcastCursor) {
+        broadcastCursor = Number(response.cursor || 0);
+      }
+      if (response?.onlineCount != null) {
+        setBroadcastPeerCount(response.onlineCount);
+      }
+
+      broadcastTransportStatus.lastPollAt = Date.now();
+      if (broadcastConnection.status !== "ready") {
+        const label = broadcastTransportStatus.endpoint?.label || "HTTP";
+        updateBroadcastConnection("ready", `已连接 ${label}`);
+      }
+      return response;
+    } catch (error) {
+      updateBroadcastConnection("error", `增量同步失败：${error.message || error}`);
+      if (reason !== "switch-server") {
+        await refreshBroadcastSnapshot({ notify: true, reason: "recover" }).catch(() => {});
+      }
+      throw error;
+    } finally {
+      broadcastPollInFlight = null;
+    }
+  })();
+
+  return broadcastPollInFlight;
+}
+
+async function sendBroadcastHeartbeat() {
+  if (broadcastHeartbeatInFlight) return broadcastHeartbeatInFlight;
+
+  broadcastHeartbeatInFlight = callBroadcastApi("/presence/heartbeat", {
+    method: "POST",
+    body: {
+      clientId: broadcastClientId,
+      serverKey: getCurrentBroadcastServerKey(),
+      clientTime: Date.now(),
+    },
+  })
+    .then((response) => {
+      if (response?.onlineCount != null) {
+        setBroadcastPeerCount(response.onlineCount);
+      }
+      if (Number(response?.cursor || 0) > broadcastCursor) {
+        broadcastCursor = Number(response.cursor || 0);
+      }
+      broadcastTransportStatus.lastHeartbeatAt = Date.now();
+      return response;
+    })
+    .finally(() => {
+      broadcastHeartbeatInFlight = null;
+    });
+
+  return broadcastHeartbeatInFlight;
+}
+
+function buildStartRecord(input) {
+  const normalizedName = normalizeTribeName(input?.challengeName || input?.name || "");
+  if (!normalizedName) return null;
+
+  const activatedAt = Number(input?.activatedAt || input?.detectedAt || Date.now());
+  const serverKey = normalizeBroadcastServerKey(input?.serverKey || getCurrentBroadcastServerKey());
+  return {
+    key: getTribeRecordKey(normalizedName),
+    serverKey,
+    name: normalizedName,
+    challengeId: String(input?.challengeId || ""),
+    activatedAt,
+    expiresAt: Number(input?.expiresAt || activatedAt + TRIBE_NOTICE_DURATION_MS),
+    updatedAt: Number(input?.updatedAt || activatedAt),
+    endedAt: Number(input?.endedAt || 0),
+    senderClientId: String(input?.senderClientId || broadcastClientId),
+  };
+}
+
 function dismissBroadcastTribe(recordKey) {
   const record = getCurrentBroadcastServerState().tribes?.[recordKey];
   if (!canRestoreRecord(record)) return false;
@@ -705,6 +892,7 @@ function dismissBroadcastTribe(recordKey) {
 function restoreBroadcastTribe(recordKey) {
   const record = getCurrentBroadcastServerState().tribes?.[recordKey];
   if (!canRestoreRecord(record)) return false;
+
   delete getCurrentBroadcastViewServerState().dismissed[recordKey];
   saveBroadcastViewState();
   renderBroadcastStrip();
@@ -731,7 +919,7 @@ function resolveBroadcastTribeLocal(input) {
   );
 }
 
-function resolveBroadcastTribe(input) {
+async function resolveBroadcastTribe(input) {
   const recordKey = getTribeRecordKey(input?.challengeName || input?.name || "");
   if (!recordKey) return false;
 
@@ -748,11 +936,32 @@ function resolveBroadcastTribe(input) {
     { notify: false }
   );
 
-  sendBroadcastMessage("tribe-end", {
-    key: recordKey,
-    serverKey: record.serverKey || getCurrentBroadcastServerKey(),
-    resolvedAt,
-  });
+  try {
+    const response = await callBroadcastApi("/tribes/end", {
+      method: "POST",
+      body: {
+        key: recordKey,
+        challengeName: record.name,
+        challengeId: record.challengeId,
+        serverKey: record.serverKey || getCurrentBroadcastServerKey(),
+        resolvedAt,
+        senderClientId: broadcastClientId,
+      },
+    });
+
+    if (response?.record) {
+      applyServerRecord(response.record, { notify: false });
+    }
+    if (Number(response?.cursor || 0) > broadcastCursor) {
+      broadcastCursor = Number(response.cursor || 0);
+    }
+    if (response?.onlineCount != null) {
+      setBroadcastPeerCount(response.onlineCount);
+    }
+  } catch (error) {
+    console.warn("[Broadcast] resolve failed:", error);
+  }
+
   return true;
 }
 
@@ -781,7 +990,6 @@ function renderBroadcastStrip() {
   }
 
   const stripName = getBroadcastStripName(latestRecord.name) || latestRecord.name;
-
   strip.innerHTML = `
     <button class="broadcast-pill tribe" type="button" onclick="openBroadcastModal()">
       <span class="broadcast-pill-type">部族</span>
@@ -819,7 +1027,8 @@ function renderBroadcastList(target, records, emptyText, activeMode = false) {
       const footer = activeMode
         ? `本轮开始于：${formatBroadcastTime(record.activatedAt)}`
         : buildInactiveRecordNote(record);
-      const canRestore = !activeMode && !record.__preview && canRestoreRecord(record) && isLocallyDismissed(record.key);
+      const canRestore =
+        !activeMode && !record.__preview && canRestoreRecord(record) && isLocallyDismissed(record.key);
 
       return `
         <div class="broadcast-history-item ${activeMode ? "active" : "inactive"}">
@@ -859,16 +1068,33 @@ function renderBroadcastList(target, records, emptyText, activeMode = false) {
 
 function renderBroadcastHistory() {
   const statusLine = getBroadcastElement("broadcast-connection-status");
+  const statusText = getBroadcastElement("broadcast-connection-text");
+  const statusServerSelect = getBroadcastElement("broadcast-server-select");
   const filterInput = getBroadcastElement("broadcast-filter-input");
   const activeList = getBroadcastElement("broadcast-active-list");
   const historyList = getBroadcastElement("broadcast-history-list");
 
   if (statusLine) {
-    statusLine.textContent = `部族通知网络：${broadcastConnection.message} · 当前 ${Math.max(
+    statusLine.dataset.status = broadcastConnection.status;
+  }
+
+  if (statusText) {
+    const endpointLabel = broadcastTransportStatus.endpoint?.label
+      ? ` · ${broadcastTransportStatus.endpoint.label}`
+      : "";
+    statusText.textContent = `部族通知网络：${broadcastConnection.message}${endpointLabel} · ${Math.max(
       1,
       Number(broadcastConnection.peerCount || 0)
     )} 人在线`;
-    statusLine.dataset.status = broadcastConnection.status;
+  } else if (statusLine) {
+    statusLine.textContent = `部族通知网络：${broadcastConnection.message} · ${Math.max(
+      1,
+      Number(broadcastConnection.peerCount || 0)
+    )} 人在线`;
+  }
+
+  if (statusServerSelect && statusServerSelect.value !== getCurrentBroadcastServerKey()) {
+    statusServerSelect.value = getCurrentBroadcastServerKey();
   }
 
   if (filterInput && filterInput.value !== broadcastFilterText) {
@@ -901,7 +1127,7 @@ function ensureBroadcastModalStructure() {
           placeholder="筛选部族中文名..."
           oninput="updateBroadcastFilter(this.value)" />
       </div>
-      <div class="broadcast-modal-note">中心服务持有唯一正式账本。开始/结束事件都会同步到所有在线客户端；手动取消激活/恢复激活仅影响你自己的显示，不会同步给其他人。</div>
+      <div class="broadcast-modal-note">中心服务持有唯一正式账本。开始/结束事件会同步到所有在线客户端；手动取消激活/恢复激活仅影响你自己的显示，不会同步给其他人。</div>
       <div class="broadcast-history-section">
         <div class="broadcast-history-title">正在激活</div>
         <div id="broadcast-active-list" class="broadcast-history-list"></div>
@@ -912,103 +1138,6 @@ function ensureBroadcastModalStructure() {
       </div>
     </div>
   `;
-}
-
-async function connectBroadcastNetwork() {
-  if (broadcastSocket) return;
-  if (broadcastReconnectTimer) {
-    clearTimeout(broadcastReconnectTimer);
-    broadcastReconnectTimer = null;
-  }
-
-  updateBroadcastConnection("loading", "正在连接...");
-
-  try {
-    broadcastServiceEndpoint = await selectBroadcastEndpoint();
-    broadcastSocket = new WebSocket(broadcastServiceEndpoint.socket);
-
-    broadcastSocket.addEventListener("open", () => {
-      updateBroadcastConnection("loading", `已连接 ${broadcastServiceEndpoint.label}，正在同步...`);
-      requestBroadcastSync();
-    });
-
-    broadcastSocket.addEventListener("message", (event) => {
-      const message = parseBroadcastMessage(event.data);
-      if (!message) return;
-
-      if (message.type === "welcome" || message.type === "sync") {
-        broadcastPeerId = String(message.sessionId || broadcastPeerId || "");
-        if (message.serverKey) {
-          currentBroadcastServerKey = normalizeBroadcastServerKey(message.serverKey);
-          saveBroadcastServerKey();
-        }
-        if (message.state) {
-          replaceBroadcastLedger(message.state, { notify: true });
-        }
-        updateBroadcastConnection("ready", `已连接 ${broadcastServiceEndpoint.label}`);
-        return;
-      }
-
-      if (message.type === "presence") {
-        broadcastConnection.peerCount = Math.max(1, Number(message.onlineCount || 0));
-        renderBroadcastStrip();
-        renderBroadcastHistory();
-        return;
-      }
-
-      if ((message.type === "tribe-start" || message.type === "tribe-upsert") && message.record) {
-        const record = normalizeLedgerRecord(message.record);
-        if (!record) return;
-        applyServerRecord(record, {
-          notify: String(record.senderPeerId || "") !== broadcastPeerId,
-        });
-        return;
-      }
-
-      if ((message.type === "tribe-end" || message.type === "tribe-resolve") && message.record) {
-        const record = normalizeLedgerRecord(message.record);
-        if (!record) return;
-        applyServerRecord(record, { notify: false });
-        return;
-      }
-
-      if (message.type === "test-ping" && message.record) {
-        showNetworkBroadcastTestNotice({
-          ...message.record,
-          senderPeerId: String(message.record.senderPeerId || ""),
-        });
-      }
-    });
-
-    broadcastSocket.addEventListener("close", () => {
-      broadcastSocket = null;
-      broadcastPeerId = "";
-      broadcastServiceEndpoint = null;
-      broadcastConnection.peerCount = 0;
-      clearCachedBroadcastEndpoint();
-      updateBroadcastConnection("error", "连接已断开");
-      scheduleBroadcastReconnect();
-    });
-
-    broadcastSocket.addEventListener("error", (error) => {
-      console.warn("[Broadcast] network error:", error);
-      updateBroadcastConnection("error", "连接失败");
-    });
-  } catch (error) {
-    console.warn("[Broadcast] socket init failed:", error);
-    broadcastPeerId = "";
-    broadcastServiceEndpoint = null;
-    broadcastConnection.peerCount = 0;
-    clearCachedBroadcastEndpoint();
-    updateBroadcastConnection("error", "通知服务不可用");
-    scheduleBroadcastReconnect(15000);
-  }
-}
-
-function requestBroadcastSync() {
-  return sendBroadcastMessage("sync-request", {
-    serverKey: getCurrentBroadcastServerKey(),
-  });
 }
 
 function ensureBroadcastServerControls() {
@@ -1038,18 +1167,43 @@ function updateBroadcastFilter(value) {
   renderBroadcastHistory();
 }
 
-function registerTribeChallengeDetection(input) {
+function isBroadcastServerMismatch(serverKey) {
+  return normalizeBroadcastServerKey(serverKey) !== getCurrentBroadcastServerKey();
+}
+
+async function registerTribeChallengeDetection(input) {
   const record = buildStartRecord(input);
   if (!record) return false;
+  if (isBroadcastServerMismatch(record.serverKey)) return false;
 
   const existing = getCurrentBroadcastServerState().tribes?.[record.key];
   if (existing && recordsShareBroadcastWindow(existing, record) && !isRecordEnded(existing)) {
     return false;
   }
 
-  record.senderPeerId = broadcastPeerId;
   applyServerRecord(record, { notify: true });
-  sendBroadcastMessage("tribe-start", { record });
+
+  try {
+    const response = await callBroadcastApi("/tribes/publish", {
+      method: "POST",
+      body: {
+        record,
+        clientId: broadcastClientId,
+      },
+    });
+    if (response?.record) {
+      applyServerRecord(response.record, { notify: false });
+    }
+    if (Number(response?.cursor || 0) > broadcastCursor) {
+      broadcastCursor = Number(response.cursor || 0);
+    }
+    if (response?.onlineCount != null) {
+      setBroadcastPeerCount(response.onlineCount);
+    }
+  } catch (error) {
+    console.warn("[Broadcast] publish failed:", error);
+  }
+
   return true;
 }
 
@@ -1063,7 +1217,7 @@ function showLocalFakeTribeNotice(input = {}) {
         input.expiresAt || Number(input.detectedAt || Date.now()) + TRIBE_NOTICE_DURATION_MS
       ),
     }),
-    senderPeerId: "local-preview",
+    senderClientId: "local-preview",
     __preview: true,
   };
 
@@ -1073,41 +1227,6 @@ function showLocalFakeTribeNotice(input = {}) {
   renderBroadcastStrip();
   renderBroadcastHistory();
   return true;
-}
-
-function showNetworkBroadcastTestNotice(input = {}) {
-  const fakeRecord = {
-    ...buildStartRecord({
-      challengeId: input.challengeId || "TEST-NET",
-      challengeName: input.challengeName || "合作：网络测试部族",
-      detectedAt: Number(input.detectedAt || Date.now()),
-      expiresAt: Number(input.expiresAt || Date.now() + 3 * 60 * 1000),
-    }),
-    senderPeerId: String(input.senderPeerId || "network-test"),
-    __preview: true,
-  };
-
-  if (!fakeRecord) return false;
-  broadcastPreviewTribes[fakeRecord.key] = fakeRecord;
-  pruneBroadcastPreviewState();
-  renderBroadcastStrip();
-  renderBroadcastHistory();
-  return true;
-}
-
-function sendNetworkBroadcastTest(input = {}) {
-  const payload = {
-    challengeId: input.challengeId || "TEST-NET",
-    challengeName: input.challengeName || "合作：网络测试部族",
-    detectedAt: Number(input.detectedAt || Date.now()),
-    expiresAt: Number(input.expiresAt || Date.now() + 3 * 60 * 1000),
-    senderPeerId: broadcastPeerId || "network-test",
-  };
-
-  showNetworkBroadcastTestNotice(payload);
-  return sendBroadcastMessage("test-ping", {
-    record: payload,
-  });
 }
 
 function clearBroadcastNotices() {
@@ -1144,35 +1263,28 @@ function initBroadcastRefreshTimer() {
   }, BROADCAST_REFRESH_MS);
 }
 
-function renderBroadcastHistory() {
-  const statusLine = getBroadcastElement("broadcast-connection-status");
-  const statusText = getBroadcastElement("broadcast-connection-text");
-  const statusServerSelect = getBroadcastElement("broadcast-server-select");
-  const filterInput = getBroadcastElement("broadcast-filter-input");
-  const activeList = getBroadcastElement("broadcast-active-list");
-  const historyList = getBroadcastElement("broadcast-history-list");
+function initBroadcastPollTimer() {
+  if (broadcastPollTimer) clearInterval(broadcastPollTimer);
+  broadcastPollTimer = setInterval(() => {
+    pollBroadcastUpdates("interval").catch(() => {});
+  }, BROADCAST_POLL_INTERVAL_MS);
+}
 
-  if (statusLine) {
-    statusLine.dataset.status = broadcastConnection.status;
+function initBroadcastHeartbeatTimer() {
+  if (broadcastHeartbeatTimer) clearInterval(broadcastHeartbeatTimer);
+  broadcastHeartbeatTimer = setInterval(() => {
+    sendBroadcastHeartbeat().catch(() => {});
+  }, BROADCAST_HEARTBEAT_INTERVAL_MS);
+}
+
+async function connectBroadcastNetwork() {
+  updateBroadcastConnection("loading", "正在连接...");
+  try {
+    await refreshBroadcastSnapshot({ notify: true, reason: "init" });
+    await sendBroadcastHeartbeat().catch(() => {});
+  } catch (error) {
+    console.warn("[Broadcast] init failed:", error);
   }
-
-  if (statusText) {
-    statusText.textContent = `部族通知网络：${broadcastConnection.message} · ${Math.max(
-      1,
-      Number(broadcastConnection.peerCount || 0)
-    )} 人在线`;
-  }
-
-  if (statusServerSelect && statusServerSelect.value !== getCurrentBroadcastServerKey()) {
-    statusServerSelect.value = getCurrentBroadcastServerKey();
-  }
-
-  if (filterInput && filterInput.value !== broadcastFilterText) {
-    filterInput.value = broadcastFilterText;
-  }
-
-  renderBroadcastList(activeList, getActiveBroadcastRecords(), "当前没有激活的部族通知。", true);
-  renderBroadcastList(historyList, getInactiveBroadcastRecords(), "暂无历史记录。", false);
 }
 
 function initBroadcastSystem() {
@@ -1187,6 +1299,8 @@ function initBroadcastSystem() {
   renderBroadcastStrip();
   renderBroadcastHistory();
   initBroadcastRefreshTimer();
+  initBroadcastPollTimer();
+  initBroadcastHeartbeatTimer();
   connectBroadcastNetwork();
 }
 
@@ -1199,7 +1313,6 @@ window.registerTribeChallengeDetection = registerTribeChallengeDetection;
 window.resolveBroadcastTribeLocal = resolveBroadcastTribeLocal;
 window.resolveBroadcastTribe = resolveBroadcastTribe;
 window.showLocalFakeTribeNotice = showLocalFakeTribeNotice;
-window.sendNetworkBroadcastTest = sendNetworkBroadcastTest;
 window.dismissBroadcastTribe = dismissBroadcastTribe;
 window.restoreBroadcastTribe = restoreBroadcastTribe;
 window.getCurrentBroadcastServerKey = getCurrentBroadcastServerKey;
@@ -1207,16 +1320,23 @@ window.setBroadcastServerKey = function setBroadcastServerKey(serverKey, options
   const { source = "auto" } = options;
   const nextServerKey = normalizeBroadcastServerKey(serverKey);
   if (nextServerKey === "unknown") return false;
+
   if (nextServerKey === currentBroadcastServerKey) {
     if (source === "manual") {
       notifyBroadcastServerChanged(nextServerKey);
-      requestBroadcastSync();
+      resetBroadcastServerCache(nextServerKey);
+      saveBroadcastState();
+      saveBroadcastViewState();
+      broadcastCursor = 0;
+      refreshBroadcastSnapshot({ notify: true, reason: "manual-refresh" }).catch(() => {});
     }
     return false;
   }
+
   currentBroadcastServerKey = nextServerKey;
-  broadcastConnection.peerCount = 0;
   resetBroadcastServerCache(nextServerKey);
+  broadcastCursor = 0;
+  broadcastConnection.peerCount = 0;
   saveBroadcastServerKey();
   pruneBroadcastState();
   pruneBroadcastViewState();
@@ -1225,6 +1345,7 @@ window.setBroadcastServerKey = function setBroadcastServerKey(serverKey, options
   renderBroadcastStrip();
   renderBroadcastHistory();
   notifyBroadcastServerChanged(nextServerKey);
-  requestBroadcastSync();
+  refreshBroadcastSnapshot({ notify: true, reason: "switch-server" }).catch(() => {});
+  sendBroadcastHeartbeat().catch(() => {});
   return true;
 };

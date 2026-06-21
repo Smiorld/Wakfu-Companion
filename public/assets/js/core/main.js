@@ -154,13 +154,13 @@ function renderPendingDropStatus() {
 
   if (!mainReady && !chatReady) {
     statusEl.textContent =
-      "\u652f\u6301\u5206\u4e24\u6b21\u62d6\u5165\uff1a\u53ef\u4ee5\u5148\u62d6\u4e00\u4e2a\uff0c\u518d\u62d6\u53e6\u4e00\u4e2a\u3002";
+      "\u652f\u6301\u5206\u4e24\u6b21\u62d6\u5165\uff1a\u53ef\u4ee5\u5148\u62d6\u4e3b\u65e5\u5fd7 wakfu\uff08\u6216 wakfu.log\uff09\uff0c\u518d\u62d6\u804a\u5929\u65e5\u5fd7 wakfu_chat\uff08\u6216 wakfu_chat.log\uff09\u3002";
     return;
   }
 
   statusEl.textContent =
-    `\u5df2\u9009\uff1a wakfu.log ${mainReady ? "\u2713" : "\u2026"}  |  ` +
-    `wakfu_chat.log ${chatReady ? "\u2713" : "\u2026"}`;
+    `\u5df2\u9009\uff1a \u4e3b\u65e5\u5fd7 wakfu ${mainReady ? "\u2713" : "\u2026"}  |  ` +
+    `\u804a\u5929\u65e5\u5fd7 wakfu_chat ${chatReady ? "\u2713" : "\u2026"}`;
 }
 
 function initializeDualFilePromptUI() {
@@ -171,7 +171,7 @@ function initializeDualFilePromptUI() {
   const dropTitle = dropZone?.querySelector("h3");
   if (dropTitle) {
     dropTitle.textContent =
-      "\u628a `wakfu.log` \u548c `wakfu_chat.log` \u62d6\u5230\u8fd9\u91cc";
+      "\u628a `wakfu` \u548c `wakfu_chat` \u8fd9\u4e24\u4e2a\u65e5\u5fd7\u6587\u4ef6\u62d6\u5230\u8fd9\u91cc";
   }
 
   const dropParagraphs = dropZone?.querySelectorAll("p");
@@ -181,7 +181,7 @@ function initializeDualFilePromptUI() {
   }
   if (dropParagraphs?.[1]) {
     dropParagraphs[1].textContent =
-      "\u53ef\u4ee5\u4e00\u6b21\u62d6\u4e24\u4e2a\uff0c\u4e5f\u53ef\u4ee5\u5206\u4e24\u6b21\u62d6\u5165\u3002";
+      "\u53ef\u4ee5\u4e00\u6b21\u62d6\u4e24\u4e2a\uff0c\u4e5f\u53ef\u4ee5\u5206\u4e24\u6b21\u62d6\u5165\u3002\u82e5\u7cfb\u7edf\u663e\u793a\u6269\u5c55\u540d\uff0c\u6587\u4ef6\u901a\u5e38\u53eb `wakfu.log` \u548c `wakfu_chat.log`\uff1b\u82e5\u7cfb\u7edf\u9690\u85cf\u6269\u5c55\u540d\uff0c\u53ef\u80fd\u53ea\u4f1a\u770b\u5230 `wakfu` \u548c `wakfu_chat`\u3002";
   }
 
   if (copyPathBtn) copyPathBtn.textContent = "\u590d\u5236";
@@ -195,7 +195,7 @@ function initializeDualFilePromptUI() {
 
   const reconnectLabel = reconnectContainer?.querySelector(".prev-file-label");
   if (reconnectLabel) {
-    reconnectLabel.textContent = "\u53d1\u73b0\u4e0a\u6b21\u4f7f\u7528\u7684\u6587\u4ef6\uff1a";
+    reconnectLabel.textContent = "\u53d1\u73b0\u4e0a\u6b21\u4f7f\u7528\u7684\u65e5\u5fd7\u6587\u4ef6\uff1a";
   }
 
   if (reconnectBtn) reconnectBtn.textContent = "\u91cd\u65b0\u8fde\u63a5";
@@ -208,7 +208,7 @@ function initializeDualFilePromptUI() {
   }
 
   if (activeFilename && !fileHandle && !chatFileHandle) {
-    activeFilename.textContent = "\u672a\u9009\u62e9\u6587\u4ef6";
+    activeFilename.textContent = "\u672a\u9009\u62e9\u65e5\u5fd7\u6587\u4ef6";
   }
 
   renderPendingDropStatus();
@@ -360,7 +360,7 @@ dropZone.addEventListener("drop", async (event) => {
 
     if (!recognizedCount) {
       alert(
-        "\u6587\u4ef6\u4e0d\u6b63\u786e\u3002\n\u8bf7\u62d6\u5165 `wakfu.log` \u6216 `wakfu_chat.log`\u3002"
+        "\u6587\u4ef6\u4e0d\u6b63\u786e\u3002\n\u8bf7\u62d6\u5165主日志 wakfu\uff08\u6216 wakfu.log\uff09\u3001聊天日志 wakfu_chat\uff08\u6216 wakfu_chat.log\uff09\u3002"
       );
       return;
     }

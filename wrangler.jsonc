@@ -1,10 +1,14 @@
 {
   "name": "wakfu-companion",
   "compatibility_date": "2024-09-23",
+  "main": "./worker.js",
+  "vars": {
+    "TRIBE_SYNC_ORIGIN": "http://168.110.57.124.sslip.io"
+  },
   "assets": {
-    "directory": "./public",
+    "directory": "./public"
   },
   "observability": {
-    "enabled": true,
-  },
+    "enabled": true
+  }
 }

@@ -79,7 +79,7 @@ async function checkPreviousFile() {
   if (reconnectContainer) {
     reconnectContainer.style.display = "block";
     if (prevFilenameEl) {
-      prevFilenameEl.innerHTML = `${handles.mainLogHandle.name}<br>${handles.chatLogHandle.name}`;
+      prevFilenameEl.innerHTML = `主日志：${handles.mainLogHandle.name}<br>聊天日志：${handles.chatLogHandle.name}`;
     }
   }
 }
