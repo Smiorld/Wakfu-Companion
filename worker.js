@@ -28,7 +28,9 @@ async function handleApiProxy(request, env) {
     });
   }
 
-  const origin = env.TRIBE_SYNC_ORIGIN || "http://168.110.57.124.sslip.io";
+  const origin =
+    String(env.TRIBE_SYNC_ORIGIN || env.ORACLE_ORIGIN || "").trim() ||
+    "http://168.110.57.124.sslip.io";
   const requestUrl = new URL(request.url);
   const upstreamUrl = new URL(origin);
   upstreamUrl.pathname = requestUrl.pathname;

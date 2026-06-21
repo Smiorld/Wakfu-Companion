@@ -21,12 +21,12 @@ const BROADCAST_SERVER_OPTIONS = [
 const BROADCAST_SERVICE_CANDIDATES = [
   {
     id: "oracle",
-    label: "Oracle HTTP",
-    baseUrl: "http://168.110.57.124.sslip.io/api/broadcast",
+    label: "Oracle HTTPS",
+    baseUrl: "https://168.110.57.124.sslip.io/api/broadcast",
   },
   {
     id: "cloudflare",
-    label: "Cloudflare HTTP",
+    label: "Cloudflare HTTPS",
     baseUrl: "https://wakfu-tribe-sync.q1541599745.workers.dev/api/broadcast",
   },
 ];
