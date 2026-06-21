@@ -16,3 +16,4 @@ wakfu_chat.log*.sample
 AGENT.md
 __pycache__/
 *.pyc
+tmp/

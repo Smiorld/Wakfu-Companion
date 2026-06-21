@@ -248,12 +248,10 @@ function escapeBroadcastHtml(value) {
 
 function normalizeTribeName(name) {
   return String(name || "")
-    .replace(/^部族[:：]?\s*/, "")
-    .replace(/^合作[:：]?\s*/, "")
+    .replace(/^(?:\u90e8\u65cf|\u5408\u4f5c)(?:\:|\uFF1A)?\s*/, "")
     .replace(/\s+/g, " ")
     .trim();
 }
-
 function getTribeRecordKey(name) {
   return normalizeTribeName(name).toLowerCase();
 }
@@ -739,7 +737,7 @@ async function refreshBroadcastSnapshot(options = {}) {
 
   const { notify = false, reason = "snapshot" } = options;
   broadcastSnapshotInFlight = (async () => {
-    updateBroadcastConnection("loading", `正在同步账本（${reason}）...`);
+    updateBroadcastConnection("loading", `\u6b63\u5728\u540c\u6b65\u8d26\u672c\uff1a${reason}...`);
 
     const response = await callBroadcastApi("/tribes/snapshot", {
       params: { server: getCurrentBroadcastServerKey() },
@@ -765,8 +763,7 @@ async function refreshBroadcastSnapshot(options = {}) {
     }
 
     broadcastTransportStatus.lastSnapshotAt = Date.now();
-    const label = broadcastTransportStatus.endpoint?.label || "HTTP";
-    updateBroadcastConnection("ready", `已连接 ${label}`);
+    updateBroadcastConnection("ready", "\u5df2\u8fde\u63a5");
     return response;
   })()
     .catch((error) => {
@@ -813,8 +810,7 @@ async function pollBroadcastUpdates(reason = "poll") {
 
       broadcastTransportStatus.lastPollAt = Date.now();
       if (broadcastConnection.status !== "ready") {
-        const label = broadcastTransportStatus.endpoint?.label || "HTTP";
-        updateBroadcastConnection("ready", `已连接 ${label}`);
+        updateBroadcastConnection("ready", "\u5df2\u8fde\u63a5");
       }
       return response;
     } catch (error) {
@@ -967,11 +963,10 @@ async function resolveBroadcastTribe(input) {
 
 function getBroadcastStripName(name) {
   return String(name || "")
-    .replace(/^合作[:：]?\s*/, "")
-    .replace(/部族$/, "")
+    .replace(/^\u5408\u4f5c(?:\:|\uFF1A)?\s*/, "")
+    .replace(/\u90e8\u65cf$/, "")
     .trim();
 }
-
 function renderBroadcastStrip() {
   const strip = getBroadcastElement("chat-broadcast-strip");
   if (!strip) return;
@@ -1080,19 +1075,21 @@ function renderBroadcastHistory() {
 
   if (statusText) {
     const endpointLabel = broadcastTransportStatus.endpoint?.label
-      ? ` · ${broadcastTransportStatus.endpoint.label}`
+      ? ` | ${broadcastTransportStatus.endpoint.label}`
       : "";
-    statusText.textContent = `部族通知网络：${broadcastConnection.message}${endpointLabel} · ${Math.max(
+    statusText.textContent = `\u90e8\u65cf\u901a\u77e5\u7f51\u7edc\uff1a${broadcastConnection.message}${endpointLabel} | ${Math.max(
       1,
       Number(broadcastConnection.peerCount || 0)
-    )} 人在线`;
+    )}\u4eba\u5728\u7ebf`;
   } else if (statusLine) {
-    statusLine.textContent = `部族通知网络：${broadcastConnection.message} · ${Math.max(
+    const endpointLabel = broadcastTransportStatus.endpoint?.label
+      ? ` | ${broadcastTransportStatus.endpoint.label}`
+      : "";
+    statusLine.textContent = `\u90e8\u65cf\u901a\u77e5\u7f51\u7edc\uff1a${broadcastConnection.message}${endpointLabel} | ${Math.max(
       1,
       Number(broadcastConnection.peerCount || 0)
-    )} 人在线`;
+    )}\u4eba\u5728\u7ebf`;
   }
-
   if (statusServerSelect && statusServerSelect.value !== getCurrentBroadcastServerKey()) {
     statusServerSelect.value = getCurrentBroadcastServerKey();
   }
@@ -1175,12 +1172,19 @@ async function registerTribeChallengeDetection(input) {
   const record = buildStartRecord(input);
   if (!record) return false;
   if (isBroadcastServerMismatch(record.serverKey)) return false;
+  if (Number(record.expiresAt || 0) <= Date.now()) return false;
 
   const existing = getCurrentBroadcastServerState().tribes?.[record.key];
+  if (
+    existing &&
+    recordsShareBroadcastWindow(existing, record) &&
+    Number(record.activatedAt || 0) <= Number(existing.updatedAt || existing.activatedAt || 0)
+  ) {
+    return false;
+  }
   if (existing && recordsShareBroadcastWindow(existing, record) && !isRecordEnded(existing)) {
     return false;
   }
-
   applyServerRecord(record, { notify: true });
 
   try {
@@ -1204,28 +1208,6 @@ async function registerTribeChallengeDetection(input) {
     console.warn("[Broadcast] publish failed:", error);
   }
 
-  return true;
-}
-
-function showLocalFakeTribeNotice(input = {}) {
-  const fakeRecord = {
-    ...buildStartRecord({
-      challengeId: input.challengeId || "-1932",
-      challengeName: input.challengeName || "合作：潘达拉幽灵部族",
-      detectedAt: Number(input.detectedAt || Date.now()),
-      expiresAt: Number(
-        input.expiresAt || Number(input.detectedAt || Date.now()) + TRIBE_NOTICE_DURATION_MS
-      ),
-    }),
-    senderClientId: "local-preview",
-    __preview: true,
-  };
-
-  if (!fakeRecord) return false;
-  broadcastPreviewTribes[fakeRecord.key] = fakeRecord;
-  pruneBroadcastPreviewState();
-  renderBroadcastStrip();
-  renderBroadcastHistory();
   return true;
 }
 
@@ -1312,7 +1294,7 @@ window.updateBroadcastFilter = updateBroadcastFilter;
 window.registerTribeChallengeDetection = registerTribeChallengeDetection;
 window.resolveBroadcastTribeLocal = resolveBroadcastTribeLocal;
 window.resolveBroadcastTribe = resolveBroadcastTribe;
-window.showLocalFakeTribeNotice = showLocalFakeTribeNotice;
+
 window.dismissBroadcastTribe = dismissBroadcastTribe;
 window.restoreBroadcastTribe = restoreBroadcastTribe;
 window.getCurrentBroadcastServerKey = getCurrentBroadcastServerKey;

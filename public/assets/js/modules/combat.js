@@ -987,6 +987,30 @@ let chatPermissionStrikeCount = 0;
 const LOOT_KEYWORDS = ["picked up", "ramassé", "obtenu", "recogido", "obtenido", "apanhou", "obteve", "你得到了", "你失去了", "配方完成", "回收"];
 const GAME_SERVER_PROXY_PATTERN = /Connexion au proxy :wakfu-([a-z0-9-]+)\.ankama-games\.com:5556/i;
 
+function parseWakfuLogTimestamp(line) {
+  const match = String(line || "").match(/\b(\d{2}):(\d{2}):(\d{2}),(\d{3})\b/);
+  if (!match) return Date.now();
+
+  const now = new Date();
+  const parsed = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    Number(match[1]),
+    Number(match[2]),
+    Number(match[3]),
+    Number(match[4])
+  );
+
+  // Wakfu log lines only carry the time-of-day. If the parsed time lands
+  // obviously in the future, treat it as a line from the previous day.
+  if (parsed.getTime() - now.getTime() > 5 * 60 * 1000) {
+    parsed.setDate(parsed.getDate() - 1);
+  }
+
+  return parsed.getTime();
+}
+
 async function parseFile() {
   const now = Date.now();
   if (isReading) {
@@ -1170,7 +1194,7 @@ function processAreaChallengeLine(line) {
     registerTribeChallengeDetection({
       challengeId,
       challengeName,
-      detectedAt: Date.now(),
+      detectedAt: parseWakfuLogTimestamp(line),
     });
   }
 }
@@ -1182,7 +1206,7 @@ function processAreaChallengeResolutionLine(line) {
   if (typeof resolveBroadcastTribe === "function") {
     resolveBroadcastTribe({
       challengeName: match[1],
-      resolvedAt: Date.now(),
+      resolvedAt: parseWakfuLogTimestamp(line),
     });
   }
 }
