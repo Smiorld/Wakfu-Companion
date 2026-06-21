@@ -1,6 +1,23 @@
 const BROADCAST_STORAGE_KEY = "wakfu_tribe_broadcast_state_v3";
 const BROADCAST_VIEW_STORAGE_KEY = "wakfu_tribe_broadcast_view_v1";
-const BROADCAST_SERVICE_URL = "wss://wakfu-tribe-sync.q1541599745.workers.dev/connect";
+const BROADCAST_ENDPOINT_CACHE_KEY = "wakfu_tribe_broadcast_endpoint_v1";
+const BROADCAST_ENDPOINT_CACHE_TTL_MS = 5 * 60 * 1000;
+const BROADCAST_SERVICE_CANDIDATES = [
+  {
+    id: "oracle",
+    label: "Oracle",
+    health: "http://168.110.57.124.sslip.io/health",
+    socket: "ws://168.110.57.124.sslip.io/connect",
+    secureOnly: false,
+  },
+  {
+    id: "cloudflare",
+    label: "Cloudflare",
+    health: "https://wakfu-tribe-sync.q1541599745.workers.dev/health",
+    socket: "wss://wakfu-tribe-sync.q1541599745.workers.dev/connect",
+    secureOnly: true,
+  },
+];
 const TRIBE_NOTICE_DURATION_MS = 30 * 60 * 1000;
 const BROADCAST_REFRESH_MS = 1000;
 const BROADCAST_MAX_RECORDS = 200;
@@ -13,6 +30,7 @@ let broadcastFilterText = "";
 let broadcastState = loadBroadcastState();
 let broadcastViewState = loadBroadcastViewState();
 let broadcastPreviewTribes = {};
+let broadcastServiceEndpoint = null;
 let broadcastConnection = {
   status: "idle",
   message: "部族通知网络未启动。",
@@ -48,6 +66,108 @@ function loadBroadcastViewState() {
 
 function saveBroadcastViewState() {
   localStorage.setItem(BROADCAST_VIEW_STORAGE_KEY, JSON.stringify(broadcastViewState));
+}
+
+function isSecureBroadcastContext() {
+  return window.location.protocol === "https:";
+}
+
+function getAvailableBroadcastCandidates() {
+  return BROADCAST_SERVICE_CANDIDATES.filter((candidate) => {
+    if (!isSecureBroadcastContext()) return true;
+    return candidate.secureOnly;
+  });
+}
+
+function loadCachedBroadcastEndpoint() {
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(BROADCAST_ENDPOINT_CACHE_KEY) || "null");
+    if (!cached || !cached.id || !cached.socket || !cached.cachedAt) return null;
+    if (Date.now() - Number(cached.cachedAt || 0) > BROADCAST_ENDPOINT_CACHE_TTL_MS) return null;
+    const candidate = getAvailableBroadcastCandidates().find((item) => item.id === cached.id);
+    return candidate || null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function saveCachedBroadcastEndpoint(candidate) {
+  if (!candidate) return;
+  sessionStorage.setItem(
+    BROADCAST_ENDPOINT_CACHE_KEY,
+    JSON.stringify({
+      id: candidate.id,
+      socket: candidate.socket,
+      cachedAt: Date.now(),
+    })
+  );
+}
+
+function clearCachedBroadcastEndpoint() {
+  sessionStorage.removeItem(BROADCAST_ENDPOINT_CACHE_KEY);
+}
+
+function probeBroadcastEndpoint(candidate, timeoutMs = 2500) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let socket = null;
+    const startedAt = performance.now();
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      try {
+        if (socket) socket.close();
+      } catch (error) {}
+      reject(new Error(`Probe timeout for ${candidate.id}`));
+    }, timeoutMs);
+
+    try {
+      socket = new WebSocket(candidate.socket);
+    } catch (error) {
+      clearTimeout(timer);
+      reject(error);
+      return;
+    }
+
+    const finish = (ok, error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try {
+        if (socket) socket.close();
+      } catch (closeError) {}
+      if (ok) {
+        resolve({
+          candidate,
+          latency: Math.round(performance.now() - startedAt),
+        });
+        return;
+      }
+      reject(error || new Error(`Probe failed for ${candidate.id}`));
+    };
+
+    socket.addEventListener("open", () => finish(true));
+    socket.addEventListener("error", () => finish(false, new Error(`Probe failed for ${candidate.id}`)));
+  });
+}
+
+async function selectBroadcastEndpoint() {
+  const cached = loadCachedBroadcastEndpoint();
+  if (cached) return cached;
+
+  const candidates = getAvailableBroadcastCandidates();
+  if (!candidates.length) throw new Error("No broadcast candidate available");
+
+  const results = await Promise.allSettled(candidates.map((candidate) => probeBroadcastEndpoint(candidate)));
+  const success = results
+    .filter((result) => result.status === "fulfilled")
+    .map((result) => result.value)
+    .sort((left, right) => left.latency - right.latency);
+
+  if (!success.length) throw new Error("No broadcast endpoint reachable");
+
+  saveCachedBroadcastEndpoint(success[0].candidate);
+  return success[0].candidate;
 }
 
 function getBroadcastElement(id) {
@@ -112,13 +232,9 @@ function formatRemainingDuration(expiresAt) {
 function formatElapsedDuration(timestamp) {
   const elapsedMs = Math.max(0, Date.now() - Number(timestamp || 0));
   const totalSeconds = Math.floor(elapsedMs / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
-
-  if (hours > 0) return `${hours}小时${minutes}分钟`;
-  if (minutes > 0) return `${minutes}分${seconds}秒`;
-  return `${seconds}秒`;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
 function normalizeLedgerRecord(record) {
@@ -484,7 +600,7 @@ function renderBroadcastStrip() {
       <span class="broadcast-pill-type">部族</span>
       <span class="broadcast-pill-text">${escapeBroadcastHtml(stripName)}</span>
       <span class="broadcast-pill-countdown">${escapeBroadcastHtml(
-        `+${formatElapsedDuration(latestRecord.activatedAt)}`
+        formatElapsedDuration(latestRecord.activatedAt)
       )}</span>
     </button>
   `;
@@ -509,7 +625,7 @@ function renderBroadcastList(target, records, emptyText, activeMode = false) {
   target.innerHTML = records
     .map((record) => {
       const timeLabel = activeMode
-        ? `已持续 +${formatElapsedDuration(record.activatedAt)}`
+        ? `已持续 ${formatElapsedDuration(record.activatedAt)}`
         : isRecordEnded(record)
           ? `距今 ${formatDurationFromNow(record.endedAt || record.updatedAt)}`
           : `距上次记录 ${formatDurationFromNow(record.activatedAt)}`;
@@ -621,10 +737,11 @@ async function connectBroadcastNetwork() {
   updateBroadcastConnection("loading", "正在连接...");
 
   try {
-    broadcastSocket = new WebSocket(BROADCAST_SERVICE_URL);
+    broadcastServiceEndpoint = await selectBroadcastEndpoint();
+    broadcastSocket = new WebSocket(broadcastServiceEndpoint.socket);
 
     broadcastSocket.addEventListener("open", () => {
-      updateBroadcastConnection("loading", "已连接服务，正在同步...");
+      updateBroadcastConnection("loading", `已连接 ${broadcastServiceEndpoint.label}，正在同步...`);
       sendBroadcastMessage("sync-request", {});
     });
 
@@ -637,7 +754,7 @@ async function connectBroadcastNetwork() {
         if (message.state) {
           replaceBroadcastLedger(message.state, { notify: true });
         }
-        updateBroadcastConnection("ready", "已连接");
+        updateBroadcastConnection("ready", `已连接 ${broadcastServiceEndpoint.label}`);
         return;
       }
 
@@ -675,7 +792,9 @@ async function connectBroadcastNetwork() {
     broadcastSocket.addEventListener("close", () => {
       broadcastSocket = null;
       broadcastPeerId = "";
+      broadcastServiceEndpoint = null;
       broadcastConnection.peerCount = 0;
+      clearCachedBroadcastEndpoint();
       updateBroadcastConnection("error", "连接已断开");
       scheduleBroadcastReconnect();
     });
@@ -687,7 +806,9 @@ async function connectBroadcastNetwork() {
   } catch (error) {
     console.warn("[Broadcast] socket init failed:", error);
     broadcastPeerId = "";
+    broadcastServiceEndpoint = null;
     broadcastConnection.peerCount = 0;
+    clearCachedBroadcastEndpoint();
     updateBroadcastConnection("error", "通知服务不可用");
     scheduleBroadcastReconnect(15000);
   }
