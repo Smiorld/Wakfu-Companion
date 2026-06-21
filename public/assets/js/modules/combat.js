@@ -1,5 +1,7 @@
 let fightStartTime = null;
 let pendingArmorDamage = null;
+let pendingReactiveDamageMatches = [];
+let pendingExitReactiveSelfHit = null;
 
 function isExplicitArmorSpellSource(spellName) {
   return !!String(spellName || "").trim();
@@ -26,8 +28,145 @@ function isNonAttributionHint(value) {
     /^\d+\s*enemy(?:ies)?\s*affected$/.test(normalized) ||
     /^\d+\s*ennemi(?:s)?\s*affect[ée]s?$/.test(normalized) ||
     /^\d+\s*enemig(?:o|os)\s*afectados$/.test(normalized) ||
-    /^\d+\s*inimig(?:o|os)\s*afetados$/.test(normalized)
+    /^\d+\s*inimig(?:o|os)\s*afetados$/.test(normalized) ||
+    normalized.includes("生命偷取") ||
+    normalized.includes("life steal") ||
+    normalized.includes("vol de vie") ||
+    normalized.includes("robo de vida") ||
+    normalized.includes("roubo de vida")
   );
+}
+
+function isLikelyExplicitEffectSource(value) {
+  const normalized = normalizeStateKey(value);
+  if (!normalized || isNonAttributionHint(value) || NOISE_WORDS.has(value)) return false;
+
+  return ![
+    "最终伤害",
+    "final damage",
+    "healing",
+    "治疗",
+    "元素抗性",
+    "critical",
+    "暴击",
+    "lock",
+    "dodge",
+  ].some((fragment) => normalized.includes(String(fragment).toLowerCase()));
+}
+
+function extractReactiveOwnerFromSpell(spellName) {
+  const raw = String(spellName || "").trim();
+  if (!raw) return null;
+
+  const patterns = [
+    /(.*?)(?:反击)$/u,
+    /(.*?)(?:counterattack)$/iu,
+    /(.*?)(?:riposte)$/iu,
+    /(.*?)(?:contraataque)$/iu,
+    /(.*?)(?:contra-ataque)$/iu,
+  ];
+
+  for (const pattern of patterns) {
+    const match = raw.match(pattern);
+    if (!match) continue;
+    const owner = String(match[1] || "").trim();
+    if (owner) return owner;
+  }
+
+  return null;
+}
+
+function trackReactiveDamageCandidate(entry) {
+  if (!entry) return;
+  pendingReactiveDamageMatches.push({
+    ...entry,
+    lookahead: 2,
+  });
+  if (pendingReactiveDamageMatches.length > 8) {
+    pendingReactiveDamageMatches = pendingReactiveDamageMatches.slice(-8);
+  }
+}
+
+function ageReactiveDamageCandidates() {
+  pendingReactiveDamageMatches = pendingReactiveDamageMatches
+    .map((entry) => ({ ...entry, lookahead: Number(entry.lookahead || 0) - 1 }))
+    .filter((entry) => entry.lookahead >= 0);
+}
+
+function clearReactiveDamageCandidates() {
+  pendingReactiveDamageMatches = [];
+}
+
+function clearExitReactiveSelfHit() {
+  pendingExitReactiveSelfHit = null;
+}
+
+function extractExitedCombatant(content) {
+  const patterns = [
+    /^([^:]+)\s*退出战斗/u,
+    /^([^:]+)\s*exits fight/iu,
+    /^([^:]+)\s*quitte le combat/iu,
+    /^([^:]+)\s*sale del combate/iu,
+    /^([^:]+)\s*sai da luta/iu,
+  ];
+
+  for (const pattern of patterns) {
+    const match = String(content || "").match(pattern);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+  }
+
+  return null;
+}
+
+function moveCombatAttribution(dataSet, fromCaster, toCaster, fromSpell, toSpell, amount, element) {
+  if (!dataSet[fromCaster]) return false;
+
+  const fromSpellKey = `${fromSpell}|${element || "neutral"}`;
+  const spellEntry = dataSet[fromCaster].spells?.[fromSpellKey];
+  if (!spellEntry || spellEntry.val < amount) return false;
+
+  spellEntry.val -= amount;
+  dataSet[fromCaster].total -= amount;
+
+  if (spellEntry.val <= 0) {
+    delete dataSet[fromCaster].spells[fromSpellKey];
+  }
+  if (dataSet[fromCaster].total <= 0) {
+    dataSet[fromCaster].total = 0;
+    if (!Object.keys(dataSet[fromCaster].spells || {}).length) {
+      delete dataSet[fromCaster];
+    }
+  }
+
+  updateCombatData(dataSet, toCaster, toSpell, amount, element);
+  return true;
+}
+
+function tryResolveReactiveDamageFromEnemyHeal(target, amount) {
+  if (!target || !amount || !pendingReactiveDamageMatches.length) return null;
+
+  const matchIndex = pendingReactiveDamageMatches.findIndex(
+    (entry) =>
+      entry &&
+      entry.amount === amount &&
+      entry.target !== target &&
+      entry.caster
+  );
+  if (matchIndex < 0) return null;
+
+  const [matchedEntry] = pendingReactiveDamageMatches.splice(matchIndex, 1);
+  const moved = moveCombatAttribution(
+    fightData,
+    matchedEntry.caster,
+    target,
+    matchedEntry.spell,
+    "Passive / Indirect",
+    matchedEntry.amount,
+    matchedEntry.element
+  );
+  return moved ? matchedEntry : null;
 }
 
 function resolveStateOwnerCandidate(ownerName) {
@@ -224,6 +363,22 @@ function processFightLog(line) {
   const content =
     contentStart >= 0 ? String(line || "").slice(contentStart + 2).trim() : String(line || "").trim();
   if (!content) return;
+  const exitedCombatant = extractExitedCombatant(content);
+
+  if (pendingExitReactiveSelfHit) {
+    if (exitedCombatant) {
+      moveCombatAttribution(
+        fightData,
+        pendingExitReactiveSelfHit.caster,
+        exitedCombatant,
+        pendingExitReactiveSelfHit.spell,
+        "Passive / Indirect",
+        pendingExitReactiveSelfHit.amount,
+        pendingExitReactiveSelfHit.element
+      );
+    }
+    clearExitReactiveSelfHit();
+  }
   const removedState = extractRemovedState(content);
 
   if (pendingIndirectAttribution && removedState && removedState.target === pendingIndirectAttribution.target) {
@@ -242,6 +397,8 @@ function processFightLog(line) {
   // 1. Turn/Time Carryover - RESET CASTER
   if (isTurnCarryoverContent(content)) {
     flushPendingIndirectAttribution();
+    clearReactiveDamageCandidates();
+    clearExitReactiveSelfHit();
     currentCaster = null;
     currentSpell = "Passive / Indirect";
     // Flush pending if any (assume Neutral if turn ended)
@@ -256,6 +413,8 @@ function processFightLog(line) {
   const castMatch = content.match(/^(.*?) (?:casts|lance(?: le sort)?|lanza(?: el hechizo)?|lança(?: o feitiço)?|施放)\s*[“"]?(.*?)[”"]?(?:\.(?=$|\s[\(（])|(?=\s[\(（])|$)/i);
   if (castMatch) {
     flushPendingIndirectAttribution();
+    clearReactiveDamageCandidates();
+    clearExitReactiveSelfHit();
     // If we have pending armor damage when a NEW spell starts, flush it as Neutral
     if (pendingArmorDamage) {
       updateCombatData(fightData, pendingArmorDamage.caster, pendingArmorDamage.spell, pendingArmorDamage.amount, "Neutral");
@@ -307,6 +466,7 @@ function processFightLog(line) {
   const actionMatch = content.match(new RegExp(`^(.*?):\\s*([+-])?(${numPattern})\\s*(${hpUnits}|${armorUnits})(.*)`));
   if (actionMatch) {
     flushPendingIndirectAttribution();
+    ageReactiveDamageCandidates();
     const target = actionMatch[1].trim();
     const sign = actionMatch[2] || "";
     const amount = parseInt(actionMatch[3].replace(/[,.\s]/g, ""), 10);
@@ -332,14 +492,11 @@ function processFightLog(line) {
         if (knownMatch) {
           spellOverride = knownMatch;
         } else {
-          const isPrioritySource = d.includes("Potion") || d.includes("Flask") || d.includes("Flasque") || d.includes("Consumable");
+          const isPrioritySource =
+            d.includes("Potion") || d.includes("Flask") || d.includes("Flasque") || d.includes("Consumable");
 
-          const isCurrentSpellValid = currentSpell && spellToClassMap[currentSpell];
-
-          if (isPrioritySource || !isCurrentSpellValid) {
-            if (!d.toLowerCase().includes("lost")) {
-              spellOverride = d;
-            }
+          if ((isPrioritySource || isLikelyExplicitEffectSource(d)) && !d.toLowerCase().includes("lost")) {
+            spellOverride = d;
           }
         }
       }
@@ -406,6 +563,11 @@ function processFightLog(line) {
 
     let finalSpell = spellOverride || currentSpell;
 
+    const reactiveOwner = extractReactiveOwnerFromSpell(spellOverride);
+    if (reactiveOwner) {
+      finalCaster = reactiveOwner;
+    }
+
     // SIGNATURE REROUTING
     if (finalSpell && finalSpell !== "Unknown Spell" && finalSpell !== "Passive / Indirect" && finalCaster !== "Dungeon Mechanic") {
       finalCaster = getSignatureCaster(finalSpell, finalCaster);
@@ -456,6 +618,12 @@ function processFightLog(line) {
         updateCombatData(armorData, finalCaster, finalSpell, amount, null);
       }
     } else if (sign === "+") {
+      const reactiveMatch =
+        !spellOverride && !isPlayerAlly({ name: target }) ? tryResolveReactiveDamageFromEnemyHeal(target, amount) : null;
+      if (reactiveMatch) {
+        finalCaster = target;
+        finalSpell = "Passive / Indirect";
+      }
       if (!directStateOwner && fallbackStateOwner && spellOverride) {
         pendingIndirectAttribution = {
           kind: "heal",
@@ -481,6 +649,25 @@ function processFightLog(line) {
         return;
       }
       updateCombatData(fightData, finalCaster, finalSpell, amount, detectedElement || "Neutral");
+      if (!spellOverride && finalCaster === target) {
+        pendingExitReactiveSelfHit = {
+          caster: finalCaster,
+          spell: finalSpell,
+          amount,
+          element: detectedElement || "Neutral",
+        };
+      } else {
+        clearExitReactiveSelfHit();
+      }
+      if (!spellOverride && !isPlayerAlly({ name: target })) {
+        trackReactiveDamageCandidate({
+          caster: finalCaster,
+          spell: finalSpell,
+          target,
+          amount,
+          element: detectedElement || "Neutral",
+        });
+      }
     }
 
     lastCombatTime = Date.now();
@@ -578,6 +765,8 @@ function performReset(isAuto = false) {
   fightStartTime = null;
   pendingArmorDamage = null; // Clear any hanging buffer
   pendingIndirectAttribution = null;
+  clearReactiveDamageCandidates();
+  clearExitReactiveSelfHit();
   stateSources = {};
   stateOwnershipMeta = {};
   stateEventOrder = 0;
@@ -1237,6 +1426,8 @@ function processLine(line) {
   processAreaChallengeResolutionLine(line);
 
   if (battleJustFinished) {
+    clearReactiveDamageCandidates();
+    clearExitReactiveSelfHit();
     saveFightToHistory();
     awaitingNewFight = true;
     updateWatchdogUI();
