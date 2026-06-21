@@ -5,6 +5,7 @@ import time
 from collections import deque
 from copy import deepcopy
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 
@@ -17,6 +18,7 @@ EVENT_RETENTION_MS = 12 * 60 * 60 * 1000
 PRESENCE_TIMEOUT_MS = 90 * 1000
 MAX_EVENTS_PER_SERVER = 4000
 MAX_RECORDS_PER_SERVER = 300
+LEDGER_PATH = Path(__file__).with_name("oracle_ledger.json")
 
 
 state_lock = threading.Lock()
@@ -60,6 +62,64 @@ def create_server_state():
 
 
 ledger = {server_key: create_server_state() for server_key in KNOWN_SERVERS}
+
+
+def serialize_ledger():
+    payload = {"servers": {}}
+    for server_key in sorted(KNOWN_SERVERS):
+        server_state = ledger[server_key]
+        payload["servers"][server_key] = {
+            "cursor": int(server_state.get("cursor") or 0),
+            "tribes": deepcopy(server_state.get("tribes") or {}),
+        }
+    return payload
+
+
+def save_ledger_to_disk():
+    payload = serialize_ledger()
+    temp_path = LEDGER_PATH.with_suffix(".json.tmp")
+    temp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    temp_path.replace(LEDGER_PATH)
+
+
+def load_ledger_from_disk():
+    if not LEDGER_PATH.exists():
+        return
+
+    try:
+        payload = json.loads(LEDGER_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return
+
+    source_servers = payload.get("servers") if isinstance(payload, dict) else None
+    if not isinstance(source_servers, dict):
+        return
+
+    for server_key in KNOWN_SERVERS:
+        ledger[server_key] = create_server_state()
+
+    for raw_server_key, source_state in source_servers.items():
+        server_key = normalize_server_key(raw_server_key)
+        next_state = ledger[server_key]
+        if not isinstance(source_state, dict):
+            continue
+
+        next_state["cursor"] = max(0, int(source_state.get("cursor") or 0))
+        source_tribes = source_state.get("tribes")
+        if not isinstance(source_tribes, dict):
+            continue
+
+        normalized_tribes = {}
+        for raw_record in source_tribes.values():
+            if not isinstance(raw_record, dict):
+                continue
+            normalized = make_record(raw_record, fallback_server=server_key)
+            if not normalized:
+                continue
+            normalized_tribes[normalized["key"]] = normalized
+
+        next_state["tribes"] = normalized_tribes
+        cleanup_server_state(server_key)
 
 
 def make_record(raw, fallback_server=None):
@@ -228,6 +288,7 @@ def publish_record(record):
 
     server_state["tribes"][record["key"]] = deepcopy(record)
     event = append_event(server_key, "tribe-upsert", record)
+    save_ledger_to_disk()
     return {
         "ok": True,
         "deduped": False,
@@ -268,6 +329,7 @@ def end_record(payload):
         updated["senderClientId"] = str(payload.get("senderClientId") or payload.get("clientId"))
     server_state["tribes"][key] = updated
     event = append_event(server_key, "tribe-end", updated)
+    save_ledger_to_disk()
 
     return {
         "ok": True,
@@ -396,6 +458,9 @@ class BroadcastHandler(BaseHTTPRequestHandler):
 
 
 def run():
+    with state_lock:
+        load_ledger_from_disk()
+        save_ledger_to_disk()
     server = ThreadingHTTPServer((HOST, PORT), BroadcastHandler)
     print(f"Listening on http://{HOST}:{PORT}{API_PREFIX}")
     server.serve_forever()
