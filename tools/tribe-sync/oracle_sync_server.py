@@ -68,9 +68,13 @@ def make_record(raw, fallback_server=None):
     if not name or not key:
         return None
 
-    activated_at = int(raw.get("activatedAt") or raw.get("detectedAt") or now_ms())
+    current_time = now_ms()
+    activated_at = min(int(raw.get("activatedAt") or raw.get("detectedAt") or current_time), current_time)
     ended_at = int(raw.get("endedAt") or 0)
-    updated_at = int(raw.get("updatedAt") or max(activated_at, ended_at, now_ms()))
+    if ended_at > 0:
+        ended_at = max(activated_at, min(ended_at, current_time))
+    updated_at = int(raw.get("updatedAt") or max(activated_at, ended_at, current_time))
+    updated_at = max(activated_at, ended_at, min(updated_at, current_time))
     server_key = normalize_server_key(raw.get("serverKey") or fallback_server)
 
     return {
@@ -79,7 +83,10 @@ def make_record(raw, fallback_server=None):
         "name": name,
         "challengeId": str(raw.get("challengeId") or ""),
         "activatedAt": activated_at,
-        "expiresAt": int(raw.get("expiresAt") or (activated_at + TRIBE_NOTICE_DURATION_MS)),
+        "expiresAt": max(
+            activated_at + TRIBE_NOTICE_DURATION_MS,
+            int(raw.get("expiresAt") or (activated_at + TRIBE_NOTICE_DURATION_MS)),
+        ),
         "updatedAt": updated_at,
         "endedAt": ended_at,
         "senderClientId": str(raw.get("senderClientId") or raw.get("clientId") or ""),
@@ -252,7 +259,8 @@ def end_record(payload):
             "status": 404,
         }
 
-    resolved_at = int(payload.get("resolvedAt") or now_ms())
+    resolved_at = min(int(payload.get("resolvedAt") or now_ms()), now_ms())
+    resolved_at = max(int(existing.get("activatedAt") or 0), resolved_at)
     updated = deepcopy(existing)
     updated["endedAt"] = resolved_at
     updated["updatedAt"] = max(int(updated.get("updatedAt") or 0), resolved_at)

@@ -273,7 +273,7 @@ function formatBroadcastTime(timestamp) {
 }
 
 function formatDurationFromNow(timestamp) {
-  const elapsedMs = Math.max(0, Date.now() - Number(timestamp || 0));
+  const elapsedMs = Math.max(0, Date.now() - sanitizeBroadcastTimestamp(timestamp));
   const totalMinutes = Math.floor(elapsedMs / 60000);
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
@@ -282,11 +282,17 @@ function formatDurationFromNow(timestamp) {
 }
 
 function formatElapsedDuration(timestamp) {
-  const elapsedMs = Math.max(0, Date.now() - Number(timestamp || 0));
+  const elapsedMs = Math.max(0, Date.now() - sanitizeBroadcastTimestamp(timestamp));
   const totalSeconds = Math.floor(elapsedMs / 1000);
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function sanitizeBroadcastTimestamp(timestamp, fallback = Date.now()) {
+  const numeric = Number(timestamp || 0);
+  if (!Number.isFinite(numeric) || numeric <= 0) return fallback;
+  return Math.min(numeric, Date.now());
 }
 
 function normalizeLedgerRecord(record) {
@@ -295,9 +301,16 @@ function normalizeLedgerRecord(record) {
   const key = String(record.key || getTribeRecordKey(name)).trim().toLowerCase();
   if (!name || !key) return null;
 
-  const activatedAt = Number(record.activatedAt || record.detectedAt || Date.now());
-  const expiresAt = Number(record.expiresAt || activatedAt + TRIBE_NOTICE_DURATION_MS);
-  const endedAt = Number(record.endedAt || 0);
+  const activatedAt = sanitizeBroadcastTimestamp(record.activatedAt || record.detectedAt || Date.now());
+  const rawEndedAt = Number(record.endedAt || 0);
+  const endedAt =
+    Number.isFinite(rawEndedAt) && rawEndedAt > 0
+      ? Math.max(activatedAt, sanitizeBroadcastTimestamp(rawEndedAt, activatedAt))
+      : 0;
+  const expiresAt = Math.max(
+    activatedAt + TRIBE_NOTICE_DURATION_MS,
+    Number(record.expiresAt || activatedAt + TRIBE_NOTICE_DURATION_MS)
+  );
 
   return {
     key,
@@ -308,7 +321,11 @@ function normalizeLedgerRecord(record) {
     challengeId: String(record.challengeId || ""),
     activatedAt,
     expiresAt,
-    updatedAt: Number(record.updatedAt || Math.max(activatedAt, endedAt || 0) || Date.now()),
+    updatedAt: Math.max(
+      activatedAt,
+      endedAt || 0,
+      sanitizeBroadcastTimestamp(record.updatedAt || Math.max(activatedAt, endedAt || 0) || Date.now())
+    ),
     endedAt,
     senderClientId: String(record.senderClientId || ""),
   };
@@ -859,7 +876,7 @@ function buildStartRecord(input) {
   const normalizedName = normalizeTribeName(input?.challengeName || input?.name || "");
   if (!normalizedName) return null;
 
-  const activatedAt = Number(input?.activatedAt || input?.detectedAt || Date.now());
+  const activatedAt = sanitizeBroadcastTimestamp(input?.activatedAt || input?.detectedAt || Date.now());
   const serverKey = normalizeBroadcastServerKey(input?.serverKey || getCurrentBroadcastServerKey());
   return {
     key: getTribeRecordKey(normalizedName),
