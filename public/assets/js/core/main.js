@@ -34,6 +34,87 @@ let pendingDroppedHandles = {
   chatLogHandle: null,
 };
 
+function getServerSelectionOptionsMarkup(selectedServerKey) {
+  const current =
+    typeof window.getCurrentBroadcastServerKey === "function"
+      ? window.getCurrentBroadcastServerKey()
+      : "ogrest";
+  const normalized = String(selectedServerKey || current || "ogrest").toLowerCase();
+  const options = [
+    { value: "ogrest", label: "Ogrest" },
+    { value: "rubilax", label: "Rubilax" },
+    { value: "pandora", label: "Pandora" },
+  ];
+
+  return options
+    .map(
+      (option) =>
+        `<option value="${option.value}"${
+          option.value === normalized ? " selected" : ""
+        }>${option.label}</option>`
+    )
+    .join("");
+}
+
+function ensureBroadcastServerSelectionUI() {
+  const createPicker = (container, id, selectId, anchor) => {
+    if (!container) return null;
+
+    let wrapper = document.getElementById(id);
+    if (!wrapper) {
+      wrapper = document.createElement("div");
+      wrapper.id = id;
+      wrapper.className = "drop-zone-server-picker";
+      wrapper.innerHTML = `
+        <label class="drop-zone-server-label" for="${selectId}">当前服务器</label>
+        <select
+          id="${selectId}"
+          class="translation-select drop-zone-server-select"
+          data-broadcast-server-select="${id}">${getServerSelectionOptionsMarkup()}</select>
+      `;
+
+      if (anchor?.parentNode) {
+        anchor.parentNode.insertBefore(wrapper, anchor.nextSibling);
+      } else {
+        container.appendChild(wrapper);
+      }
+
+      const serverSelect = wrapper.querySelector("select");
+      if (serverSelect) {
+        serverSelect.addEventListener("change", (event) => {
+          if (typeof window.setBroadcastServerKey === "function") {
+            window.setBroadcastServerKey(event.target.value, { source: "manual" });
+          }
+        });
+      }
+    }
+
+    return wrapper;
+  };
+
+  const dropAnchor = dropZone?.querySelector(".path-container");
+  const reconnectAnchor = reconnectContainer?.querySelector(".prev-filename");
+  return {
+    drop: createPicker(dropZone, "drop-zone-server-picker", "drop-zone-server-select", dropAnchor),
+    reconnect: createPicker(
+      reconnectContainer,
+      "reconnect-server-picker",
+      "reconnect-server-select",
+      reconnectAnchor
+    ),
+  };
+}
+
+function updateBroadcastServerSelectionUI(serverKey) {
+  const normalized = String(serverKey || "ogrest").toLowerCase();
+  ["drop-zone-server-select", "reconnect-server-select"].forEach((id) => {
+    const selector = document.getElementById(id);
+    if (selector && selector.value !== normalized) {
+      selector.value = normalized;
+    }
+  });
+}
+
 function getOrCreateDropStatusLine() {
   if (!dropZone) return null;
 
@@ -104,6 +185,13 @@ function initializeDualFilePromptUI() {
   }
 
   if (copyPathBtn) copyPathBtn.textContent = "\u590d\u5236";
+
+  ensureBroadcastServerSelectionUI();
+  updateBroadcastServerSelectionUI(
+    typeof window.getCurrentBroadcastServerKey === "function"
+      ? window.getCurrentBroadcastServerKey()
+      : "ogrest"
+  );
 
   const reconnectLabel = reconnectContainer?.querySelector(".prev-file-label");
   if (reconnectLabel) {
@@ -387,6 +475,7 @@ window.addEventListener("pageshow", () => {
 });
 
 window.startSessionTimer = startSessionTimer;
+window.updateBroadcastServerSelectionUI = updateBroadcastServerSelectionUI;
 
 async function startTracking(mainLogHandle, nextChatHandle) {
   fileHandle = mainLogHandle;

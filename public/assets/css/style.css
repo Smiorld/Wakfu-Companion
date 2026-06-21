@@ -225,6 +225,26 @@ body {
   box-shadow: 0 0 15px rgba(0, 210, 255, 0.2);
 }
 
+.drop-zone-server-picker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 12px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.drop-zone-server-label {
+  color: #bdbdbd;
+  font-size: 0.9rem;
+}
+
+.drop-zone-server-select {
+  min-width: 160px;
+  max-width: 220px;
+}
+
 /* --- Footer --- */
 #app-footer {
   position: fixed;
@@ -4279,12 +4299,38 @@ body.pip-window .empty-state {
 }
 
 .broadcast-connection-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   font-size: 0.82rem;
   color: #bbb;
   border: 1px solid #3a3a3a;
   background: #191919;
   border-radius: 6px;
   padding: 9px 12px;
+}
+
+.broadcast-connection-status > span:first-child {
+  min-width: 0;
+  flex: 1;
+}
+
+.broadcast-server-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+  color: #bdbdbd;
+  font-size: 0.78rem;
+}
+
+.broadcast-server-select {
+  min-width: 132px;
+  padding: 5px 26px 5px 10px;
+  font-size: 0.78rem;
+  height: 30px;
 }
 
 .broadcast-connection-status[data-status="ready"] {
@@ -4500,6 +4546,16 @@ body.pip-window .empty-state {
   .broadcast-modal-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .broadcast-connection-status {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .broadcast-server-picker {
+    margin-left: 0;
+    justify-content: space-between;
   }
 
   .broadcast-modal-action-buttons,

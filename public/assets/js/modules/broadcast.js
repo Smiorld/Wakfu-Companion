@@ -1,5 +1,6 @@
-const BROADCAST_STORAGE_KEY = "wakfu_tribe_broadcast_state_v3";
-const BROADCAST_VIEW_STORAGE_KEY = "wakfu_tribe_broadcast_view_v1";
+const BROADCAST_STORAGE_KEY = "wakfu_tribe_broadcast_state_v4";
+const BROADCAST_VIEW_STORAGE_KEY = "wakfu_tribe_broadcast_view_v2";
+const BROADCAST_SERVER_KEY_STORAGE = "wakfu_tribe_current_server_v1";
 const BROADCAST_ENDPOINT_CACHE_KEY = "wakfu_tribe_broadcast_endpoint_v1";
 const BROADCAST_ENDPOINT_CACHE_TTL_MS = 5 * 60 * 1000;
 const BROADCAST_SERVICE_CANDIDATES = [
@@ -21,12 +22,19 @@ const BROADCAST_SERVICE_CANDIDATES = [
 const TRIBE_NOTICE_DURATION_MS = 30 * 60 * 1000;
 const BROADCAST_REFRESH_MS = 1000;
 const BROADCAST_MAX_RECORDS = 200;
+const KNOWN_BROADCAST_SERVERS = new Set(["ogrest", "rubilax", "pandora"]);
+const BROADCAST_SERVER_OPTIONS = [
+  { value: "ogrest", label: "Ogrest" },
+  { value: "rubilax", label: "Rubilax" },
+  { value: "pandora", label: "Pandora" },
+];
 
 let broadcastSocket = null;
 let broadcastPeerId = "";
 let broadcastRefreshTimer = null;
 let broadcastReconnectTimer = null;
 let broadcastFilterText = "";
+let currentBroadcastServerKey = loadBroadcastServerKey();
 let broadcastState = loadBroadcastState();
 let broadcastViewState = loadBroadcastViewState();
 let broadcastPreviewTribes = {};
@@ -37,12 +45,77 @@ let broadcastConnection = {
   peerCount: 0,
 };
 
+function normalizeBroadcastServerKey(serverKey) {
+  const normalized = String(serverKey || "").trim().toLowerCase();
+  if (KNOWN_BROADCAST_SERVERS.has(normalized)) return normalized;
+  return "unknown";
+}
+
+function loadBroadcastServerKey() {
+  try {
+    const stored = normalizeBroadcastServerKey(localStorage.getItem(BROADCAST_SERVER_KEY_STORAGE) || "");
+    return stored === "unknown" ? "ogrest" : stored;
+  } catch (error) {
+    return "ogrest";
+  }
+}
+
+function saveBroadcastServerKey() {
+  localStorage.setItem(BROADCAST_SERVER_KEY_STORAGE, currentBroadcastServerKey);
+}
+
+function getCurrentBroadcastServerKey() {
+  const normalized = normalizeBroadcastServerKey(currentBroadcastServerKey);
+  return normalized === "unknown" ? "ogrest" : normalized;
+}
+
+function createEmptyBroadcastServerState() {
+  return { tribes: {} };
+}
+
+function createEmptyBroadcastViewServerState() {
+  return { dismissed: {} };
+}
+
+function getBroadcastServerOptionsMarkup(selectedServerKey = getCurrentBroadcastServerKey()) {
+  const normalizedSelected = normalizeBroadcastServerKey(selectedServerKey);
+  return BROADCAST_SERVER_OPTIONS.map(
+    (option) =>
+      `<option value="${option.value}"${
+        option.value === normalizedSelected ? " selected" : ""
+      }>${option.label}</option>`
+  ).join("");
+}
+
+function syncBroadcastServerSelectors() {
+  const currentServerKey = getCurrentBroadcastServerKey();
+  document.querySelectorAll("[data-broadcast-server-select]").forEach((selector) => {
+    if (selector.value !== currentServerKey) {
+      selector.value = currentServerKey;
+    }
+  });
+}
+
+function notifyBroadcastServerChanged(serverKey) {
+  const normalized = normalizeBroadcastServerKey(serverKey);
+  syncBroadcastServerSelectors();
+  if (typeof window.updateBroadcastServerSelectionUI === "function") {
+    window.updateBroadcastServerSelectionUI(normalized);
+  }
+}
+
+function getBroadcastServerLabel(serverKey = getCurrentBroadcastServerKey()) {
+  const normalized = normalizeBroadcastServerKey(serverKey);
+  if (normalized === "unknown") return "未识别";
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
 function loadBroadcastState() {
   try {
     const parsed = JSON.parse(localStorage.getItem(BROADCAST_STORAGE_KEY) || "{}");
     return normalizeLedgerState(parsed);
   } catch (error) {
-    return { tribes: {} };
+    return { servers: {} };
   }
 }
 
@@ -53,14 +126,9 @@ function saveBroadcastState() {
 function loadBroadcastViewState() {
   try {
     const parsed = JSON.parse(localStorage.getItem(BROADCAST_VIEW_STORAGE_KEY) || "{}");
-    return {
-      dismissed:
-        parsed && typeof parsed.dismissed === "object" && !Array.isArray(parsed.dismissed)
-          ? parsed.dismissed
-          : {},
-    };
+    return normalizeBroadcastViewState(parsed);
   } catch (error) {
-    return { dismissed: {} };
+    return { servers: {} };
   }
 }
 
@@ -175,6 +243,43 @@ function getBroadcastElement(id) {
   return document.getElementById(id);
 }
 
+function getCurrentBroadcastServerState() {
+  const serverKey = getCurrentBroadcastServerKey();
+  if (!broadcastState.servers || typeof broadcastState.servers !== "object") {
+    broadcastState.servers = {};
+  }
+  if (!broadcastState.servers[serverKey]) {
+    broadcastState.servers[serverKey] = createEmptyBroadcastServerState();
+  }
+  return broadcastState.servers[serverKey];
+}
+
+function getCurrentBroadcastViewServerState() {
+  const serverKey = getCurrentBroadcastServerKey();
+  if (!broadcastViewState.servers || typeof broadcastViewState.servers !== "object") {
+    broadcastViewState.servers = {};
+  }
+  if (!broadcastViewState.servers[serverKey]) {
+    broadcastViewState.servers[serverKey] = createEmptyBroadcastViewServerState();
+  }
+  return broadcastViewState.servers[serverKey];
+}
+
+function resetBroadcastServerCache(serverKey) {
+  const normalizedServerKey = normalizeBroadcastServerKey(serverKey);
+  if (normalizedServerKey === "unknown") return;
+
+  if (!broadcastState.servers || typeof broadcastState.servers !== "object") {
+    broadcastState.servers = {};
+  }
+  if (!broadcastViewState.servers || typeof broadcastViewState.servers !== "object") {
+    broadcastViewState.servers = {};
+  }
+
+  broadcastState.servers[normalizedServerKey] = createEmptyBroadcastServerState();
+  broadcastViewState.servers[normalizedServerKey] = createEmptyBroadcastViewServerState();
+}
+
 function escapeBroadcastHtml(value) {
   return String(value == null ? "" : value)
     .replace(/&/g, "&amp;")
@@ -249,6 +354,9 @@ function normalizeLedgerRecord(record) {
 
   return {
     key,
+    serverKey: normalizeBroadcastServerKey(
+      record.serverKey || record.server || record.serverName || getCurrentBroadcastServerKey()
+    ),
     name,
     challengeId: String(record.challengeId || ""),
     activatedAt,
@@ -260,25 +368,89 @@ function normalizeLedgerRecord(record) {
 }
 
 function normalizeLedgerState(input) {
-  const next = { tribes: {} };
-  const source = input && typeof input.tribes === "object" && !Array.isArray(input.tribes) ? input.tribes : {};
+  const next = { servers: {} };
+  const sourceServers =
+    input && typeof input.servers === "object" && !Array.isArray(input.servers) ? input.servers : null;
 
-  Object.values(source).forEach((record) => {
-    const normalized = normalizeLedgerRecord(record);
+  if (sourceServers) {
+    Object.entries(sourceServers).forEach(([serverKey, serverState]) => {
+      const normalizedServerKey = normalizeBroadcastServerKey(serverKey);
+      const nextServerState = createEmptyBroadcastServerState();
+      const sourceTribes =
+        serverState && typeof serverState.tribes === "object" && !Array.isArray(serverState.tribes)
+          ? serverState.tribes
+          : {};
+
+      Object.values(sourceTribes).forEach((record) => {
+        const normalized = normalizeLedgerRecord({ ...record, serverKey: normalizedServerKey });
+        if (!normalized) return;
+        nextServerState.tribes[normalized.key] = normalized;
+      });
+
+      next.servers[normalizedServerKey] = nextServerState;
+    });
+    return next;
+  }
+
+  const legacySource =
+    input && typeof input.tribes === "object" && !Array.isArray(input.tribes) ? input.tribes : {};
+  const legacyServerKey = getCurrentBroadcastServerKey();
+  const legacyServerState = createEmptyBroadcastServerState();
+
+  Object.values(legacySource).forEach((record) => {
+    const normalized = normalizeLedgerRecord({ ...record, serverKey: legacyServerKey });
     if (!normalized) return;
-    next.tribes[normalized.key] = normalized;
+    legacyServerState.tribes[normalized.key] = normalized;
   });
 
+  if (Object.keys(legacyServerState.tribes).length) {
+    next.servers[legacyServerKey] = legacyServerState;
+  }
+  return next;
+}
+
+function normalizeBroadcastViewState(input) {
+  const next = { servers: {} };
+  const sourceServers =
+    input && typeof input.servers === "object" && !Array.isArray(input.servers) ? input.servers : null;
+
+  if (sourceServers) {
+    Object.entries(sourceServers).forEach(([serverKey, serverState]) => {
+      const normalizedServerKey = normalizeBroadcastServerKey(serverKey);
+      const dismissed =
+        serverState && typeof serverState.dismissed === "object" && !Array.isArray(serverState.dismissed)
+          ? serverState.dismissed
+          : {};
+      next.servers[normalizedServerKey] = {
+        dismissed,
+      };
+    });
+    return next;
+  }
+
+  const legacyDismissed =
+    input && typeof input.dismissed === "object" && !Array.isArray(input.dismissed) ? input.dismissed : {};
+  if (Object.keys(legacyDismissed).length) {
+    next.servers[getCurrentBroadcastServerKey()] = {
+      dismissed: legacyDismissed,
+    };
+  }
   return next;
 }
 
 function replaceBroadcastLedger(state, options = {}) {
   const { notify = false } = options;
-  const previousRecords = { ...(broadcastState.tribes || {}) };
-  const nextState = normalizeLedgerState(state);
-  const nextRecords = Object.values(nextState.tribes || {});
+  const serverKey = getCurrentBroadcastServerKey();
+  const previousRecords = { ...(getCurrentBroadcastServerState().tribes || {}) };
+  const normalizedInput =
+    state && typeof state.servers === "object"
+      ? normalizeLedgerState(state)
+      : { servers: { [serverKey]: normalizeLedgerState({ servers: { [serverKey]: state } }).servers[serverKey] } };
+  const nextServerState =
+    normalizedInput.servers?.[serverKey] || createEmptyBroadcastServerState();
+  const nextRecords = Object.values(nextServerState.tribes || {});
 
-  broadcastState = nextState;
+  broadcastState.servers[serverKey] = nextServerState;
   pruneBroadcastState();
   pruneBroadcastViewState();
   saveBroadcastState();
@@ -301,8 +473,9 @@ function replaceBroadcastLedger(state, options = {}) {
 }
 
 function pruneBroadcastState() {
+  const serverState = getCurrentBroadcastServerState();
   const nextTribes = {};
-  const records = Object.values(broadcastState.tribes || {})
+  const records = Object.values(serverState.tribes || {})
     .map(normalizeLedgerRecord)
     .filter(Boolean)
     .sort((left, right) => Number(right.updatedAt || 0) - Number(left.updatedAt || 0))
@@ -312,14 +485,16 @@ function pruneBroadcastState() {
     nextTribes[record.key] = record;
   });
 
-  broadcastState.tribes = nextTribes;
+  serverState.tribes = nextTribes;
 }
 
 function pruneBroadcastViewState() {
+  const serverState = getCurrentBroadcastServerState();
+  const viewServerState = getCurrentBroadcastViewServerState();
   const nextDismissed = {};
 
-  Object.entries(broadcastViewState.dismissed || {}).forEach(([key, dismissedAt]) => {
-    const record = broadcastState.tribes?.[key];
+  Object.entries(viewServerState.dismissed || {}).forEach(([key, dismissedAt]) => {
+    const record = serverState.tribes?.[key];
     if (!record) return;
     if (!canRestoreRecord(record) && !isLocallyDismissed(key)) return;
     if (canRestoreRecord(record)) {
@@ -327,7 +502,7 @@ function pruneBroadcastViewState() {
     }
   });
 
-  broadcastViewState.dismissed = nextDismissed;
+  viewServerState.dismissed = nextDismissed;
 }
 
 function pruneBroadcastPreviewState() {
@@ -348,8 +523,15 @@ function pruneBroadcastPreviewState() {
 function getBroadcastRecords() {
   pruneBroadcastState();
   pruneBroadcastPreviewState();
+  const serverState = getCurrentBroadcastServerState();
+  const currentServerKey = getCurrentBroadcastServerKey();
   const filterValue = broadcastFilterText.trim().toLowerCase();
-  return [...Object.values(broadcastState.tribes || {}), ...Object.values(broadcastPreviewTribes || {})]
+  return [
+    ...Object.values(serverState.tribes || {}),
+    ...Object.values(broadcastPreviewTribes || {}).filter(
+      (record) => normalizeBroadcastServerKey(record?.serverKey || "") === currentServerKey
+    ),
+  ]
     .filter((record) => {
       if (!filterValue) return true;
       return String(record.name || "").toLowerCase().includes(filterValue);
@@ -370,7 +552,7 @@ function isRecordEnded(record) {
 }
 
 function isLocallyDismissed(recordKey) {
-  return Number(broadcastViewState.dismissed?.[recordKey] || 0) > 0;
+  return Number(getCurrentBroadcastViewServerState().dismissed?.[recordKey] || 0) > 0;
 }
 
 function canRestoreRecord(record) {
@@ -468,8 +650,10 @@ function buildStartRecord(input) {
   if (!normalizedName) return null;
 
   const activatedAt = Number(input?.activatedAt || input?.detectedAt || Date.now());
+  const serverKey = normalizeBroadcastServerKey(input?.serverKey || getCurrentBroadcastServerKey());
   return {
     key: getTribeRecordKey(normalizedName),
+    serverKey,
     name: normalizedName,
     challengeId: String(input?.challengeId || ""),
     activatedAt,
@@ -484,12 +668,14 @@ function applyServerRecord(record, options = {}) {
   const { notify = false } = options;
   const normalized = normalizeLedgerRecord(record);
   if (!normalized) return false;
+  if (normalized.serverKey !== getCurrentBroadcastServerKey()) return false;
 
-  const existing = broadcastState.tribes[normalized.key];
+  const serverState = getCurrentBroadcastServerState();
+  const existing = serverState.tribes[normalized.key];
   const changed = JSON.stringify(existing || null) !== JSON.stringify(normalized);
   const shouldNotify = notify && shouldNotifyForActivatedRecord(existing, normalized);
 
-  broadcastState.tribes[normalized.key] = normalized;
+  serverState.tribes[normalized.key] = normalized;
   pruneBroadcastState();
   pruneBroadcastViewState();
   saveBroadcastState();
@@ -506,10 +692,10 @@ function applyServerRecord(record, options = {}) {
 }
 
 function dismissBroadcastTribe(recordKey) {
-  const record = broadcastState.tribes?.[recordKey];
+  const record = getCurrentBroadcastServerState().tribes?.[recordKey];
   if (!canRestoreRecord(record)) return false;
 
-  broadcastViewState.dismissed[recordKey] = Date.now();
+  getCurrentBroadcastViewServerState().dismissed[recordKey] = Date.now();
   saveBroadcastViewState();
   renderBroadcastStrip();
   renderBroadcastHistory();
@@ -517,9 +703,9 @@ function dismissBroadcastTribe(recordKey) {
 }
 
 function restoreBroadcastTribe(recordKey) {
-  const record = broadcastState.tribes?.[recordKey];
+  const record = getCurrentBroadcastServerState().tribes?.[recordKey];
   if (!canRestoreRecord(record)) return false;
-  delete broadcastViewState.dismissed[recordKey];
+  delete getCurrentBroadcastViewServerState().dismissed[recordKey];
   saveBroadcastViewState();
   renderBroadcastStrip();
   renderBroadcastHistory();
@@ -530,7 +716,7 @@ function resolveBroadcastTribeLocal(input) {
   const recordKey = getTribeRecordKey(input?.challengeName || input?.name || "");
   if (!recordKey) return false;
 
-  const record = broadcastState.tribes?.[recordKey];
+  const record = getCurrentBroadcastServerState().tribes?.[recordKey];
   if (!record) return false;
   const resolvedAt = Number(input?.resolvedAt || Date.now());
   if (resolvedAt < Number(record.activatedAt || 0)) return false;
@@ -549,7 +735,7 @@ function resolveBroadcastTribe(input) {
   const recordKey = getTribeRecordKey(input?.challengeName || input?.name || "");
   if (!recordKey) return false;
 
-  const record = broadcastState.tribes?.[recordKey];
+  const record = getCurrentBroadcastServerState().tribes?.[recordKey];
   if (!record) return false;
 
   const resolvedAt = Number(input?.resolvedAt || Date.now());
@@ -564,6 +750,7 @@ function resolveBroadcastTribe(input) {
 
   sendBroadcastMessage("tribe-end", {
     key: recordKey,
+    serverKey: record.serverKey || getCurrentBroadcastServerKey(),
     resolvedAt,
   });
   return true;
@@ -742,7 +929,7 @@ async function connectBroadcastNetwork() {
 
     broadcastSocket.addEventListener("open", () => {
       updateBroadcastConnection("loading", `已连接 ${broadcastServiceEndpoint.label}，正在同步...`);
-      sendBroadcastMessage("sync-request", {});
+      requestBroadcastSync();
     });
 
     broadcastSocket.addEventListener("message", (event) => {
@@ -751,6 +938,10 @@ async function connectBroadcastNetwork() {
 
       if (message.type === "welcome" || message.type === "sync") {
         broadcastPeerId = String(message.sessionId || broadcastPeerId || "");
+        if (message.serverKey) {
+          currentBroadcastServerKey = normalizeBroadcastServerKey(message.serverKey);
+          saveBroadcastServerKey();
+        }
         if (message.state) {
           replaceBroadcastLedger(message.state, { notify: true });
         }
@@ -814,6 +1005,34 @@ async function connectBroadcastNetwork() {
   }
 }
 
+function requestBroadcastSync() {
+  return sendBroadcastMessage("sync-request", {
+    serverKey: getCurrentBroadcastServerKey(),
+  });
+}
+
+function ensureBroadcastServerControls() {
+  const statusLine = getBroadcastElement("broadcast-connection-status");
+  if (!statusLine) return;
+
+  const hasServerPicker = statusLine.querySelector("[data-broadcast-server-select]");
+  if (!hasServerPicker) {
+    statusLine.innerHTML = `
+      <span id="broadcast-connection-text">部族通知网络：正在连接...</span>
+      <label class="broadcast-server-picker">
+        <span>服务器</span>
+        <select
+          id="broadcast-server-select"
+          class="translation-select broadcast-server-select"
+          data-broadcast-server-select="modal"
+          onchange="window.setBroadcastServerKey(this.value, { source: 'manual' })">${getBroadcastServerOptionsMarkup()}</select>
+      </label>
+    `;
+  }
+
+  syncBroadcastServerSelectors();
+}
+
 function updateBroadcastFilter(value) {
   broadcastFilterText = String(value || "").trim();
   renderBroadcastHistory();
@@ -823,7 +1042,7 @@ function registerTribeChallengeDetection(input) {
   const record = buildStartRecord(input);
   if (!record) return false;
 
-  const existing = broadcastState.tribes?.[record.key];
+  const existing = getCurrentBroadcastServerState().tribes?.[record.key];
   if (existing && recordsShareBroadcastWindow(existing, record) && !isRecordEnded(existing)) {
     return false;
   }
@@ -892,8 +1111,8 @@ function sendNetworkBroadcastTest(input = {}) {
 }
 
 function clearBroadcastNotices() {
-  broadcastState.tribes = {};
-  broadcastViewState.dismissed = {};
+  getCurrentBroadcastServerState().tribes = {};
+  getCurrentBroadcastViewServerState().dismissed = {};
   saveBroadcastState();
   saveBroadcastViewState();
   renderBroadcastStrip();
@@ -925,8 +1144,42 @@ function initBroadcastRefreshTimer() {
   }, BROADCAST_REFRESH_MS);
 }
 
+function renderBroadcastHistory() {
+  const statusLine = getBroadcastElement("broadcast-connection-status");
+  const statusText = getBroadcastElement("broadcast-connection-text");
+  const statusServerSelect = getBroadcastElement("broadcast-server-select");
+  const filterInput = getBroadcastElement("broadcast-filter-input");
+  const activeList = getBroadcastElement("broadcast-active-list");
+  const historyList = getBroadcastElement("broadcast-history-list");
+
+  if (statusLine) {
+    statusLine.dataset.status = broadcastConnection.status;
+  }
+
+  if (statusText) {
+    statusText.textContent = `部族通知网络：${broadcastConnection.message} · ${Math.max(
+      1,
+      Number(broadcastConnection.peerCount || 0)
+    )} 人在线`;
+  }
+
+  if (statusServerSelect && statusServerSelect.value !== getCurrentBroadcastServerKey()) {
+    statusServerSelect.value = getCurrentBroadcastServerKey();
+  }
+
+  if (filterInput && filterInput.value !== broadcastFilterText) {
+    filterInput.value = broadcastFilterText;
+  }
+
+  renderBroadcastList(activeList, getActiveBroadcastRecords(), "当前没有激活的部族通知。", true);
+  renderBroadcastList(historyList, getInactiveBroadcastRecords(), "暂无历史记录。", false);
+}
+
 function initBroadcastSystem() {
   ensureBroadcastModalStructure();
+  ensureBroadcastServerControls();
+  saveBroadcastServerKey();
+  notifyBroadcastServerChanged(getCurrentBroadcastServerKey());
   pruneBroadcastState();
   pruneBroadcastViewState();
   saveBroadcastState();
@@ -949,3 +1202,29 @@ window.showLocalFakeTribeNotice = showLocalFakeTribeNotice;
 window.sendNetworkBroadcastTest = sendNetworkBroadcastTest;
 window.dismissBroadcastTribe = dismissBroadcastTribe;
 window.restoreBroadcastTribe = restoreBroadcastTribe;
+window.getCurrentBroadcastServerKey = getCurrentBroadcastServerKey;
+window.setBroadcastServerKey = function setBroadcastServerKey(serverKey, options = {}) {
+  const { source = "auto" } = options;
+  const nextServerKey = normalizeBroadcastServerKey(serverKey);
+  if (nextServerKey === "unknown") return false;
+  if (nextServerKey === currentBroadcastServerKey) {
+    if (source === "manual") {
+      notifyBroadcastServerChanged(nextServerKey);
+      requestBroadcastSync();
+    }
+    return false;
+  }
+  currentBroadcastServerKey = nextServerKey;
+  broadcastConnection.peerCount = 0;
+  resetBroadcastServerCache(nextServerKey);
+  saveBroadcastServerKey();
+  pruneBroadcastState();
+  pruneBroadcastViewState();
+  saveBroadcastState();
+  saveBroadcastViewState();
+  renderBroadcastStrip();
+  renderBroadcastHistory();
+  notifyBroadcastServerChanged(nextServerKey);
+  requestBroadcastSync();
+  return true;
+};

@@ -985,6 +985,7 @@ let permissionStrikeCount = 0; // Counter for transient errors
 let chatPermissionStrikeCount = 0;
 
 const LOOT_KEYWORDS = ["picked up", "ramassé", "obtenu", "recogido", "obtenido", "apanhou", "obteve", "你得到了", "你失去了", "配方完成", "回收"];
+const GAME_SERVER_PROXY_PATTERN = /Connexion au proxy :wakfu-([a-z0-9-]+)\.ankama-games\.com:5556/i;
 
 async function parseFile() {
   const now = Date.now();
@@ -1186,6 +1187,15 @@ function processAreaChallengeResolutionLine(line) {
   }
 }
 
+function processGameServerLine(line) {
+  const match = String(line || "").match(GAME_SERVER_PROXY_PATTERN);
+  if (!match) return;
+
+  if (typeof window.setBroadcastServerKey === "function") {
+    window.setBroadcastServerKey(match[1], { source: "auto" });
+  }
+}
+
 function processLine(line) {
   if (!line || line.trim() === "") return;
 
@@ -1198,6 +1208,7 @@ function processLine(line) {
     processSessionLog(line);
   }
 
+  processGameServerLine(line);
   processAreaChallengeLine(line);
   processAreaChallengeResolutionLine(line);
 
