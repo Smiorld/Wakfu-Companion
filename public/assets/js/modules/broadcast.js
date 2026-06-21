@@ -109,6 +109,18 @@ function formatRemainingDuration(expiresAt) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+function formatElapsedDuration(timestamp) {
+  const elapsedMs = Math.max(0, Date.now() - Number(timestamp || 0));
+  const totalSeconds = Math.floor(elapsedMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) return `${hours}小时${minutes}分钟`;
+  if (minutes > 0) return `${minutes}分${seconds}秒`;
+  return `${seconds}秒`;
+}
+
 function normalizeLedgerRecord(record) {
   if (!record) return null;
   const name = normalizeTribeName(record.name || record.challengeName || "");
@@ -472,11 +484,11 @@ function renderBroadcastStrip() {
       <span class="broadcast-pill-type">部族</span>
       <span class="broadcast-pill-text">${escapeBroadcastHtml(stripName)}</span>
       <span class="broadcast-pill-countdown">${escapeBroadcastHtml(
-        formatRemainingDuration(latestRecord.expiresAt)
+        `+${formatElapsedDuration(latestRecord.activatedAt)}`
       )}</span>
     </button>
   `;
-  strip.title = `${latestRecord.name}\n首次记录：${formatBroadcastTime(latestRecord.activatedAt)}`;
+  strip.title = `${latestRecord.name}\n本轮开始于：${formatBroadcastTime(latestRecord.activatedAt)}`;
 }
 
 function buildInactiveRecordNote(record) {
@@ -497,12 +509,12 @@ function renderBroadcastList(target, records, emptyText, activeMode = false) {
   target.innerHTML = records
     .map((record) => {
       const timeLabel = activeMode
-        ? `剩余 ${formatRemainingDuration(record.expiresAt)}`
+        ? `已持续 +${formatElapsedDuration(record.activatedAt)}`
         : isRecordEnded(record)
           ? `距今 ${formatDurationFromNow(record.endedAt || record.updatedAt)}`
-          : `距今 ${formatDurationFromNow(record.activatedAt)}`;
+          : `距上次记录 ${formatDurationFromNow(record.activatedAt)}`;
       const footer = activeMode
-        ? `首次记录：${formatBroadcastTime(record.activatedAt)}`
+        ? `本轮开始于：${formatBroadcastTime(record.activatedAt)}`
         : buildInactiveRecordNote(record);
       const canRestore = !activeMode && !record.__preview && canRestoreRecord(record) && isLocallyDismissed(record.key);
 
