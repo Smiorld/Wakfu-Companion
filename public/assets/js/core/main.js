@@ -57,7 +57,7 @@ function getServerSelectionOptionsMarkup(selectedServerKey) {
 }
 
 function ensureBroadcastServerSelectionUI() {
-  const createPicker = (container, id, selectId, anchor) => {
+  const createPicker = (container, id, selectId, anchor, placement = "after") => {
     if (!container) return null;
 
     let wrapper = document.getElementById(id);
@@ -73,7 +73,9 @@ function ensureBroadcastServerSelectionUI() {
           data-broadcast-server-select="${id}">${getServerSelectionOptionsMarkup()}</select>
       `;
 
-      if (anchor?.parentNode) {
+      if (placement === "append" && anchor) {
+        anchor.appendChild(wrapper);
+      } else if (anchor?.parentNode) {
         anchor.parentNode.insertBefore(wrapper, anchor.nextSibling);
       } else {
         container.appendChild(wrapper);
@@ -92,10 +94,16 @@ function ensureBroadcastServerSelectionUI() {
     return wrapper;
   };
 
-  const dropAnchor = dropZone?.querySelector(".path-container");
+  const dropAnchor = dropZone?.querySelector("#drop-zone-server-slot");
   const reconnectAnchor = reconnectContainer?.querySelector(".prev-filename");
   return {
-    drop: createPicker(dropZone, "drop-zone-server-picker", "drop-zone-server-select", dropAnchor),
+    drop: createPicker(
+      dropZone,
+      "drop-zone-server-picker",
+      "drop-zone-server-select",
+      dropAnchor,
+      "append"
+    ),
     reconnect: createPicker(
       reconnectContainer,
       "reconnect-server-picker",
@@ -121,16 +129,13 @@ function getOrCreateDropStatusLine() {
   let statusEl = document.getElementById("drop-zone-file-status");
   if (statusEl) return statusEl;
 
-  statusEl = document.createElement("p");
+  statusEl = document.createElement("div");
   statusEl.id = "drop-zone-file-status";
-  statusEl.style.marginTop = "10px";
-  statusEl.style.color = "#8fdcff";
-  statusEl.style.fontSize = "0.9rem";
-  statusEl.style.lineHeight = "1.6";
+  statusEl.className = "setup-log-status";
 
-  const pathContainer = dropZone.querySelector(".path-container");
-  if (pathContainer?.parentNode) {
-    pathContainer.parentNode.insertBefore(statusEl, pathContainer.nextSibling);
+  const dropNote = document.getElementById("setup-step-drop-note");
+  if (dropNote?.parentNode) {
+    dropNote.parentNode.insertBefore(statusEl, dropNote.nextSibling);
   } else {
     dropZone.appendChild(statusEl);
   }
@@ -145,22 +150,136 @@ function resetPendingDropHandles() {
   };
 }
 
+function ingestSelectedLogHandles(handles) {
+  let recognizedCount = 0;
+
+  handles.forEach((handle) => {
+    const fileName = String(handle?.name || "").toLowerCase();
+    if (fileName === "wakfu.log") {
+      pendingDroppedHandles.mainLogHandle = handle;
+      recognizedCount += 1;
+    } else if (fileName === "wakfu_chat.log") {
+      pendingDroppedHandles.chatLogHandle = handle;
+      recognizedCount += 1;
+    }
+  });
+
+  return recognizedCount;
+}
+
+async function tryStartTrackingFromPendingHandles() {
+  renderPendingDropStatus();
+
+  if (!pendingDroppedHandles.mainLogHandle || !pendingDroppedHandles.chatLogHandle) {
+    return false;
+  }
+
+  window.isRestoredSession = false;
+  fileHandle = pendingDroppedHandles.mainLogHandle;
+  chatFileHandle = pendingDroppedHandles.chatLogHandle;
+  await startTracking(fileHandle, chatFileHandle);
+  return true;
+}
+
 function renderPendingDropStatus() {
   const statusEl = getOrCreateDropStatusLine();
   if (!statusEl) return;
 
   const mainReady = Boolean(pendingDroppedHandles.mainLogHandle);
   const chatReady = Boolean(pendingDroppedHandles.chatLogHandle);
+  const chips = [
+    {
+      label: "\u4e3b\u65e5\u5fd7 `wakfu.log`",
+      ready: mainReady,
+    },
+    {
+      label: "\u804a\u5929\u65e5\u5fd7 `wakfu_chat.log`",
+      ready: chatReady,
+    },
+  ];
 
-  if (!mainReady && !chatReady) {
-    statusEl.textContent =
-      "\u652f\u6301\u5206\u4e24\u6b21\u62d6\u5165\uff1a\u53ef\u4ee5\u5148\u62d6\u4e3b\u65e5\u5fd7 wakfu\uff08\u6216 wakfu.log\uff09\uff0c\u518d\u62d6\u804a\u5929\u65e5\u5fd7 wakfu_chat\uff08\u6216 wakfu_chat.log\uff09\u3002";
+  statusEl.innerHTML = chips
+    .map(
+      (chip) => `
+        <div class="setup-log-chip ${chip.ready ? "is-ready" : "is-missing"}">
+          <span class="setup-log-chip-icon">${chip.ready ? "\u2713" : "\u2715"}</span>
+          <span class="setup-log-chip-label">${chip.label}</span>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function buildSetupPanelLayout() {
+  if (!dropZone) return;
+
+  const footerBlock = dropZone.querySelector("div[style*='border-top: 1px solid #333']");
+  const serverHeading = dropZone.querySelector("h3");
+  const directParagraphs = Array.from(dropZone.children).filter(
+    (element) => element.tagName === "P"
+  );
+  const pathCaption = directParagraphs[0] || null;
+  const fileNameNote = directParagraphs[1] || null;
+  const pathContainer = dropZone.querySelector(".path-container");
+
+  if (!footerBlock || !serverHeading || !pathCaption || !fileNameNote || !pathContainer) {
     return;
   }
 
-  statusEl.textContent =
-    `\u5df2\u9009\uff1a \u4e3b\u65e5\u5fd7 wakfu ${mainReady ? "\u2713" : "\u2026"}  |  ` +
-    `\u804a\u5929\u65e5\u5fd7 wakfu_chat ${chatReady ? "\u2713" : "\u2026"}`;
+  let steps = document.getElementById("setup-steps");
+  if (!steps) {
+    steps = document.createElement("div");
+    steps.id = "setup-steps";
+    steps.className = "setup-steps";
+    dropZone.insertBefore(steps, footerBlock);
+  }
+
+  const ensureStep = (id) => {
+    let step = document.getElementById(id);
+    if (!step) {
+      step = document.createElement("div");
+      step.id = id;
+      step.className = "setup-step";
+    }
+    return step;
+  };
+
+  const serverStep = ensureStep("setup-step-server");
+  const pathStep = ensureStep("setup-step-path");
+  const dropStep = ensureStep("setup-step-drop");
+
+  let serverSlot = document.getElementById("drop-zone-server-slot");
+  if (!serverSlot) {
+    serverSlot = document.createElement("div");
+    serverSlot.id = "drop-zone-server-slot";
+    serverSlot.className = "setup-server-slot";
+  }
+
+  let pathTitle = document.getElementById("setup-step-path-title");
+  if (!pathTitle) {
+    pathTitle = document.createElement("div");
+    pathTitle.id = "setup-step-path-title";
+    pathTitle.className = "setup-step-title";
+  }
+
+  let dropTitle = document.getElementById("setup-step-drop-title");
+  if (!dropTitle) {
+    dropTitle = document.createElement("div");
+    dropTitle.id = "setup-step-drop-title";
+    dropTitle.className = "setup-step-title";
+  }
+
+  serverHeading.id = "setup-step-server-title";
+  serverHeading.className = "setup-step-title";
+  pathCaption.id = "setup-path-caption";
+  pathCaption.className = "setup-step-note";
+  fileNameNote.id = "setup-step-drop-note";
+  fileNameNote.className = "setup-step-note";
+
+  serverStep.replaceChildren(serverHeading, serverSlot);
+  pathStep.replaceChildren(pathTitle, pathCaption, pathContainer);
+  dropStep.replaceChildren(dropTitle, fileNameNote, getOrCreateDropStatusLine());
+  steps.replaceChildren(serverStep, pathStep, dropStep);
 }
 
 function initializeDualFilePromptUI() {
@@ -168,20 +287,25 @@ function initializeDualFilePromptUI() {
     document.title = "\u6c83\u571f\u4f34\u4fa3 | T2\u85af\u6761";
   }
 
-  const dropTitle = dropZone?.querySelector("h3");
-  if (dropTitle) {
-    dropTitle.textContent =
-      "\u628a `wakfu` \u548c `wakfu_chat` \u8fd9\u4e24\u4e2a\u65e5\u5fd7\u6587\u4ef6\u62d6\u5230\u8fd9\u91cc";
-  }
+  buildSetupPanelLayout();
 
-  const dropParagraphs = dropZone?.querySelectorAll("p");
-  if (dropParagraphs?.[0]) {
-    dropParagraphs[0].textContent =
-      "\u9ed8\u8ba4\u8def\u5f84\uff08\u53ef\u590d\u5236\u5230\u8d44\u6e90\u7ba1\u7406\u5668\uff09\uff1a";
+  const serverTitle = document.getElementById("setup-step-server-title");
+  const pathTitle = document.getElementById("setup-step-path-title");
+  const pathCaption = document.getElementById("setup-path-caption");
+  const dropTitle = document.getElementById("setup-step-drop-title");
+  const dropNote = document.getElementById("setup-step-drop-note");
+
+  if (serverTitle) serverTitle.textContent = "1、选择服务器：";
+  if (pathTitle) pathTitle.textContent = "2、打开日志目录，导入日志。";
+  if (pathCaption) {
+    pathCaption.textContent =
+      "打开资源管理器或“我的电脑”，把下面这个地址粘贴到地址栏后按回车。";
   }
-  if (dropParagraphs?.[1]) {
-    dropParagraphs[1].textContent =
-      "\u53ef\u4ee5\u4e00\u6b21\u62d6\u4e24\u4e2a\uff0c\u4e5f\u53ef\u4ee5\u5206\u4e24\u6b21\u62d6\u5165\u3002\u82e5\u7cfb\u7edf\u663e\u793a\u6269\u5c55\u540d\uff0c\u6587\u4ef6\u901a\u5e38\u53eb `wakfu.log` \u548c `wakfu_chat.log`\uff1b\u82e5\u7cfb\u7edf\u9690\u85cf\u6269\u5c55\u540d\uff0c\u53ef\u80fd\u53ea\u4f1a\u770b\u5230 `wakfu` \u548c `wakfu_chat`\u3002";
+  if (dropTitle) {
+    dropTitle.textContent = "3、把 `wakfu.log` 和 `wakfu_chat.log` 拖进来。";
+  }
+  if (dropNote) {
+    dropNote.textContent = "也可能叫 `wakfu` 和 `wakfu_chat`。";
   }
 
   if (copyPathBtn) copyPathBtn.textContent = "\u590d\u5236";
@@ -345,18 +469,7 @@ dropZone.addEventListener("drop", async (event) => {
 
   try {
     const handles = await Promise.all(items.map((item) => item.getAsFileSystemHandle()));
-    let recognizedCount = 0;
-
-    handles.forEach((handle) => {
-      const fileName = String(handle.name || "").toLowerCase();
-      if (fileName === "wakfu.log") {
-        pendingDroppedHandles.mainLogHandle = handle;
-        recognizedCount += 1;
-      } else if (fileName === "wakfu_chat.log") {
-        pendingDroppedHandles.chatLogHandle = handle;
-        recognizedCount += 1;
-      }
-    });
+    const recognizedCount = ingestSelectedLogHandles(handles);
 
     if (!recognizedCount) {
       alert(
@@ -365,16 +478,7 @@ dropZone.addEventListener("drop", async (event) => {
       return;
     }
 
-    renderPendingDropStatus();
-
-    if (!pendingDroppedHandles.mainLogHandle || !pendingDroppedHandles.chatLogHandle) {
-      return;
-    }
-
-    window.isRestoredSession = false;
-    fileHandle = pendingDroppedHandles.mainLogHandle;
-    chatFileHandle = pendingDroppedHandles.chatLogHandle;
-    await startTracking(fileHandle, chatFileHandle);
+    await tryStartTrackingFromPendingHandles();
   } catch (error) {
     console.error(error);
     alert("\u8bfb\u53d6\u6587\u4ef6\u5931\u8d25\uff0c\u8bf7\u91cd\u8bd5\u3002");
