@@ -3588,6 +3588,11 @@ body.pip-window .empty-state {
   transform: translateY(-1px);
 }
 
+.oopz-link-fab {
+  left: 108px;
+  text-transform: none;
+}
+
 #dungeon-sidebar .sidebar-content {
   display: flex;
   flex-direction: column;
