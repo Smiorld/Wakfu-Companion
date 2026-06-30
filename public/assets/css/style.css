@@ -1341,6 +1341,7 @@ button.aux-btn:hover {
 #chat-list {
   overflow-y: auto;
   flex-grow: 1;
+  min-height: 0;
   padding: 10px;
   display: flex;
   flex-direction: column;
@@ -1355,6 +1356,14 @@ button.aux-btn:hover {
   gap: 4px;
   flex-wrap: wrap;
   justify-content: space-between;
+}
+
+#chat-scroll-btn {
+  transition: bottom 0.32s ease;
+}
+
+#chat-panel.quick-trans-open #chat-scroll-btn {
+  bottom: 172px;
 }
 
 /* Gold for Kamas */
@@ -3597,6 +3606,151 @@ body.pip-window .empty-state {
   text-transform: none;
 }
 
+.onboarding-help-fab {
+  position: fixed;
+  right: 18px;
+  bottom: 8px;
+  z-index: 1100;
+  border: 1px solid rgba(0, 210, 255, 0.52);
+  background: linear-gradient(180deg, rgba(0, 210, 255, 0.95), rgba(0, 156, 190, 0.95));
+  color: #041218;
+  font-size: 0.84rem;
+  font-weight: 800;
+  padding: 8px 15px;
+  border-radius: 999px;
+  cursor: pointer;
+  user-select: none;
+  touch-action: none;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35), 0 0 18px rgba(0, 210, 255, 0.28);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.onboarding-help-fab:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.42), 0 0 22px rgba(0, 210, 255, 0.34);
+}
+
+.onboarding-help-fab.is-draggable {
+  cursor: grab;
+}
+
+.onboarding-help-fab.is-dragging {
+  cursor: grabbing;
+  transition: none;
+  filter: brightness(1.04);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.5), 0 0 28px rgba(0, 210, 255, 0.4);
+}
+
+#footer-tool-buttons {
+  display: inline-flex;
+  align-items: center;
+}
+
+.driver-active-element {
+  border-radius: 8px;
+  box-shadow: 0 0 0 2px rgba(0, 210, 255, 0.9), 0 0 18px rgba(0, 210, 255, 0.3);
+}
+
+.driver-popover.wakfu-onboarding-popover {
+  background: linear-gradient(180deg, rgba(34, 34, 34, 0.98), rgba(22, 22, 22, 0.98));
+  color: var(--text-color);
+  border: 1px solid rgba(0, 210, 255, 0.36);
+  border-radius: 10px;
+  min-width: 280px;
+  max-width: 340px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.58), 0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+}
+
+.driver-popover.wakfu-onboarding-popover * {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.driver-popover.wakfu-onboarding-popover .driver-popover-title {
+  color: var(--accent);
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.driver-popover.wakfu-onboarding-popover .driver-popover-description {
+  color: #d2d9dc;
+  font-size: 0.88rem;
+  line-height: 1.65;
+}
+
+.driver-popover.wakfu-onboarding-popover .driver-popover-close-btn {
+  color: #8aa3ad;
+}
+
+.driver-popover.wakfu-onboarding-popover .driver-popover-close-btn:hover,
+.driver-popover.wakfu-onboarding-popover .driver-popover-close-btn:focus {
+  color: #fff;
+}
+
+.driver-popover.wakfu-onboarding-popover .driver-popover-footer {
+  margin-top: 16px;
+  gap: 10px;
+}
+
+.driver-popover.wakfu-onboarding-popover .driver-popover-progress-text {
+  color: #86bdcb;
+  font-size: 0.78rem;
+}
+
+.driver-popover.wakfu-onboarding-popover .driver-popover-footer-btn {
+  border: 1px solid #3c4f55;
+  border-radius: 5px;
+  background: #252525;
+  color: #d6eef4;
+  padding: 6px 11px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.driver-popover.wakfu-onboarding-popover .driver-popover-footer-btn:hover,
+.driver-popover.wakfu-onboarding-popover .driver-popover-footer-btn:focus {
+  background: #2d3940;
+  border-color: rgba(0, 210, 255, 0.5);
+  color: #fff;
+}
+
+.driver-popover.wakfu-onboarding-popover .driver-popover-next-btn,
+.driver-popover.wakfu-onboarding-popover .driver-popover-done-btn {
+  background: var(--accent);
+  border-color: rgba(0, 210, 255, 0.75);
+  color: #031118;
+}
+
+.driver-popover.wakfu-onboarding-popover .driver-popover-next-btn:hover,
+.driver-popover.wakfu-onboarding-popover .driver-popover-next-btn:focus,
+.driver-popover.wakfu-onboarding-popover .driver-popover-done-btn:hover,
+.driver-popover.wakfu-onboarding-popover .driver-popover-done-btn:focus {
+  background: #7fe7ff;
+  color: #000;
+}
+
+.driver-popover.wakfu-onboarding-popover .driver-popover-arrow {
+  border-width: 6px;
+}
+
+.driver-popover.wakfu-onboarding-popover.driver-popover-side-left .driver-popover-arrow {
+  border-left-color: rgba(22, 22, 22, 0.98);
+}
+
+.driver-popover.wakfu-onboarding-popover.driver-popover-side-right .driver-popover-arrow {
+  border-right-color: rgba(22, 22, 22, 0.98);
+}
+
+.driver-popover.wakfu-onboarding-popover.driver-popover-side-top .driver-popover-arrow {
+  border-top-color: rgba(22, 22, 22, 0.98);
+}
+
+.driver-popover.wakfu-onboarding-popover.driver-popover-side-bottom .driver-popover-arrow {
+  border-bottom-color: rgba(22, 22, 22, 0.98);
+}
+
 #dungeon-sidebar .sidebar-content {
   display: flex;
   flex-direction: column;
@@ -3759,18 +3913,77 @@ body.pip-window .empty-state {
 }
 
 /* --- Quick Translator Modal --- */
+.quick-trans-inline {
+  flex: 0 0 auto;
+  max-height: 0;
+  opacity: 0;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  background: linear-gradient(180deg, rgba(24, 24, 24, 0.96), rgba(19, 19, 19, 0.98));
+  border-top: 1px solid transparent;
+  transition: max-height 0.32s ease, opacity 0.22s ease, border-color 0.22s ease;
+}
+
+.quick-trans-inline-inner {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transform: translateY(12px);
+  transition: transform 0.32s ease;
+}
+
+.quick-trans-inline-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quick-trans-input-row {
+  align-items: stretch;
+}
+
+.quick-trans-char-count {
+  flex: 0 0 auto;
+  align-self: center;
+  color: #8e8e8e;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+#chat-panel.quick-trans-open .quick-trans-inline {
+  max-height: 172px;
+  opacity: 1;
+  border-top-color: #333;
+}
+
+#chat-panel.quick-trans-open .quick-trans-inline-inner {
+  transform: translateY(0);
+}
+
+#quick-trans-btn.is-active {
+  background: var(--accent);
+  color: #000;
+  border-color: var(--accent);
+  box-shadow: 0 0 14px rgba(0, 210, 255, 0.35);
+}
+
 .qt-textarea {
   width: 100%;
-  height: 80px;
+  height: 40px;
   background: #151515;
   border: 1px solid #444;
   color: #eee;
-  padding: 10px;
+  padding: 8px 10px;
   border-radius: 4px;
   resize: none;
   font-family: inherit;
-  font-size: 0.95rem;
-  margin-top: 5px;
+  font-size: 0.88rem;
+  margin-top: 0;
+  line-height: 1.35;
+  overflow: hidden;
+  flex: 1 1 auto;
 }
 .qt-textarea:focus {
   outline: none;
@@ -3782,31 +3995,47 @@ body.pip-window .empty-state {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 15px 0;
+  margin: 0;
   background: #252525;
-  padding: 10px 15px;
+  padding: 6px 8px;
   border-radius: 4px;
   border: 1px solid #333;
+  min-height: 38px;
+}
+
+.quick-trans-target-label {
+  font-size: 0.68rem;
+  color: #888;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 .qt-lang-group {
   display: flex;
-  gap: 8px;
+  gap: 5px;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .qt-lang-btn {
   background: #333;
   border: 1px solid #555;
   color: #ccc;
-  padding: 6px 12px;
+  padding: 0 8px;
   border-radius: 4px;
   cursor: pointer;
   font-weight: bold;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   transition: all 0.2s;
   display: flex;
   align-items: center;
-  gap: 5px;
+  justify-content: center;
+  min-width: 34px;
+  height: 26px;
 }
 .qt-lang-btn:hover {
   background: #444;
@@ -3824,20 +4053,24 @@ body.pip-window .empty-state {
   background: #121212;
   border: 1px solid #444;
   border-radius: 4px;
-  min-height: 60px;
+  min-height: 44px;
+  height: 44px;
   display: flex;
-  margin-top: 5px;
   overflow: hidden;
 }
 
 .qt-output {
-  padding: 12px;
-  font-size: 1rem;
+  padding: 8px 10px;
+  font-size: 0.88rem;
   color: var(--accent);
   width: 100%;
   word-break: break-word;
   font-style: italic;
   align-self: center;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .qt-copy-btn {
@@ -3846,8 +4079,8 @@ body.pip-window .empty-state {
   border-left: 1px solid #333;
   color: #888;
   cursor: pointer;
-  width: 50px;
-  font-size: 1.2rem;
+  width: 38px;
+  font-size: 0.98rem;
   transition: all 0.2s;
   flex-shrink: 0;
 }
@@ -4182,13 +4415,21 @@ body.pip-window .empty-state {
 }
 
 /* --- Chat Header Strip (reserved for future broadcast pills) --- */
+.chat-broadcast-strip-anchor {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .chat-header-strip {
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  flex-grow: 1;
+  flex: 1 1 auto;
+  width: 100%;
   margin-left: 20px;
   margin-right: 15px;
   min-height: 32px;

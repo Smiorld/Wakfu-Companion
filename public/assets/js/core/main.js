@@ -531,6 +531,10 @@ async function startTracking(mainLogHandle, nextChatHandle) {
   if (typeof window.enableBroadcastNetwork === "function") {
     window.enableBroadcastNetwork("logs-imported");
   }
+
+  if (typeof window.onboardingAfterLogsImported === "function") {
+    window.onboardingAfterLogsImported();
+  }
 }
 
 function startMaintenanceRoutine() {

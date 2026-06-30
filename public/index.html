@@ -4,7 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>沃土伴侣 | T2薯条</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=20260630c" />
+    <link rel="stylesheet" href="assets/vendor/driverjs/driver.css?v=20260630a" />
+    <link rel="stylesheet" href="assets/css/style.css?v=20260630e" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
   </head>
   <body>
@@ -53,7 +54,7 @@
       <!-- 3-Column Layout -->
       <div class="panels-container">
         <!-- 1. Combat Meter (Damage, Healing & Armor) -->
-        <div class="tool-panel">
+        <div class="tool-panel" id="combat-panel">
           <div class="panel-header tab-header">
             <div class="meter-tab active" id="tab-damage" onclick="switchMeterMode('damage')">
               <img src="./assets/img/headers/damage.png" class="tab-icon" onerror="this.style.display='none'" />
@@ -68,7 +69,7 @@
               护甲
             </div>
             <!-- PiP Button -->
-            <button class="pip-btn" onclick="togglePiP('meter-split-container', '战斗统计')" title="画中画">⧉</button>
+            <button class="pip-btn" id="combat-pip-btn" onclick="togglePiP('meter-split-container', '战斗统计')" title="画中画">⧉</button>
           </div>
 
           <!-- Controls Area -->
@@ -141,7 +142,7 @@
         </div>
 
         <!-- 2. Item Tracker -->
-        <div class="tool-panel">
+        <div class="tool-panel" id="tracker-panel">
           <div class="panel-header tracker-header">
             <div class="tracker-title-group">
               <img src="./assets/img/headers/item_tracker.png" class="header-label-icon" onerror="this.style.display='none'" />
@@ -175,7 +176,7 @@
               <button class="filter-icon-btn" id="tracker-loss-toggle" onclick="toggleTrackerLossMode()" title="&#22833;&#21435;&#29289;&#21697;&#26102;&#25187;&#20943;&#36827;&#24230;&#65306;&#20851;&#38381;">&#20943;</button>
               <button class="pip-btn" id="btn-toggle-totals" onclick="toggleTrackerTotals()" title="显示或隐藏卡玛总计" style="margin-right: 5px; font-weight: bold; color: #ffd700">₭</button>
               <button class="pip-btn" id="tracker-view-toggle" onclick="toggleTrackerView()" title="切换网格或列表视图" style="margin-right: 5px">☰</button>
-              <button class="pip-btn" onclick="togglePiP('tracker-list', '追踪器')" title="画中画">⧉</button>
+              <button class="pip-btn" id="tracker-pip-btn" onclick="togglePiP('tracker-list', '追踪器')" title="画中画">⧉</button>
             </div>
           </div>
           <div class="tracker-controls">
@@ -204,12 +205,14 @@
         </div>
 
         <!-- 3. Chat Translator -->
-        <div class="tool-panel">
+        <div class="tool-panel" id="chat-panel">
           <div class="panel-header chat-panel-header">
             <img src="./assets/img/headers/chat.png" class="header-label-icon" onerror="this.style.display='none'" />
             <span class="header-label">聊天与翻译</span>
 
-            <div id="chat-broadcast-strip" class="chat-header-strip"></div>
+            <div id="chat-broadcast-strip-anchor" class="chat-broadcast-strip-anchor">
+              <div id="chat-broadcast-strip" class="chat-header-strip"></div>
+            </div>
 
             <button
               id="clearChatBtn"
@@ -224,9 +227,9 @@
               ">
               清空
             </button>
-            <button class="pip-btn" onclick="openQuickTransModal()" title="&#24555;&#36895;&#32842;&#22825;&#32763;&#35793;&#22120;" style="margin-right: 5px; font-size: 1.1rem">🌐</button>
+            <button class="pip-btn" id="quick-trans-btn" onclick="openQuickTransModal()" title="&#24555;&#36895;&#32842;&#22825;&#32763;&#35793;&#22120;" style="margin-right: 5px; font-size: 1.1rem">🌐</button>
             <!-- PiP Button -->
-            <button class="pip-btn" onclick="togglePiP('chat-list', '聊天与翻译')" title="画中画">⧉</button>
+            <button class="pip-btn" id="chat-pip-btn" onclick="togglePiP('chat-list', '聊天与翻译')" title="画中画">⧉</button>
           </div>
 
           <div class="trans-toolbar">
@@ -237,7 +240,7 @@
 
             <span class="trans-label">&#33258;&#21160;&#32763;&#35793;&#65306;</span>
             <button class="lang-btn master-on" id="btnMaster" onclick="toggleMasterSwitch()">&#24050;&#24320;&#21551;</button>
-            <button class="translation-config-trigger" type="button" onclick="openTranslationConfigModal()" title="&#32763;&#35793;&#24341;&#25806;&#37197;&#32622;">&#9881;</button>
+            <button class="translation-config-trigger" id="translation-config-btn" type="button" onclick="openTranslationConfigModal()" title="&#32763;&#35793;&#24341;&#25806;&#37197;&#32622;">&#9881;</button>
           </div>
 
           <div id="chat-list">
@@ -245,6 +248,30 @@
           </div>
 
           <button id="chat-scroll-btn" class="scroll-bottom-btn" onclick="scrollToChatBottom()">↓</button>
+
+          <div id="quick-trans-inline" class="quick-trans-inline" aria-hidden="true">
+            <div class="quick-trans-inline-inner">
+              <div class="quick-trans-inline-row quick-trans-input-row">
+                <textarea id="qt-input" class="qt-textarea" maxlength="300" placeholder="&#36755;&#20837;&#35201;&#32763;&#35793;&#30340;&#20869;&#23481;..."></textarea>
+                <span class="quick-trans-char-count">(<span id="qt-char-count" style="color: #fff">0</span>/300)</span>
+              </div>
+
+              <div class="qt-controls">
+                <span class="quick-trans-target-label">&#30446;&#26631;&#35821;&#35328;&#65306;</span>
+                <div class="qt-lang-group">
+                  <button class="qt-lang-btn" type="button" onclick="performQuickTrans('en')">英</button>
+                  <button class="qt-lang-btn" type="button" onclick="performQuickTrans('es')">西</button>
+                  <button class="qt-lang-btn" type="button" onclick="performQuickTrans('fr')">法</button>
+                  <button class="qt-lang-btn" type="button" onclick="performQuickTrans('pt')">葡</button>
+                </div>
+              </div>
+
+              <div class="qt-output-container">
+                <div id="qt-output" class="qt-output">...</div>
+                <button id="qt-copy-btn" class="qt-copy-btn" type="button" onclick="copyQuickTrans()" title="&#22797;&#21046;">📋</button>
+              </div>
+            </div>
+          </div>
 
           <div class="chat-filters">
             <button class="filter-btn active" id="filterALL" onclick="setChatFilter('all')">聊天</button>
@@ -260,9 +287,9 @@
     </div>
 
     <!-- ??????? Floating Window -->
-    <div id="quick-trans-modal" class="floating-window" style="display: none; left: 50%; top: 20%; transform: translateX(-50%)">
+    <div id="legacy-quick-trans-modal" class="floating-window" style="display: none; left: 50%; top: 20%; transform: translateX(-50%)">
       <!-- Header is now the drag handle -->
-      <div class="modal-header draggable-header" id="qt-drag-handle">
+      <div class="modal-header draggable-header" id="legacy-qt-drag-handle">
         <!-- Icon & Title Group -->
         <div
           style="
@@ -280,8 +307,8 @@
 
       <div class="modal-body">
         <div class="input-group">
-          <label>&#25991;&#26412;&#65288;<span id="qt-char-count" style="color: #fff">0</span>/300&#65289;</label>
-          <textarea id="qt-input" class="qt-textarea" maxlength="300" placeholder="&#36755;&#20837;&#35201;&#32763;&#35793;&#30340;&#20869;&#23481;..."></textarea>
+          <label>&#25991;&#26412;&#65288;<span id="legacy-qt-char-count" style="color: #fff">0</span>/300&#65289;</label>
+          <textarea id="legacy-qt-input" class="qt-textarea" maxlength="300" placeholder="&#36755;&#20837;&#35201;&#32763;&#35793;&#30340;&#20869;&#23481;..."></textarea>
         </div>
 
         <div class="qt-controls">
@@ -305,7 +332,7 @@
         <div class="input-group">
           <label>&#32763;&#35793;&#32467;&#26524;</label>
           <div class="qt-output-container">
-            <div id="qt-output" class="qt-output">...</div>
+            <div id="legacy-qt-output" class="qt-output">...</div>
             <button class="qt-copy-btn" onclick="copyQuickTrans()" title="&#22797;&#21046;">📋</button>
           </div>
         </div>
@@ -710,16 +737,18 @@
         <span class="footer-separator">|</span>
 
         <!-- Sidebar Toggles -->
-        <span class="footer-btn" onclick="toggleProfSidebar()" style="margin-right: 10px">生产计算</span>
+        <span id="footer-tool-buttons">
+        <span class="footer-btn" id="prof-sidebar-btn" onclick="toggleProfSidebar()" style="margin-right: 10px">生产计算</span>
 
         <!-- Daily Dungeons Button 
         <span class="footer-btn" onclick="toggleDungeonSidebar()" style="margin-right: 10px">DAILY DUNGEONS</span> -->
 
-        <span class="footer-btn" onclick="toggleSidebar()" style="margin-right: 10px">快捷信息</span>
+        <span class="footer-btn" id="sidebar-btn" onclick="toggleSidebar()" style="margin-right: 10px">快捷信息</span>
 
-        <span class="footer-btn" onclick="toggleSessionWindow()" style="margin-right: 10px">会话总结</span>
+        <span class="footer-btn" id="session-window-btn" onclick="toggleSessionWindow()" style="margin-right: 10px">会话总结</span>
 
-        <span class="footer-btn" onclick="openSoundSettingsModal()" style="margin-right: 10px">声音设置</span>
+        <span class="footer-btn" id="sound-settings-btn" onclick="openSoundSettingsModal()" style="margin-right: 10px">声音设置</span>
+        </span>
 
       </div>
     </div>
@@ -732,6 +761,7 @@
       onclick="window.open('https://oopz.cn/i/rRTDSZ', '_blank', 'noopener,noreferrer')">
       OOPZ单人服语音频道
     </button>
+    <button class="onboarding-help-fab" id="onboarding-help-btn" type="button" style="display: none">使用教程</button>
 
     <!-- Session Recap -->
     <div id="session-window" class="floating-window session-window-init" style="display: none">
@@ -974,18 +1004,20 @@
     <script src="assets/js/modules/sessionRecap.js?v=20260619b"></script>
     <script src="assets/js/modules/state.js?v=20260619b"></script>
     <script src="assets/js/modules/utils.js?v=20260619b"></script>
-    <script src="assets/js/modules/filesystem.js?v=20260621e"></script>
+    <script src="assets/js/modules/filesystem.js?v=20260630a"></script>
     <script src="assets/js/modules/soundSettings.js?v=20260620a"></script>
     <script src="assets/docs/azure-translator-setup-guide.js?v=20260619b"></script>
-    <script src="assets/js/modules/chat.js?v=20260630c"></script>
-    <script src="assets/js/modules/broadcast.js?v=20260630a"></script>
+    <script src="assets/js/modules/chat.js?v=20260630d"></script>
+    <script src="assets/js/modules/broadcast.js?v=20260630b"></script>
     <script src="assets/js/modules/combat.js?v=20260621f"></script>
     <script src="assets/js/modules/tracker.js?v=20260619b"></script>
     <script src="assets/js/modules/forecast.js?v=20260619b"></script>
     <script src="assets/js/modules/ui.js?v=20260619b"></script>
+    <script src="assets/vendor/driverjs/driver.js.iife.js?v=20260630a"></script>
+    <script src="assets/js/modules/onboarding.js?v=20260630b"></script>
 
     <!-- Core -->
     <script src="assets/js/core/professions.js?v=20260619b"></script>
-    <script src="assets/js/core/main.js?v=20260630a"></script>
+    <script src="assets/js/core/main.js?v=20260630c"></script>
   </body>
 </html>

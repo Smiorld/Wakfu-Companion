@@ -1010,7 +1010,7 @@ function renderBroadcastStrip() {
   const latestRecord = getLatestActiveBroadcastRecord();
   if (!latestRecord) {
     strip.innerHTML = `
-      <button class="broadcast-pill empty" type="button" onclick="openBroadcastModal()">
+      <button id="broadcast-strip-pill" class="broadcast-pill empty" type="button" onclick="openBroadcastModal()">
         无部族 <span class="broadcast-pill-peers">${escapeBroadcastHtml(
           `在线${Math.max(1, Number(broadcastConnection.peerCount || 0))}人`
         )}</span>
@@ -1022,7 +1022,7 @@ function renderBroadcastStrip() {
 
   const stripName = getBroadcastStripName(latestRecord.name) || latestRecord.name;
   strip.innerHTML = `
-    <button class="broadcast-pill tribe" type="button" onclick="openBroadcastModal()">
+    <button id="broadcast-strip-pill" class="broadcast-pill tribe" type="button" onclick="openBroadcastModal()">
       <span class="broadcast-pill-type">部族</span>
       <span class="broadcast-pill-text">${escapeBroadcastHtml(stripName)}</span>
       <span class="broadcast-pill-countdown">${escapeBroadcastHtml(

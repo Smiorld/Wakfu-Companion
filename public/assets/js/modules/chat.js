@@ -1516,31 +1516,67 @@ function getChannelColor(category) {
   return map[category] || CHAT_COLORS.Default;
 }
 
+function syncQuickTransUI(isOpen) {
+  const chatPanel = getChatElement("chat-panel");
+  const inlinePanel = getChatElement("quick-trans-inline");
+  const toggleBtn = getChatElement("quick-trans-btn");
+
+  if (chatPanel) {
+    chatPanel.classList.toggle("quick-trans-open", isOpen);
+  }
+  if (inlinePanel) {
+    inlinePanel.setAttribute("aria-hidden", isOpen ? "false" : "true");
+  }
+  if (toggleBtn) {
+    toggleBtn.classList.toggle("is-active", isOpen);
+    toggleBtn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+  }
+}
+
+function prepareQuickTransPanel() {
+  const input = getChatElement("qt-input");
+  const counter = getChatElement("qt-char-count");
+  const outputEl = getChatElement("qt-output");
+
+  if (!input || !counter || !outputEl) return { input, counter, outputEl };
+
+  if (input.dataset.qtBound !== "true") {
+    input.dataset.qtBound = "true";
+    input.addEventListener("input", () => {
+      counter.textContent = String(input.value.length);
+    });
+  }
+
+  counter.textContent = String(input.value.length);
+  if (!outputEl.textContent.trim()) {
+    outputEl.textContent = "...";
+    outputEl.style.color = "#666";
+  }
+
+  return { input, counter, outputEl };
+}
+
 function openQuickTransModal() {
-  const modal = document.getElementById("quick-trans-modal");
-  const input = document.getElementById("qt-input");
-  const counter = document.getElementById("qt-char-count");
+  const chatPanel = getChatElement("chat-panel");
+  const isOpen = chatPanel?.classList.contains("quick-trans-open");
 
-  input.value = "";
-  counter.textContent = "0";
-  document.getElementById("qt-output").textContent = "...";
-  document.getElementById("qt-output").style.color = "#666";
+  if (isOpen) {
+    closeQuickTransModal();
+    return;
+  }
 
-  input.oninput = function () {
-    counter.textContent = this.value.length;
-  };
-
-  modal.style.display = "flex";
-  input.focus();
+  const { input } = prepareQuickTransPanel();
+  syncQuickTransUI(true);
+  input?.focus();
 }
 
 function closeQuickTransModal() {
-  document.getElementById("quick-trans-modal").style.display = "none";
+  syncQuickTransUI(false);
 }
 
 async function performQuickTrans(targetLang) {
-  const text = document.getElementById("qt-input").value.trim();
-  const outputEl = document.getElementById("qt-output");
+  const text = getChatElement("qt-input")?.value.trim();
+  const outputEl = getChatElement("qt-output");
 
   if (!text) return;
   outputEl.textContent = "\u7ffb\u8bd1\u4e2d...";
@@ -1566,10 +1602,10 @@ async function performQuickTrans(targetLang) {
   }
 }
 
-function copyQuickTrans() {
-  const outputEl = document.getElementById("qt-output");
-  const text = outputEl.textContent;
-  const btn = document.querySelector(".qt-copy-btn");
+function legacyCopyQuickTransUnused() {
+  const outputEl = getChatElement("qt-output");
+  const text = outputEl?.textContent;
+  const btn = getChatElement("qt-copy-btn");
 
   if (
     text &&
@@ -1582,6 +1618,29 @@ function copyQuickTrans() {
       btn.style.color = "#2ecc71";
       setTimeout(() => {
         btn.textContent = "复制";
+        btn.style.color = "";
+      }, 1500);
+    });
+  }
+}
+
+function copyQuickTrans() {
+  const outputEl = getChatElement("qt-output");
+  const text = outputEl?.textContent;
+  const btn = getChatElement("qt-copy-btn");
+
+  if (
+    text &&
+    text !== "..." &&
+    text !== "\u7ffb\u8bd1\u4e2d..." &&
+    text !== "\u7f51\u7edc\u9519\u8bef\u3002"
+  ) {
+    navigator.clipboard.writeText(text).then(() => {
+      if (!btn) return;
+      btn.textContent = "\u2713";
+      btn.style.color = "#2ecc71";
+      setTimeout(() => {
+        btn.textContent = "\ud83d\udccb";
         btn.style.color = "";
       }, 1500);
     });
