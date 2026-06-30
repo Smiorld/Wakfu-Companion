@@ -527,6 +527,10 @@ async function startTracking(mainLogHandle, nextChatHandle) {
   parseIntervalId = setInterval(parseTrackedFiles, 1000);
   parseTrackedFiles();
   startWatchdog();
+
+  if (typeof window.enableBroadcastNetwork === "function") {
+    window.enableBroadcastNetwork("logs-imported");
+  }
 }
 
 function startMaintenanceRoutine() {

@@ -1,6 +1,6 @@
 {
   "name": "wakfu-companion",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Static site for Wakfu Companion",
   "main": "index.html",
   "scripts": {

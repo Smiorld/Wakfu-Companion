@@ -55,6 +55,8 @@ let broadcastConnection = {
 let broadcastSnapshotInFlight = null;
 let broadcastPollInFlight = null;
 let broadcastHeartbeatInFlight = null;
+let broadcastNetworkEnabled = false;
+let broadcastNetworkStarted = false;
 
 function normalizeBroadcastServerKey(serverKey) {
   const normalized = String(serverKey || "").trim().toLowerCase();
@@ -129,6 +131,11 @@ function notifyBroadcastServerChanged(serverKey) {
   if (typeof window.updateBroadcastServerSelectionUI === "function") {
     window.updateBroadcastServerSelectionUI(normalized);
   }
+}
+
+function updateBroadcastWaitingStatus() {
+  if (broadcastNetworkEnabled) return;
+  updateBroadcastConnection("idle", "Waiting for wakfu.log + wakfu_chat.log");
 }
 
 function loadStoredJson(keys, fallbackFactory) {
@@ -750,6 +757,10 @@ function applyBroadcastEvents(events = []) {
 }
 
 async function refreshBroadcastSnapshot(options = {}) {
+  if (!broadcastNetworkEnabled) {
+    updateBroadcastWaitingStatus();
+    return null;
+  }
   if (broadcastSnapshotInFlight) return broadcastSnapshotInFlight;
 
   const { notify = false, reason = "snapshot" } = options;
@@ -795,6 +806,10 @@ async function refreshBroadcastSnapshot(options = {}) {
 }
 
 async function pollBroadcastUpdates(reason = "poll") {
+  if (!broadcastNetworkEnabled) {
+    updateBroadcastWaitingStatus();
+    return null;
+  }
   if (broadcastPollInFlight) return broadcastPollInFlight;
 
   broadcastPollInFlight = (async () => {
@@ -845,6 +860,10 @@ async function pollBroadcastUpdates(reason = "poll") {
 }
 
 async function sendBroadcastHeartbeat() {
+  if (!broadcastNetworkEnabled) {
+    updateBroadcastWaitingStatus();
+    return null;
+  }
   if (broadcastHeartbeatInFlight) return broadcastHeartbeatInFlight;
 
   broadcastHeartbeatInFlight = callBroadcastApi("/presence/heartbeat", {
@@ -1264,6 +1283,7 @@ function initBroadcastRefreshTimer() {
 
 function initBroadcastPollTimer() {
   if (broadcastPollTimer) clearInterval(broadcastPollTimer);
+  if (!broadcastNetworkEnabled) return;
   broadcastPollTimer = setInterval(() => {
     pollBroadcastUpdates("interval").catch(() => {});
   }, BROADCAST_POLL_INTERVAL_MS);
@@ -1271,12 +1291,13 @@ function initBroadcastPollTimer() {
 
 function initBroadcastHeartbeatTimer() {
   if (broadcastHeartbeatTimer) clearInterval(broadcastHeartbeatTimer);
+  if (!broadcastNetworkEnabled) return;
   broadcastHeartbeatTimer = setInterval(() => {
     sendBroadcastHeartbeat().catch(() => {});
   }, BROADCAST_HEARTBEAT_INTERVAL_MS);
 }
 
-async function connectBroadcastNetwork() {
+async function connectBroadcastNetworkLegacy() {
   updateBroadcastConnection("loading", "正在连接...");
   try {
     await refreshBroadcastSnapshot({ notify: true, reason: "init" });
@@ -1284,6 +1305,35 @@ async function connectBroadcastNetwork() {
   } catch (error) {
     console.warn("[Broadcast] init failed:", error);
   }
+}
+
+function connectBroadcastNetwork(reason = "init") {
+  if (!broadcastNetworkEnabled) {
+    updateBroadcastWaitingStatus();
+    return Promise.resolve();
+  }
+
+  updateBroadcastConnection("loading", "Connecting...");
+  return refreshBroadcastSnapshot({ notify: true, reason })
+    .then(() => sendBroadcastHeartbeat().catch(() => {}))
+    .catch((error) => {
+      console.warn("[Broadcast] init failed:", error);
+    });
+}
+
+function startBroadcastNetwork(reason = "logs-ready") {
+  if (!broadcastNetworkEnabled || broadcastNetworkStarted) return false;
+  broadcastNetworkStarted = true;
+  initBroadcastPollTimer();
+  initBroadcastHeartbeatTimer();
+  connectBroadcastNetwork(reason);
+  return true;
+}
+
+function enableBroadcastNetwork(reason = "logs-ready") {
+  if (broadcastNetworkEnabled) return startBroadcastNetwork(reason);
+  broadcastNetworkEnabled = true;
+  return startBroadcastNetwork(reason);
 }
 
 function initBroadcastSystem() {
@@ -1298,9 +1348,7 @@ function initBroadcastSystem() {
   renderBroadcastStrip();
   renderBroadcastHistory();
   initBroadcastRefreshTimer();
-  initBroadcastPollTimer();
-  initBroadcastHeartbeatTimer();
-  connectBroadcastNetwork();
+  updateBroadcastWaitingStatus();
 }
 
 window.initBroadcastSystem = initBroadcastSystem;
@@ -1315,6 +1363,7 @@ window.resolveBroadcastTribe = resolveBroadcastTribe;
 window.dismissBroadcastTribe = dismissBroadcastTribe;
 window.restoreBroadcastTribe = restoreBroadcastTribe;
 window.getCurrentBroadcastServerKey = getCurrentBroadcastServerKey;
+window.enableBroadcastNetwork = enableBroadcastNetwork;
 window.setBroadcastServerKey = function setBroadcastServerKey(serverKey, options = {}) {
   const { source = "auto" } = options;
   const nextServerKey = normalizeBroadcastServerKey(serverKey);
@@ -1327,7 +1376,11 @@ window.setBroadcastServerKey = function setBroadcastServerKey(serverKey, options
       saveBroadcastState();
       saveBroadcastViewState();
       broadcastCursor = 0;
-      refreshBroadcastSnapshot({ notify: true, reason: "manual-refresh" }).catch(() => {});
+      if (broadcastNetworkEnabled) {
+        refreshBroadcastSnapshot({ notify: true, reason: "manual-refresh" }).catch(() => {});
+      } else {
+        updateBroadcastWaitingStatus();
+      }
     }
     return false;
   }
@@ -1344,7 +1397,11 @@ window.setBroadcastServerKey = function setBroadcastServerKey(serverKey, options
   renderBroadcastStrip();
   renderBroadcastHistory();
   notifyBroadcastServerChanged(nextServerKey);
-  refreshBroadcastSnapshot({ notify: true, reason: "switch-server" }).catch(() => {});
-  sendBroadcastHeartbeat().catch(() => {});
+  if (broadcastNetworkEnabled) {
+    refreshBroadcastSnapshot({ notify: true, reason: "switch-server" }).catch(() => {});
+    sendBroadcastHeartbeat().catch(() => {});
+  } else {
+    updateBroadcastWaitingStatus();
+  }
   return true;
 };
