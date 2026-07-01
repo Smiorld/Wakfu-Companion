@@ -220,6 +220,13 @@ function getBroadcastChallengeMetaLabel(record) {
   return `ID ${challengeId}`;
 }
 
+function getBroadcastHoverLocation(record) {
+  const challengeId = String(record?.challengeId || "").trim();
+  if (!challengeId) return "";
+  if (typeof getTribeChallengeLocation !== "function") return "";
+  return String(getTribeChallengeLocation(challengeId) || "").trim();
+}
+
 function getCurrentBroadcastServerState() {
   const serverKey = getCurrentBroadcastServerKey();
   if (!broadcastState.servers || typeof broadcastState.servers !== "object") {
@@ -1043,7 +1050,14 @@ function renderBroadcastStrip() {
       )}</span>
     </button>
   `;
-  strip.title = `${latestRecord.name}\n本轮开始于：${formatBroadcastTime(latestRecord.activatedAt)}`;
+  const hoverLocation = getBroadcastHoverLocation(latestRecord);
+  strip.title = [
+    latestRecord.name,
+    hoverLocation ? `地点：${hoverLocation}` : "",
+    `本轮开始于：${formatBroadcastTime(latestRecord.activatedAt)}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 function buildInactiveRecordNote(record) {
