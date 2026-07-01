@@ -3,6 +3,7 @@
 // Scope: collaborative area challenges whose description matches the tribe/horde event template
 
 const AREA_CHALLENGE_ZH_MAP = Object.freeze({
+  "-2311": "合作：冻原部族",
   "-2310": "合作：企鹅部族",
   "-2309": "合作：卫熊部族",
   "-2308": "合作：爬壳类部族",
@@ -73,6 +74,7 @@ const AREA_CHALLENGE_ZH_MAP = Object.freeze({
   "-1363": "合作：寒冰咕哩部族",
   "-1348": "合作：低语者部族",
   "-1333": "合作：食尸鬼部族",
+  "-1318": "合作：碎石者部族",
   "-1290": "合作：异域生物部族",
   "-1278": "合作：野性绵球部族",
   "-1268": "合作：汉尼草部族",

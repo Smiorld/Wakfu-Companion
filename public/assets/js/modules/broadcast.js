@@ -207,6 +207,19 @@ function getBroadcastElement(id) {
   return document.getElementById(id);
 }
 
+function getBroadcastChallengeMetaLabel(record) {
+  const challengeId = String(record?.challengeId || "").trim();
+  if (!challengeId) return "";
+
+  const location =
+    typeof getTribeChallengeLocation === "function"
+      ? String(getTribeChallengeLocation(challengeId) || "").trim()
+      : "";
+
+  if (location) return location;
+  return `ID ${challengeId}`;
+}
+
 function getCurrentBroadcastServerState() {
   const serverKey = getCurrentBroadcastServerKey();
   if (!broadcastState.servers || typeof broadcastState.servers !== "object") {
@@ -1073,9 +1086,9 @@ function renderBroadcastList(target, records, emptyText, activeMode = false) {
             <span class="broadcast-history-actions">
               ${
                 record.challengeId
-                  ? `<span class="broadcast-muted-note">ID ${escapeBroadcastHtml(
+                  ? `<span class="broadcast-muted-note" title="ID ${escapeBroadcastHtml(
                       record.challengeId
-                    )}</span>`
+                    )}">${escapeBroadcastHtml(getBroadcastChallengeMetaLabel(record))}</span>`
                   : ""
               }
               ${

@@ -10,6 +10,8 @@ Thumbs.db
 artifacts/
 scripts/*
 !scripts/build-wakfu-term-glossary.js
+!scripts/build-area-challenge-map.js
+!scripts/build-tribe-zone-map.js
 !scripts/extract-wakfu-i18n.js
 wakfu_chat.log*.sample
 *.sample
