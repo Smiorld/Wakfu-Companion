@@ -1635,7 +1635,7 @@ function copyQuickTrans() {
     text !== "\u7ffb\u8bd1\u4e2d..." &&
     text !== "\u7f51\u7edc\u9519\u8bef\u3002"
   ) {
-    navigator.clipboard.writeText(text).then(() => {
+    const markCopySuccess = () => {
       if (!btn) return;
       btn.textContent = "\u2713";
       btn.style.color = "#2ecc71";
@@ -1643,7 +1643,48 @@ function copyQuickTrans() {
         btn.textContent = "\ud83d\udccb";
         btn.style.color = "";
       }, 1500);
-    });
+    };
+
+    const ownerWindow = outputEl?.ownerDocument?.defaultView || window;
+    const ownerDocument = outputEl?.ownerDocument || document;
+
+    const fallbackCopy = () => {
+      const temp = ownerDocument.createElement("textarea");
+      temp.value = text;
+      temp.setAttribute("readonly", "readonly");
+      temp.style.position = "fixed";
+      temp.style.opacity = "0";
+      temp.style.pointerEvents = "none";
+      temp.style.left = "-9999px";
+      ownerDocument.body.appendChild(temp);
+      temp.focus();
+      temp.select();
+      temp.setSelectionRange(0, temp.value.length);
+
+      let copied = false;
+      try {
+        copied = ownerDocument.execCommand("copy");
+      } catch (_error) {
+        copied = false;
+      }
+
+      ownerDocument.body.removeChild(temp);
+
+      if (copied) {
+        markCopySuccess();
+      } else {
+        alert("\u590d\u5236\u5931\u8d25\uff0c\u8bf7\u624b\u52a8\u9009\u4e2d\u7ffb\u8bd1\u7ed3\u679c\u540e\u590d\u5236\u3002");
+      }
+    };
+
+    const clipboardApi = ownerWindow?.navigator?.clipboard || navigator.clipboard;
+    if (clipboardApi?.writeText) {
+      clipboardApi.writeText(text).then(markCopySuccess).catch(() => {
+        fallbackCopy();
+      });
+    } else {
+      fallbackCopy();
+    }
   }
 }
 
