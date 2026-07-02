@@ -119,6 +119,13 @@ body {
   gap: 8px;
 }
 
+.setup-step-inline {
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+}
+
 .setup-step-title {
   margin: 0;
   color: #f0f0f0;
@@ -140,6 +147,10 @@ body {
   width: 100%;
   display: flex;
   justify-content: center;
+}
+
+.setup-step-inline .setup-server-slot {
+  width: auto;
 }
 
 #drop-zone-server-picker .drop-zone-server-label {

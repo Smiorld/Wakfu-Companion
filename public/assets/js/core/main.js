@@ -212,74 +212,6 @@ function renderPendingDropStatus() {
 
 function buildSetupPanelLayout() {
   if (!dropZone) return;
-
-  const footerBlock = dropZone.querySelector("div[style*='border-top: 1px solid #333']");
-  const serverHeading = dropZone.querySelector("h3");
-  const directParagraphs = Array.from(dropZone.children).filter(
-    (element) => element.tagName === "P"
-  );
-  const pathCaption = directParagraphs[0] || null;
-  const fileNameNote = directParagraphs[1] || null;
-  const pathContainer = dropZone.querySelector(".path-container");
-
-  if (!footerBlock || !serverHeading || !pathCaption || !fileNameNote || !pathContainer) {
-    return;
-  }
-
-  let steps = document.getElementById("setup-steps");
-  if (!steps) {
-    steps = document.createElement("div");
-    steps.id = "setup-steps";
-    steps.className = "setup-steps";
-    dropZone.insertBefore(steps, footerBlock);
-  }
-
-  const ensureStep = (id) => {
-    let step = document.getElementById(id);
-    if (!step) {
-      step = document.createElement("div");
-      step.id = id;
-      step.className = "setup-step";
-    }
-    return step;
-  };
-
-  const serverStep = ensureStep("setup-step-server");
-  const pathStep = ensureStep("setup-step-path");
-  const dropStep = ensureStep("setup-step-drop");
-
-  let serverSlot = document.getElementById("drop-zone-server-slot");
-  if (!serverSlot) {
-    serverSlot = document.createElement("div");
-    serverSlot.id = "drop-zone-server-slot";
-    serverSlot.className = "setup-server-slot";
-  }
-
-  let pathTitle = document.getElementById("setup-step-path-title");
-  if (!pathTitle) {
-    pathTitle = document.createElement("div");
-    pathTitle.id = "setup-step-path-title";
-    pathTitle.className = "setup-step-title";
-  }
-
-  let dropTitle = document.getElementById("setup-step-drop-title");
-  if (!dropTitle) {
-    dropTitle = document.createElement("div");
-    dropTitle.id = "setup-step-drop-title";
-    dropTitle.className = "setup-step-title";
-  }
-
-  serverHeading.id = "setup-step-server-title";
-  serverHeading.className = "setup-step-title";
-  pathCaption.id = "setup-path-caption";
-  pathCaption.className = "setup-step-note";
-  fileNameNote.id = "setup-step-drop-note";
-  fileNameNote.className = "setup-step-note";
-
-  serverStep.replaceChildren(serverHeading, serverSlot);
-  pathStep.replaceChildren(pathTitle, pathCaption, pathContainer);
-  dropStep.replaceChildren(dropTitle, fileNameNote, getOrCreateDropStatusLine());
-  steps.replaceChildren(serverStep, pathStep, dropStep);
 }
 
 function initializeDualFilePromptUI() {
@@ -289,24 +221,17 @@ function initializeDualFilePromptUI() {
 
   buildSetupPanelLayout();
 
+  const browserTitle = document.getElementById("setup-step-browser-title");
   const serverTitle = document.getElementById("setup-step-server-title");
   const pathTitle = document.getElementById("setup-step-path-title");
-  const pathCaption = document.getElementById("setup-path-caption");
   const dropTitle = document.getElementById("setup-step-drop-title");
   const dropNote = document.getElementById("setup-step-drop-note");
 
-  if (serverTitle) serverTitle.textContent = "1、选择服务器：";
-  if (pathTitle) pathTitle.textContent = "2、打开日志目录，导入日志。";
-  if (pathCaption) {
-    pathCaption.textContent =
-      "打开资源管理器或“我的电脑”，把下面这个地址粘贴到地址栏后按回车。";
-  }
-  if (dropTitle) {
-    dropTitle.textContent = "3、把 `wakfu.log` 和 `wakfu_chat.log` 拖进来。";
-  }
-  if (dropNote) {
-    dropNote.textContent = "也可能叫 `wakfu` 和 `wakfu_chat`。";
-  }
+  if (browserTitle) browserTitle.textContent = "1. 用 Chrome 或 Edge 浏览器启动本工具。";
+  if (serverTitle) serverTitle.textContent = "2. 选择服务器：";
+  if (pathTitle) pathTitle.textContent = "3. 打开“我的电脑”，把下面这个路径粘贴到地址栏然后回车。";
+  if (dropTitle) dropTitle.textContent = "4. 把 `wakfu.log` 和 `wakfu_chat.log` 拖进来。";
+  if (dropNote) dropNote.textContent = "也可能叫 `wakfu` 和 `wakfu_chat`。";
 
   if (copyPathBtn) copyPathBtn.textContent = "\u590d\u5236";
 
