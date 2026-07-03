@@ -4,6 +4,7 @@ const HELP_BUTTON_DRAG_THRESHOLD = 10;
 const ONBOARDING_CONTEXTS = {
   combat: "combat",
   tracker: "tracker",
+  professions: "professions",
   tribe: "tribe",
   chat: "chat",
   footer: "footer",
@@ -236,11 +237,18 @@ function buildContextSteps(contextKey) {
         "start"
       ),
       createOnboardingStep(
-        "#tracker-panel",
-        "\u5e38\u7528\u64cd\u4f5c",
-        "\u4f60\u53ef\u4ee5\u641c\u7d22\u5e76\u6dfb\u52a0\u6761\u76ee\uff0c\u4e5f\u53ef\u4ee5\u5bfc\u5165/\u5bfc\u51fa\u8ffd\u8e2a\u8868\uff0c\u8fd8\u80fd\u5207\u6362\u7f51\u683c\u3001\u5217\u8868\u89c6\u56fe\u548c\u5361\u739b\u603b\u8ba1\u3002",
+        "#tracker-panel .tracker-controls",
+        "\u641c\u7d22\u4e0e\u5bfc\u5165\u5bfc\u51fa",
+        "\u53ef\u4ee5\u641c\u7d22\u7269\u54c1\u5e76\u624b\u52a8\u6dfb\u52a0\u3002\u201c\u5bfc\u5165/\u5bfc\u51fa\u201d\u73b0\u5728\u4f1a\u76f4\u63a5\u5904\u7406 JSON \u6587\u4ef6\uff0c\u4e5f\u80fd\u4e0e\u751f\u4ea7\u8ba1\u7b97\u7684\u5bfc\u51fa\u4e92\u901a\uff1a\u751f\u4ea7\u8ba1\u7b97\u5bfc\u5165\u5230\u8fd9\u91cc\u65f6\uff0c\u4f1a\u628a\u539f\u6750\u6599\u53d8\u6210\u8ffd\u8e2a\u76ee\u6807\u3002",
         "bottom",
         "start"
+      ),
+      createOnboardingStep(
+        "#tracker-panel .tracker-header-actions",
+        "\u5934\u90e8\u6309\u94ae",
+        "\u8fd9\u4e00\u6392\u6309\u94ae\u53ef\u4ee5\u5207\u6362\u804c\u4e1a\u7b5b\u9009\uff0c\u6309\u4e13\u4e1a\u6392\u5e8f\uff0c\u51b3\u5b9a\u201c\u5931\u53bb\u7269\u54c1\u201d\u65f6\u662f\u5426\u6263\u51cf\u8fdb\u5ea6\uff0c\u663e\u793a/\u9690\u85cf\u5361\u739b\u603b\u8ba1\uff0c\u8fd8\u80fd\u5728\u7f51\u683c\u4e0e\u5217\u8868\u89c6\u56fe\u4e4b\u95f4\u5207\u6362\u3002",
+        "bottom",
+        "center"
       ),
       createOnboardingStep(
         "#tracker-pip-btn",
@@ -248,6 +256,43 @@ function buildContextSteps(contextKey) {
         "\u8ffd\u8e2a\u5668\u4e5f\u652f\u6301\u5355\u72ec\u5f39\u51fa\u7f6e\u9876\u5c0f\u7a97\u53e3\uff0c\u65b9\u4fbf\u4f60\u5728\u5176\u4ed6\u754c\u9762\u4e0b\u7ee7\u7eed\u76ef\u8fdb\u5ea6\u3002",
         "bottom",
         "center"
+      ),
+    ],
+    [ONBOARDING_CONTEXTS.professions]: [
+      createOnboardingStep(
+        "#prof-sidebar-btn",
+        "\u751f\u4ea7\u8ba1\u7b97",
+        "\u8fd9\u91cc\u6253\u5f00\u751f\u4ea7\u8ba1\u7b97\u4fa7\u8fb9\u680f\uff0c\u7528\u6765\u63a8\u7b97\u5347\u7ea7\u6216\u624b\u52a8\u5236\u4f5c\u65f6\u7684\u6750\u6599\u3001\u6210\u672c\u4e0e\u4ea7\u51fa\u3002",
+        "top",
+        "center"
+      ),
+      createOnboardingStep(
+        "#prof-calc-mode-switch",
+        "\u8fd0\u7b97\u6a21\u5f0f",
+        "\u8fd9\u91cc\u53ef\u4ee5\u5728\u201c\u7ecf\u9a8c\u63a8\u7b97\u6b21\u6570\u201d\u548c\u201c\u624b\u586b\u751f\u4ea7\u6b21\u6570\u201d\u4e4b\u95f4\u5207\u6362\u3002\u53f3\u4e0b\u89d2\u7684\u201c\u8fd0\u7b97/\u8fd0\u7b97\u4e2d\u201d\u4f1a\u9501\u5b9a\u662f\u5426\u81ea\u52a8\u91cd\u7b97\u3002",
+        "bottom",
+        "start"
+      ),
+      createOnboardingStep(
+        "#prof-materials-builder",
+        "\u539f\u6750\u6599\u5217\u8868",
+        "\u539f\u6750\u6599\u540d\u79f0\u73b0\u5728\u9700\u8981\u4ece\u641c\u7d22\u7ed3\u679c\u4e2d\u9009\u4e2d\u7269\u54c1\u3002\u9009\u4e2d\u540e\u4f1a\u540c\u6b65\u663e\u793a\u8ffd\u8e2a\u5668\u540c\u6b3e\u56fe\u6807\uff0c\u7a00\u6709\u7269\u54c1\u4e5f\u4f1a\u5e26\u7a00\u6709\u6837\u5f0f\u3002",
+        "right",
+        "start"
+      ),
+      createOnboardingStep(
+        "#prof-header-actions",
+        "\u5bfc\u5165\u3001\u5bfc\u51fa\u3001\u8ffd\u8e2a",
+        "\u201c\u5bfc\u51fa\u201d\u4f1a\u4e0b\u8f7d\u751f\u4ea7\u8ba1\u7b97 JSON\uff0c\u201c\u5bfc\u5165\u201d\u652f\u6301\u62d6\u5165\u6587\u4ef6\u3001\u9009\u6587\u4ef6\u6216\u7c98\u8d34 JSON\u3002\u201c\u8ffd\u8e2a\u201d\u4f1a\u6309\u5f53\u524d\u8fd0\u7b97\u7ed3\u679c\uff0c\u76f4\u63a5\u628a\u539f\u6750\u6599\u603b\u9700\u6c42\u63a8\u9001\u5230\u8ffd\u8e2a\u5668\u3002",
+        "bottom",
+        "center"
+      ),
+      createOnboardingStep(
+        "#profession-results-list",
+        "\u548c\u8ffd\u8e2a\u5668\u8054\u52a8",
+        "\u751f\u4ea7\u8ba1\u7b97\u4e0e\u8ffd\u8e2a\u5668\u7684\u5bfc\u5165\u5bfc\u51fa\u73b0\u5728\u662f\u4e92\u901a\u7684\u3002\u751f\u4ea7\u8ba1\u7b97\u5bfc\u5165\u8ffd\u8e2a\u5668\u5bfc\u51fa\u65f6\uff0c\u4f1a\u628a\u8ffd\u8e2a\u76ee\u6807\u53d8\u6210\u539f\u6750\u6599\u6570\u91cf\uff1b\u53cd\u8fc7\u6765\u5bfc\u5165\u5230\u8ffd\u8e2a\u5668\u65f6\uff0c\u4f1a\u7528\u539f\u6750\u6599\u6570\u91cf\u548c\u5355\u4ef7\u5408\u5e76\u66f4\u65b0\u8ffd\u8e2a\u6761\u76ee\u3002",
+        "top",
+        "start"
       ),
     ],
     [ONBOARDING_CONTEXTS.chat]: [
@@ -290,13 +335,6 @@ function buildContextSteps(contextKey) {
       ),
     ],
     [ONBOARDING_CONTEXTS.footer]: [
-      createOnboardingStep(
-        "#prof-sidebar-btn",
-        "\u751f\u4ea7\u8ba1\u7b97",
-        "\u7528\u6765\u8ba1\u7b97\u5347\u7ea7\u6240\u9700\u5236\u4f5c\u6b21\u6570\uff0c\u540c\u65f6\u53ef\u4ee5\u7b97\u6750\u6599\u6210\u672c\u4e0e\u4ea7\u51fa\u3002",
-        "top",
-        "center"
-      ),
       createOnboardingStep(
         "#sidebar-btn",
         "\u5feb\u6377\u4fe1\u606f",
@@ -416,9 +454,10 @@ function findOnboardingContextAtPoint(clientX, clientY) {
   if (target.closest("#bug-report-btn, #oopz-link-btn")) return ONBOARDING_CONTEXTS.support;
   if (target.closest("#chat-broadcast-strip-anchor")) return ONBOARDING_CONTEXTS.tribe;
   if (target.closest("#chat-panel")) return ONBOARDING_CONTEXTS.chat;
+  if (target.closest("#professions-sidebar, #prof-sidebar-btn")) return ONBOARDING_CONTEXTS.professions;
   if (target.closest("#tracker-panel")) return ONBOARDING_CONTEXTS.tracker;
   if (target.closest("#combat-panel")) return ONBOARDING_CONTEXTS.combat;
-  if (target.closest("#footer-tool-buttons, #prof-sidebar-btn, #sidebar-btn, #session-window-btn, #sound-settings-btn")) {
+  if (target.closest("#footer-tool-buttons, #sidebar-btn, #session-window-btn, #sound-settings-btn")) {
     return ONBOARDING_CONTEXTS.footer;
   }
 
