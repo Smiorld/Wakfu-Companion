@@ -45,6 +45,7 @@ const DEFAULT_PROF_CALC_STATE = {
 let materialRowId = 0;
 let currentProfCalcMode = PROF_CALC_MODE_EXPERIENCE;
 let professionCalcAutoCalculate = false;
+let professionTransferMode = "export";
 
 function initializeProfessionCalculator() {
   syncProfessionCalculatorText();
@@ -110,6 +111,26 @@ function buildProfessionCalculatorLayout() {
   if (!levelsContainer || !calcBtn) return;
 
   levelsContainer.classList.add("prof-levels-grid");
+
+  const sidebarHeader =
+    typeof document.querySelector === "function"
+      ? document.querySelector("#professions-sidebar .sidebar-header")
+      : null;
+  if (sidebarHeader && !document.getElementById("prof-header-actions")) {
+    const closeBtn = sidebarHeader.querySelector(".close-sidebar-btn");
+    const headerActions = document.createElement("div");
+    headerActions.id = "prof-header-actions";
+    headerActions.className = "prof-header-actions";
+    headerActions.innerHTML = `
+      <button type="button" id="prof-import-btn" class="tracker-action-btn prof-header-btn">导入</button>
+      <button type="button" id="prof-export-btn" class="tracker-action-btn prof-header-btn">导出</button>
+    `;
+    if (closeBtn?.parentNode) {
+      closeBtn.parentNode.insertBefore(headerActions, closeBtn);
+    } else {
+      sidebarHeader.appendChild(headerActions);
+    }
+  }
 
   if (!document.getElementById("prof-calc-mode-switch")) {
     const modeSwitch = document.createElement("div");
@@ -244,6 +265,20 @@ function bindProfessionCalculatorEvents() {
   if (clearBtn) {
     clearBtn.onclick = () => {
       resetProfessionCalculatorState();
+    };
+  }
+
+  const importBtn = document.getElementById("prof-import-btn");
+  if (importBtn) {
+    importBtn.onclick = () => {
+      openProfessionTransferModal("import");
+    };
+  }
+
+  const exportBtn = document.getElementById("prof-export-btn");
+  if (exportBtn) {
+    exportBtn.onclick = () => {
+      openProfessionTransferModal("export");
     };
   }
 
@@ -670,6 +705,40 @@ function getProfessionCalculatorState() {
   };
 }
 
+function normalizeProfessionCalculatorState(input) {
+  const source = input && typeof input === "object" ? input : {};
+  const fallbackMaterials = Array.isArray(DEFAULT_PROF_CALC_STATE.materials)
+    ? DEFAULT_PROF_CALC_STATE.materials
+    : [];
+  const materialsSource =
+    Array.isArray(source.materials) && source.materials.length > 0
+      ? source.materials
+      : fallbackMaterials;
+
+  return {
+    mode:
+      source.mode === PROF_CALC_MODE_MANUAL
+        ? PROF_CALC_MODE_MANUAL
+        : PROF_CALC_MODE_EXPERIENCE,
+    autoCalculate: Boolean(source.autoCalculate),
+    currentLevel: String(source.currentLevel ?? DEFAULT_PROF_CALC_STATE.currentLevel),
+    currentLevelExp: String(
+      source.currentLevelExp ?? DEFAULT_PROF_CALC_STATE.currentLevelExp
+    ),
+    targetLevel: String(source.targetLevel ?? DEFAULT_PROF_CALC_STATE.targetLevel),
+    craftXp: String(source.craftXp ?? DEFAULT_PROF_CALC_STATE.craftXp),
+    craftCount: String(source.craftCount ?? DEFAULT_PROF_CALC_STATE.craftCount),
+    outputName: String(source.outputName ?? DEFAULT_PROF_CALC_STATE.outputName),
+    outputQty: String(source.outputQty ?? DEFAULT_PROF_CALC_STATE.outputQty),
+    outputPrice: String(source.outputPrice ?? DEFAULT_PROF_CALC_STATE.outputPrice),
+    materials: materialsSource.map((material, index) => ({
+      name: String(material?.name ?? `材料${index + 1}`),
+      qty: String(material?.qty ?? ""),
+      price: String(material?.price ?? ""),
+    })),
+  };
+}
+
 function saveProfessionCalculatorState() {
   try {
     localStorage.setItem(
@@ -688,54 +757,128 @@ function restoreProfessionCalculatorState() {
     savedState = null;
   }
 
-  const state = savedState || DEFAULT_PROF_CALC_STATE;
-  currentProfCalcMode = state.mode || PROF_CALC_MODE_EXPERIENCE;
-  professionCalcAutoCalculate = Boolean(state.autoCalculate);
-
-  setInputValue("prof-current-lvl", state.currentLevel || "0");
-  setInputValue("prof-base-exp", state.currentLevelExp || "0");
-  setInputValue("prof-target-lvl", state.targetLevel || "20");
-  setInputValue("prof-craft-xp", state.craftXp || "600");
-  setInputValue("prof-craft-count", state.craftCount || "");
-  setInputValue("prof-output-name", state.outputName || "产物");
-  setInputValue("prof-output-qty", state.outputQty || "");
-  setInputValue("prof-output-price", state.outputPrice || "");
-
-  const rowsContainer = document.getElementById("prof-material-rows");
-  if (rowsContainer) {
-    rowsContainer.innerHTML = "";
-    materialRowId = 0;
-    const materials =
-      Array.isArray(state.materials) && state.materials.length > 0
-        ? state.materials
-        : DEFAULT_PROF_CALC_STATE.materials;
-    materials.forEach((material) => {
-      addProfessionMaterialRow(material.name, material.qty, material.price);
-    });
-  }
+  applyProfessionCalculatorState(savedState || DEFAULT_PROF_CALC_STATE);
 }
 
 function resetProfessionCalculatorState() {
-  setInputValue("prof-current-lvl", DEFAULT_PROF_CALC_STATE.currentLevel);
-  setInputValue("prof-base-exp", DEFAULT_PROF_CALC_STATE.currentLevelExp);
-  setInputValue("prof-target-lvl", DEFAULT_PROF_CALC_STATE.targetLevel);
-  setInputValue("prof-craft-xp", DEFAULT_PROF_CALC_STATE.craftXp);
-  setInputValue("prof-craft-count", DEFAULT_PROF_CALC_STATE.craftCount);
-  setInputValue("prof-output-name", DEFAULT_PROF_CALC_STATE.outputName);
-  setInputValue("prof-output-qty", DEFAULT_PROF_CALC_STATE.outputQty);
-  setInputValue("prof-output-price", DEFAULT_PROF_CALC_STATE.outputPrice);
+  applyProfessionCalculatorState(DEFAULT_PROF_CALC_STATE);
+  resetProfessionCalculationResult();
+  saveProfessionCalculatorState();
+  updateProfessionCalcToggleUI();
+}
+
+function applyProfessionCalculatorState(inputState) {
+  const state = normalizeProfessionCalculatorState(inputState);
+  currentProfCalcMode = state.mode;
+  professionCalcAutoCalculate = state.autoCalculate;
+
+  setInputValue("prof-current-lvl", state.currentLevel);
+  setInputValue("prof-base-exp", state.currentLevelExp);
+  setInputValue("prof-target-lvl", state.targetLevel);
+  setInputValue("prof-craft-xp", state.craftXp);
+  setInputValue("prof-craft-count", state.craftCount);
+  setInputValue("prof-output-name", state.outputName);
+  setInputValue("prof-output-qty", state.outputQty);
+  setInputValue("prof-output-price", state.outputPrice);
 
   const rowsContainer = document.getElementById("prof-material-rows");
   if (rowsContainer) {
     rowsContainer.innerHTML = "";
     materialRowId = 0;
-    DEFAULT_PROF_CALC_STATE.materials.forEach((material) => {
+    state.materials.forEach((material) => {
       addProfessionMaterialRow(material.name, material.qty, material.price);
     });
   }
 
-  resetProfessionCalculationResult();
-  saveProfessionCalculatorState();
+  applyProfessionCalcMode();
+  updateProfessionCalcToggleUI();
+}
+
+function getProfessionTransferElements() {
+  return {
+    modal: document.getElementById("prof-transfer-modal"),
+    title: document.getElementById("prof-transfer-title"),
+    note: document.getElementById("prof-transfer-note"),
+    text: document.getElementById("prof-transfer-text"),
+    copyBtn: document.getElementById("prof-transfer-copy-btn"),
+    applyBtn: document.getElementById("prof-transfer-apply-btn"),
+  };
+}
+
+function openProfessionTransferModal(mode = "export") {
+  professionTransferMode = mode === "import" ? "import" : "export";
+  const { modal, title, note, text, copyBtn, applyBtn } = getProfessionTransferElements();
+  if (!modal || !title || !note || !text || !copyBtn || !applyBtn) return;
+
+  if (professionTransferMode === "import") {
+    title.textContent = "生产计算导入";
+    note.textContent =
+      "把之前导出的生产计算文本粘贴到这里，导入后会覆盖当前原材料区、产物区以及相关计算设置。";
+    text.value = "";
+    text.readOnly = false;
+    copyBtn.style.display = "none";
+    applyBtn.style.display = "";
+  } else {
+    title.textContent = "生产计算导出";
+    note.textContent =
+      "导出完整生产计算状态，包含原材料区、产物区以及当前计算设置。";
+    text.value = JSON.stringify(
+      {
+        version: 1,
+        type: "wakfu-profession-calc",
+        data: getProfessionCalculatorState(),
+      },
+      null,
+      2
+    );
+    text.readOnly = true;
+    copyBtn.style.display = "";
+    applyBtn.style.display = "none";
+    text.select();
+  }
+
+  modal.style.display = "flex";
+}
+
+function closeProfessionTransferModal() {
+  const { modal } = getProfessionTransferElements();
+  if (modal) modal.style.display = "none";
+}
+
+async function copyProfessionTransferText() {
+  const { text } = getProfessionTransferElements();
+  if (!text) return;
+
+  try {
+    await navigator.clipboard.writeText(text.value || "");
+  } catch {
+    text.select();
+    document.execCommand("copy");
+  }
+}
+
+function applyProfessionImport() {
+  const { text } = getProfessionTransferElements();
+  if (!text) return;
+
+  try {
+    const parsed = JSON.parse(text.value || "{}");
+    const payload =
+      parsed?.type === "wakfu-profession-calc" && parsed?.data
+        ? parsed.data
+        : parsed;
+    applyProfessionCalculatorState(payload);
+    saveProfessionCalculatorState();
+    if (professionCalcAutoCalculate) {
+      renderProfessionCalculationResult();
+    } else {
+      resetProfessionCalculationResult();
+    }
+    closeProfessionTransferModal();
+  } catch (error) {
+    console.error("Failed to import profession calculator state:", error);
+    alert("生产计算导入失败，请确认内容是完整的导出文本。");
+  }
 }
 
 function resetProfessionCalculationResult() {
@@ -801,3 +944,8 @@ function escapeHtml(value) {
 function escapeHtmlAttribute(value) {
   return escapeHtml(value).replace(/`/g, "&#96;");
 }
+
+window.openProfessionTransferModal = openProfessionTransferModal;
+window.closeProfessionTransferModal = closeProfessionTransferModal;
+window.copyProfessionTransferText = copyProfessionTransferText;
+window.applyProfessionImport = applyProfessionImport;

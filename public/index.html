@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>沃土伴侣 | T2薯条</title>
     <link rel="stylesheet" href="assets/vendor/driverjs/driver.css?v=20260630a" />
-    <link rel="stylesheet" href="assets/css/style.css?v=20260703b" />
+    <link rel="stylesheet" href="assets/css/style.css?v=20260703c" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
   </head>
   <body>
@@ -954,6 +954,23 @@
       </div>
     </div>
 
+    <div id="prof-transfer-modal" class="custom-modal" style="display: none">
+      <div class="modal-content tracker-transfer-modal-content">
+        <div class="modal-header">
+          <h3 id="prof-transfer-title">生产计算导出</h3>
+          <button class="close-modal" onclick="closeProfessionTransferModal()">×</button>
+        </div>
+        <div class="modal-body tracker-transfer-body">
+          <div class="tracker-transfer-note" id="prof-transfer-note"></div>
+          <textarea id="prof-transfer-text" class="tracker-transfer-textarea" spellcheck="false"></textarea>
+          <div class="tracker-transfer-actions">
+            <button id="prof-transfer-copy-btn" class="tracker-action-btn" onclick="copyProfessionTransferText()">复制</button>
+            <button id="prof-transfer-apply-btn" class="add-track-btn" onclick="applyProfessionImport()">导入并覆盖</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div id="broadcast-modal" class="floating-window broadcast-window" style="display: none"></div>
 
     <div id="sound-settings-modal" class="floating-window sound-settings-window" style="display: none; left: 50%; top: 16%; transform: translateX(-50%); width: 520px">
@@ -1056,7 +1073,7 @@
     <script src="assets/js/modules/onboarding.js?v=20260630b"></script>
 
     <!-- Core -->
-    <script src="assets/js/core/professions.js?v=20260619b"></script>
+    <script src="assets/js/core/professions.js?v=20260703b"></script>
     <script src="assets/js/core/main.js?v=20260703b"></script>
   </body>
 </html>

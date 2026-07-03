@@ -2920,6 +2920,20 @@ body.pip-window .empty-state {
   margin-bottom: 15px;
 }
 
+.prof-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+.prof-header-btn {
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  line-height: 1;
+}
+
 .selected-job-icon {
   width: 34px;
   height: 34px;
