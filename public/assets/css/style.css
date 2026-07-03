@@ -4307,6 +4307,13 @@ body.pip-window .empty-state {
   min-height: 22px;
 }
 
+button.stat-row {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
 .stat-label {
   color: #888;
 }
@@ -4367,6 +4374,118 @@ body.pip-window .empty-state {
 
 .session-modal-body {
   padding: 15px;
+}
+
+.session-kama-detail-trigger {
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
+  border: 1px solid transparent;
+}
+
+.session-kama-detail-trigger:hover {
+  background: rgba(0, 225, 255, 0.08);
+  border-color: rgba(0, 225, 255, 0.22);
+}
+
+.session-kama-detail-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.session-kama-detail-main .stat-val {
+  margin-left: auto;
+  text-align: right;
+}
+
+.session-kama-detail-action {
+  color: var(--accent);
+  font-size: 0.76rem;
+  letter-spacing: 0.4px;
+  flex: 0 0 auto;
+  min-width: 32px;
+  text-align: right;
+}
+
+.session-kama-detail-window {
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+}
+
+.session-kama-detail-body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 320px;
+  max-height: 420px;
+}
+
+.session-kama-detail-summary {
+  color: #b8b8b8;
+  font-size: 0.8rem;
+  border: 1px solid #333;
+  background: #181818;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.session-kama-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 4px;
+}
+
+.session-kama-detail-item {
+  border: 1px solid #333;
+  background: #171717;
+  border-radius: 8px;
+  padding: 9px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.session-kama-detail-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.76rem;
+}
+
+.session-kama-detail-time {
+  color: #8e8e8e;
+  font-family: monospace;
+}
+
+.session-kama-detail-amount {
+  font-family: monospace;
+  font-weight: 700;
+}
+
+.session-kama-detail-amount.earned {
+  color: #2ecc71;
+}
+
+.session-kama-detail-amount.spent {
+  color: #e74c3c;
+}
+
+.session-kama-detail-source {
+  color: #d2d2d2;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  word-break: break-word;
 }
 
 .sound-settings-window {

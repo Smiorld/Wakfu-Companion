@@ -4,7 +4,7 @@
 // ==========================================
 
 let sessionStats = {
-  kamas: { earned: 0, spent: 0 },
+  kamas: { earned: 0, spent: 0, details: { earned: [], spent: [] } },
   quests: 0,
   challenges: 0,
   xp: {
@@ -28,6 +28,8 @@ let sessionStats = {
 
 let sessionStartTime = null;
 let sessionTimerInterval = null;
+let sessionKamaDetailMode = "earned";
+let lastSessionContextLine = null;
 
 const REGEX_QUEST_SUCCESS_ONLY =
   /(?:quest finished|quest completed|completed the quest|finished the quest|won the quest|quête terminée|terminé la quête|mission accomplie|misión cumplida|completado la misión|missão cumprida|completou a missão|你完成了任务|任务完成|完成任务|".*?"任务(?:获胜|完成))/i;
@@ -116,6 +118,161 @@ const PROFESSION_DISPLAY_LABELS = {
   Trapper: "畜牧",
 };
 
+function createEmptySessionKamaDetails() {
+  return { earned: [], spent: [] };
+}
+
+function sanitizeSessionKamaDetails(details) {
+  const next = createEmptySessionKamaDetails();
+  if (!details || typeof details !== "object") return next;
+
+  ["earned", "spent"].forEach((key) => {
+    const source = Array.isArray(details[key]) ? details[key] : [];
+    next[key] = source
+      .filter((entry) => entry && typeof entry === "object")
+      .map((entry) => ({
+        time: String(entry.time || "").trim(),
+        amount: Number(entry.amount) || 0,
+        source: String(entry.source || "").trim(),
+      }))
+      .filter((entry) => entry.amount > 0);
+  });
+
+  return next;
+}
+
+function extractSessionLogTime(line) {
+  const match = String(line || "").match(/\b(\d{2}:\d{2}:\d{2})(?:,\d{3})?\b/);
+  return match ? match[1] : "";
+}
+
+function extractSessionMessage(line) {
+  const text = String(line || "");
+  const markerIndex = text.indexOf(" - ");
+  return markerIndex >= 0 ? text.slice(markerIndex + 3).trim() : text.trim();
+}
+
+function isStandaloneKamaMessage(message) {
+  return /^(?:\[[^\]]+\]\s*)?(?:你获得了|你失去了|获得了|失去了|won|earned|gained|spent|lost)\s*[\d\s.,\u00A0]+\s*(?:kamas?|卡玛)[。.]?$/i.test(
+    String(message || "").trim()
+  );
+}
+
+function toSessionTimeSeconds(value) {
+  const match = String(value || "").match(/^(\d{2}):(\d{2}):(\d{2})$/);
+  if (!match) return null;
+  return (
+    parseInt(match[1], 10) * 3600 +
+    parseInt(match[2], 10) * 60 +
+    parseInt(match[3], 10)
+  );
+}
+
+function isNearbySessionTime(a, b, maxDeltaSeconds = 10) {
+  const aSeconds = toSessionTimeSeconds(a);
+  const bSeconds = toSessionTimeSeconds(b);
+  if (aSeconds === null || bSeconds === null) return false;
+  return Math.abs(aSeconds - bSeconds) <= maxDeltaSeconds;
+}
+
+function buildSessionKamaDetail(kind, amount, line) {
+  const time = extractSessionLogTime(line);
+  const message = extractSessionMessage(line);
+  let source = message;
+
+  if (
+    isStandaloneKamaMessage(message) &&
+    lastSessionContextLine?.message &&
+    lastSessionContextLine.message !== message &&
+    isNearbySessionTime(time, lastSessionContextLine.time)
+  ) {
+    source = `${lastSessionContextLine.message} / ${message}`;
+  }
+
+  return { time, amount, source };
+}
+
+function appendSessionKamaDetail(kind, amount, line) {
+  if (!sessionStats.kamas.details || typeof sessionStats.kamas.details !== "object") {
+    sessionStats.kamas.details = createEmptySessionKamaDetails();
+  }
+  if (!Array.isArray(sessionStats.kamas.details[kind])) {
+    sessionStats.kamas.details[kind] = [];
+  }
+  sessionStats.kamas.details[kind].push(buildSessionKamaDetail(kind, amount, line));
+}
+
+function renderSessionKamaDetail() {
+  const listEl = document.getElementById("session-kama-detail-list");
+  const summaryEl = document.getElementById("session-kama-detail-summary");
+  const titleEl = document.getElementById("session-kama-detail-title");
+  if (!listEl || !summaryEl || !titleEl) return;
+
+  const kind = sessionKamaDetailMode === "spent" ? "spent" : "earned";
+  const details = Array.isArray(sessionStats.kamas.details?.[kind])
+    ? sessionStats.kamas.details[kind]
+    : [];
+  const total = sessionStats.kamas[kind] || 0;
+  const title = kind === "spent" ? "卡玛花费明细" : "卡玛获得明细";
+
+  titleEl.textContent = title;
+  summaryEl.textContent = `共 ${details.length} 笔，合计 ${total.toLocaleString()} ₭`;
+
+  if (!details.length) {
+    listEl.innerHTML = '<div class="empty-state-mini">暂无明细记录。</div>';
+    return;
+  }
+
+  listEl.innerHTML = details
+    .slice()
+    .reverse()
+    .map(
+      (entry) => `
+        <div class="session-kama-detail-item">
+          <div class="session-kama-detail-meta">
+            <span class="session-kama-detail-time">${entry.time || "--:--:--"}</span>
+            <span class="session-kama-detail-amount ${kind}">${kind === "spent" ? "-" : "+"}${entry.amount.toLocaleString()} ₭</span>
+          </div>
+          <div class="session-kama-detail-source">${entry.source || "未记录来源"}</div>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function positionSessionKamaDetailWindow() {
+  const detailWindow = document.getElementById("session-kama-detail-window");
+  const sessionWindow = document.getElementById("session-window");
+  if (!detailWindow || !sessionWindow) return;
+
+  const sessionRect = sessionWindow.getBoundingClientRect();
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+  const rightPreferredLeft = sessionRect.right + 12;
+  const fitsRight = rightPreferredLeft + detailWindow.offsetWidth <= viewportWidth - 12;
+
+  detailWindow.style.top = `${Math.max(12, Math.round(sessionRect.top))}px`;
+  if (fitsRight) {
+    detailWindow.style.left = `${Math.round(rightPreferredLeft)}px`;
+  } else {
+    detailWindow.style.left = `${Math.max(12, Math.round(sessionRect.left - detailWindow.offsetWidth - 12))}px`;
+  }
+}
+
+function openSessionKamaDetail(mode = "earned") {
+  const detailWindow = document.getElementById("session-kama-detail-window");
+  if (!detailWindow) return;
+
+  sessionKamaDetailMode = mode === "spent" ? "spent" : "earned";
+  renderSessionKamaDetail();
+  detailWindow.style.display = "flex";
+  positionSessionKamaDetailWindow();
+}
+
+function closeSessionKamaDetail() {
+  const detailWindow = document.getElementById("session-kama-detail-window");
+  if (detailWindow) detailWindow.style.display = "none";
+}
+
 function loadSessionData() {
   const stored = localStorage.getItem("wakfu_session_stats");
   const storedTime = localStorage.getItem("wakfu_session_start");
@@ -124,7 +281,11 @@ function loadSessionData() {
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
-      sessionStats.kamas = { ...sessionStats.kamas, ...parsed.kamas };
+      sessionStats.kamas = {
+        ...sessionStats.kamas,
+        ...parsed.kamas,
+        details: sanitizeSessionKamaDetails(parsed.kamas?.details),
+      };
       sessionStats.quests = parsed.quests || 0;
       sessionStats.challenges = parsed.challenges || 0;
 
@@ -249,8 +410,10 @@ function processSessionLog(line) {
         lower.includes("gasto")
       ) {
         sessionStats.kamas.spent += amount;
+        appendSessionKamaDetail("spent", amount, line);
       } else {
         sessionStats.kamas.earned += amount;
+        appendSessionKamaDetail("earned", amount, line);
       }
       statChanged = true;
     }
@@ -286,6 +449,14 @@ function processSessionLog(line) {
     }
     updateSessionUI();
     saveSessionData();
+  }
+
+  const message = extractSessionMessage(line);
+  if (message && !isStandaloneKamaMessage(message)) {
+    lastSessionContextLine = {
+      time: extractSessionLogTime(line),
+      message,
+    };
   }
 }
 
@@ -362,6 +533,7 @@ function updateSessionUI() {
     xpContainer.innerHTML = '<div class="empty-state-mini">暂无经验记录。</div>';
   }
 
+  renderSessionKamaDetail();
   updateCurrentSessionDuration();
 }
 
@@ -396,6 +568,7 @@ function toggleSessionWindow() {
     }
   } else {
     win.style.display = "none";
+    closeSessionKamaDetail();
 
     if (sessionTimerInterval !== null) {
       clearInterval(sessionTimerInterval);
@@ -407,6 +580,7 @@ function toggleSessionWindow() {
 function resetSessionStats() {
   sessionStats.kamas.earned = 0;
   sessionStats.kamas.spent = 0;
+  sessionStats.kamas.details = createEmptySessionKamaDetails();
   sessionStats.quests = 0;
   sessionStats.challenges = 0;
 
@@ -415,6 +589,7 @@ function resetSessionStats() {
   }
 
   sessionStartTime = Date.now();
+  lastSessionContextLine = null;
   saveSessionData();
   updateSessionUI();
   updateCurrentSessionDuration();
@@ -425,6 +600,8 @@ loadSessionData();
 window.toggleSessionWindow = toggleSessionWindow;
 window.resetSessionStats = resetSessionStats;
 window.startSessionTimer = startSessionTimer;
+window.openSessionKamaDetail = openSessionKamaDetail;
+window.closeSessionKamaDetail = closeSessionKamaDetail;
 
 window.addEventListener("beforeunload", () => {
   saveSessionData();

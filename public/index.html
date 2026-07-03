@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>沃土伴侣 | T2薯条</title>
     <link rel="stylesheet" href="assets/vendor/driverjs/driver.css?v=20260630a" />
-    <link rel="stylesheet" href="assets/css/style.css?v=20260702a" />
+    <link rel="stylesheet" href="assets/css/style.css?v=20260703b" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
   </head>
   <body>
@@ -808,14 +808,20 @@
             <img src="assets/img/headers/kamas.png" class="session-icon" onerror="this.style.display='none'" />
             <h4>卡玛</h4>
           </div>
-          <div class="stat-row">
-            <span class="stat-label">获得：</span>
-            <span id="sess-kamas-earned" class="stat-val positive">0</span>
-          </div>
-          <div class="stat-row">
-            <span class="stat-label">花费：</span>
-            <span id="sess-kamas-spent" class="stat-val negative">0</span>
-          </div>
+          <button class="stat-row session-kama-detail-trigger" type="button" onclick="openSessionKamaDetail('earned')">
+            <span class="session-kama-detail-main">
+              <span class="stat-label">获得：</span>
+              <span id="sess-kamas-earned" class="stat-val positive">0</span>
+            </span>
+            <span class="session-kama-detail-action">明细</span>
+          </button>
+          <button class="stat-row session-kama-detail-trigger" type="button" onclick="openSessionKamaDetail('spent')">
+            <span class="session-kama-detail-main">
+              <span class="stat-label">花费：</span>
+              <span id="sess-kamas-spent" class="stat-val negative">0</span>
+            </span>
+            <span class="session-kama-detail-action">明细</span>
+          </button>
           <div class="stat-row net-row">
             <span class="stat-label">净值：</span>
             <span id="sess-kamas-net" class="stat-val">0</span>
@@ -847,6 +853,26 @@
         </div>
 
         <button onclick="resetSessionStats()" class="add-track-btn session-reset-btn">重置会话</button>
+      </div>
+    </div>
+
+    <div
+      id="session-kama-detail-window"
+      class="floating-window session-kama-detail-window"
+      style="display: none; left: calc(20% + 360px); top: 20%; width: 340px"
+    >
+      <div class="modal-header draggable-header" id="session-kama-detail-drag-handle">
+        <div class="session-header-group">
+          <img src="./assets/img/headers/kamas.png" class="sidebar-header-icon" onerror="this.style.display='none'" />
+          <h3 id="session-kama-detail-title">卡玛明细</h3>
+        </div>
+        <button class="close-modal" onclick="closeSessionKamaDetail()">×</button>
+      </div>
+      <div class="modal-body session-kama-detail-body">
+        <div id="session-kama-detail-summary" class="session-kama-detail-summary"></div>
+        <div id="session-kama-detail-list" class="session-kama-detail-list">
+          <div class="empty-state-mini">暂无明细记录。</div>
+        </div>
       </div>
     </div>
 
@@ -1014,7 +1040,7 @@
     <script src="assets/data/daily_dungeon_rotation.js?v=20260619b"></script>
 
     <!-- Modules -->
-    <script src="assets/js/modules/sessionRecap.js?v=20260619b"></script>
+    <script src="assets/js/modules/sessionRecap.js?v=20260703b"></script>
     <script src="assets/js/modules/state.js?v=20260619b"></script>
     <script src="assets/js/modules/utils.js?v=20260619b"></script>
     <script src="assets/js/modules/filesystem.js?v=20260630a"></script>
@@ -1031,6 +1057,6 @@
 
     <!-- Core -->
     <script src="assets/js/core/professions.js?v=20260619b"></script>
-    <script src="assets/js/core/main.js?v=20260702b"></script>
+    <script src="assets/js/core/main.js?v=20260703b"></script>
   </body>
 </html>

@@ -366,6 +366,12 @@ document.addEventListener("DOMContentLoaded", () => {
     makeDraggable(sessWindow, sessHandle);
   }
 
+  const sessionKamaDetailWindow = document.getElementById("session-kama-detail-window");
+  const sessionKamaDetailHandle = document.getElementById("session-kama-detail-drag-handle");
+  if (sessionKamaDetailWindow && sessionKamaDetailHandle) {
+    makeDraggable(sessionKamaDetailWindow, sessionKamaDetailHandle);
+  }
+
   const soundSettingsWindow = document.getElementById("sound-settings-modal");
   const soundSettingsHandle = document.getElementById("sound-settings-drag-handle");
   if (soundSettingsWindow && soundSettingsHandle) {
