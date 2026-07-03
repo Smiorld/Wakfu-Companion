@@ -2774,10 +2774,21 @@ body.pip-window .empty-state {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px rgba(0, 209, 255, 0.25);
 }
+
+.tracker-transfer-textarea.is-drag-over {
+  border-color: var(--accent);
+  background: rgba(0, 210, 255, 0.06);
+}
+
 .tracker-transfer-actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.tracker-transfer-file-btn {
+  position: relative;
+  overflow: hidden;
 }
 
 .input-group {
@@ -3277,14 +3288,14 @@ body.pip-window .empty-state {
 
 .prof-materials-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 88px 110px 34px;
+  grid-template-columns: minmax(0, 1fr) 52px 64px 34px;
   gap: 8px;
   align-items: center;
 }
 
 .prof-form-row-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 88px 110px;
+  grid-template-columns: 40px minmax(0, 1fr) 52px 64px;
   gap: 8px;
   align-items: center;
   text-align: center;
@@ -3296,13 +3307,26 @@ body.pip-window .empty-state {
   flex: 1 1 auto;
 }
 
-.prof-form-row-header span:nth-child(2),
-.prof-form-row-header span:nth-child(3) {
-  transform: translateX(-10px);
+.prof-form-row-header span:nth-child(3),
+.prof-form-row-header span:nth-child(4) {
+  transform: translateX(-6px);
 }
 
 .prof-form-row-header-materials {
   grid-column: 1 / 4;
+}
+
+.prof-form-row-header-output {
+  grid-template-columns: 40px minmax(0, 1fr) 52px 64px;
+}
+
+.prof-form-row-header-output span:nth-child(1) {
+  grid-column: 1 / 3;
+}
+
+.prof-form-row-header-output span:nth-child(2),
+.prof-form-row-header-output span:nth-child(3) {
+  transform: translateX(-6px);
 }
 
 .prof-material-header-btn {
@@ -3318,9 +3342,21 @@ body.pip-window .empty-state {
 
 .prof-output-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 88px 110px;
+  grid-template-columns: 40px minmax(0, 1fr) 52px 64px;
   gap: 8px;
   min-width: 0;
+}
+
+.prof-output-name {
+  grid-column: 1 / 3;
+}
+
+.prof-output-qty {
+  grid-column: 3;
+}
+
+.prof-output-price {
+  grid-column: 4;
 }
 
 .prof-material-rows {
@@ -3330,15 +3366,40 @@ body.pip-window .empty-state {
 
 .prof-material-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 88px 110px 34px;
-  grid-template-areas: "name qty price remove";
+  grid-template-columns: 40px minmax(0, 1fr) 52px 64px 34px;
+  grid-template-areas: "icon name qty price remove";
   gap: 8px;
   align-items: center;
   min-width: 0;
 }
 
+.prof-material-icon-wrap {
+  grid-area: icon;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #3d3d3d;
+  background: #1a1a1a;
+}
+
+.prof-material-icon-wrap.is-empty {
+  background: #171717;
+}
+
+.prof-material-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.prof-material-icon-wrap.is-empty .prof-material-icon {
+  display: none;
+}
+
 .prof-material-name {
   grid-area: name;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .prof-material-qty {
@@ -3351,6 +3412,11 @@ body.pip-window .empty-state {
 
 .prof-remove-material-btn {
   grid-area: remove;
+}
+
+.prof-material-row.is-invalid .prof-material-name {
+  border-color: rgba(231, 76, 60, 0.9);
+  box-shadow: 0 0 0 1px rgba(231, 76, 60, 0.18);
 }
 
 .prof-results-header {
@@ -3416,10 +3482,10 @@ body.pip-window .empty-state {
   }
 
   .prof-material-row {
-    grid-template-columns: minmax(0, 1fr) 34px;
+    grid-template-columns: 40px minmax(0, 1fr) 34px;
     grid-template-areas:
-      "name remove"
-      "qty price";
+      "icon name remove"
+      "qty qty price";
   }
 
   .prof-cost-row {
@@ -3440,8 +3506,8 @@ body.pip-window .empty-state {
     text-align: left;
   }
 
-  .prof-form-row-header span:nth-child(2),
-  .prof-form-row-header span:nth-child(3) {
+  .prof-form-row-header span:nth-child(3),
+  .prof-form-row-header span:nth-child(4) {
     transform: none;
   }
 

@@ -6,7 +6,7 @@ let trackerDecreaseOnLoss =
   localStorage.getItem("wakfu_tracker_decrease_on_loss") === "true";
 let trackerTransferMode = "export";
 
-const TRACKER_TRANSFER_SCHEMA = "wakfu-tracker";
+const TRACKER_TRANSFER_SCHEMA = "wakfu-companion-transfer";
 const TRACKER_TRANSFER_VERSION = 1;
 
 const PROFESSION_SORT_ORDER = {
@@ -116,6 +116,29 @@ function getTrackerExportName(itemName, nameMode = "bilingual") {
   if (nameMode === "chinese") return chineseName || itemName;
 
   return chineseName ? `${chineseName}  ${itemName}` : itemName;
+}
+
+function getTrackerCatalogItemIconPath(item) {
+  if (!item) return "./assets/img/resources/not_found.png";
+  if (item.profession === "ALL" && item.imgId) {
+    return `./assets/img/items/${item.imgId}.png`;
+  }
+  const safeItemName = (item.imgName || item.name || "not_found").replace(/\s+/g, "_");
+  return `./assets/img/resources/${safeItemName}.png`;
+}
+
+function buildTransferItemFromCatalogItem(catalogItem, overrides = {}) {
+  return {
+    name: getTrackerExportName(catalogItem.name, "bilingual"),
+    englishName: catalogItem.name,
+    chineseName: getPrimaryChineseLabel(catalogItem.name),
+    current: overrides.current ?? 0,
+    target: overrides.target ?? 0,
+    price: overrides.price ?? 0,
+    level: overrides.level ?? catalogItem.level ?? 0,
+    rarity: overrides.rarity ?? catalogItem.rarity ?? "common",
+    profession: overrides.profession ?? catalogItem.profession ?? "ALL",
+  };
 }
 
 function buildTrackerCatalog() {
@@ -240,6 +263,9 @@ function initTrackerDropdowns() {
   loadTrackerState();
   updateTrackerLossToggleUI();
   setTrackerFilter(currentTrackerFilter);
+  if (typeof window.refreshProfessionMaterialCatalogBindings === "function") {
+    window.refreshProfessionMaterialCatalogBindings();
+  }
 }
 
 function processItemLog(line) {
@@ -332,6 +358,7 @@ function buildTrackerExportPayload(nameMode = "bilingual") {
   return {
     schema: TRACKER_TRANSFER_SCHEMA,
     version: TRACKER_TRANSFER_VERSION,
+    source: "tracker",
     nameMode,
     exportedAt: new Date().toISOString(),
     items: trackedItems.map((item) => ({
@@ -354,33 +381,49 @@ function getTrackerTransferElements() {
     title: document.getElementById("tracker-transfer-title"),
     note: document.getElementById("tracker-transfer-note"),
     text: document.getElementById("tracker-transfer-text"),
+    fileBtn: document.getElementById("tracker-transfer-file-btn"),
+    fileInput: document.getElementById("tracker-transfer-file-input"),
     copyBtn: document.getElementById("tracker-transfer-copy-btn"),
     applyBtn: document.getElementById("tracker-transfer-apply-btn"),
   };
 }
 
 function openTrackerTransferModal(mode = "export") {
-  const { modal, title, note, text, copyBtn, applyBtn } = getTrackerTransferElements();
-  if (!modal || !title || !note || !text || !copyBtn || !applyBtn) return;
+  const { modal, title, note, text, fileBtn, fileInput, copyBtn, applyBtn } = getTrackerTransferElements();
+  if (!modal || !title || !note || !text || !fileBtn || !fileInput || !copyBtn || !applyBtn) return;
 
   trackerTransferMode = mode === "import" ? "import" : "export";
 
   if (trackerTransferMode === "export") {
-    title.textContent = "追踪器导出";
-    note.textContent =
-      "导出的是可读可改的 JSON。默认名称使用中英双语；后续如需纯英文输出，现有格式也可以直接兼容。";
-    text.value = JSON.stringify(buildTrackerExportPayload("bilingual"), null, 2);
-    text.readOnly = true;
-    copyBtn.style.display = "inline-flex";
-    applyBtn.style.display = "none";
+    const defaultName = sanitizeTrackerTransferFilename("追踪器导出");
+    const promptedName = prompt("导出文件名：", defaultName);
+    if (promptedName === null) return;
+    const fileName = promptedName || defaultName;
+    downloadTrackerTransferFile(
+      buildTrackerExportPayload("bilingual"),
+      sanitizeTrackerTransferFilename(fileName) || defaultName
+    );
+    closeTrackerTransferModal();
+    return;
   } else {
     title.textContent = "追踪器导入";
     note.textContent =
-      "把导出的 JSON 粘贴到这里即可。导入只会合并和更新字符串里出现的物品，不会删除你本地已有但未出现在导入内容里的项目。";
+      "支持把 JSON 文本粘贴到这里，或把导出的文件拖进来。也兼容生产计算导出。";
     text.value = "";
     text.readOnly = false;
+    fileBtn.style.display = "inline-flex";
     copyBtn.style.display = "none";
     applyBtn.style.display = "inline-flex";
+    bindTrackerTransferDropZone(modal, text);
+    if (fileInput.dataset.bound !== "true") {
+      fileInput.dataset.bound = "true";
+      fileInput.addEventListener("change", async (event) => {
+        const file = event.target?.files?.[0];
+        if (!file) return;
+        await loadTrackerTransferFile(file);
+        event.target.value = "";
+      });
+    }
   }
 
   modal.style.display = "flex";
@@ -407,10 +450,99 @@ async function copyTrackerTransferText() {
   }
 }
 
+async function loadTrackerTransferFile(file) {
+  try {
+    const text = await file.text();
+    const elements = getTrackerTransferElements();
+    if (!elements.text) return;
+    elements.text.value = text;
+    if (trackerTransferMode === "import") {
+      applyTrackerImport();
+    }
+  } catch (error) {
+    console.error("Failed to read tracker transfer file:", error);
+    alert("读取追踪器导入文件失败。");
+  }
+}
+
+function bindTrackerTransferDropZone(modal, textArea) {
+  if (!modal || !textArea || modal.dataset.trackerTransferDropBound === "true") return;
+  modal.dataset.trackerTransferDropBound = "true";
+
+  const setDragState = (active) => {
+    textArea.classList.toggle("is-drag-over", active);
+  };
+
+  ["dragenter", "dragover"].forEach((eventName) => {
+    modal.addEventListener(eventName, (event) => {
+      if (trackerTransferMode !== "import") return;
+      event.preventDefault();
+      setDragState(true);
+    });
+  });
+
+  ["dragleave", "dragend"].forEach((eventName) => {
+    modal.addEventListener(eventName, () => {
+      setDragState(false);
+    });
+  });
+
+  modal.addEventListener("drop", (event) => {
+    if (trackerTransferMode !== "import") return;
+    event.preventDefault();
+    setDragState(false);
+    const file = event.dataTransfer?.files?.[0];
+    if (file) {
+      loadTrackerTransferFile(file);
+      return;
+    }
+    const droppedText = event.dataTransfer?.getData("text/plain");
+    if (droppedText) {
+      textArea.value = droppedText;
+    }
+  });
+}
+
+function sanitizeTrackerTransferFilename(value) {
+  return String(value || "")
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, "_")
+    .replace(/\s+/g, " ");
+}
+
+function downloadTrackerTransferFile(payload, baseName) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: "application/json;charset=utf-8",
+  });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `${baseName || "追踪器导出"}.json`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+}
+
 function parseTrackerTransferItems(rawText) {
   const parsed = JSON.parse(rawText);
   if (Array.isArray(parsed)) return parsed;
   if (parsed && Array.isArray(parsed.items)) return parsed.items;
+
+  const professionMaterials =
+    (Array.isArray(parsed?.materials) && parsed.materials) ||
+    (Array.isArray(parsed?.calculator?.materials) && parsed.calculator.materials) ||
+    (Array.isArray(parsed?.data?.materials) && parsed.data.materials);
+
+  if (professionMaterials) {
+    return professionMaterials.map((material) => ({
+      name: material?.displayName || material?.name || material?.englishName || "",
+      englishName: material?.englishName,
+      chineseName: material?.chineseName,
+      target: material?.qty ?? material?.target ?? 0,
+      price: material?.price ?? 0,
+    }));
+  }
+
   throw new Error("未找到可导入的 items 数组。");
 }
 
@@ -443,18 +575,7 @@ function findImportedTrackerCatalogItem(entry) {
   return null;
 }
 
-function applyTrackerImport() {
-  const { text } = getTrackerTransferElements();
-  if (!text) return;
-
-  let importedItems;
-  try {
-    importedItems = parseTrackerTransferItems(text.value.trim());
-  } catch (error) {
-    alert(`导入失败：${error.message}`);
-    return;
-  }
-
+function mergeTrackerTransferItems(importedItems) {
   let addedCount = 0;
   let updatedCount = 0;
   let skippedCount = 0;
@@ -470,9 +591,20 @@ function applyTrackerImport() {
       (item) => item.name === catalogItem.name && (item.rarity || "common") === (catalogItem.rarity || "common")
     );
 
-    const nextCurrent = Math.max(0, normalizeTrackerImportedNumber(entry.current, 0));
-    const nextTarget = Math.max(0, normalizeTrackerImportedNumber(entry.target, 0));
-    const nextPrice = Math.max(0, normalizeTrackerImportedNumber(entry.price, existingItem?.price || 0));
+    const hasCurrent = entry?.current !== undefined && entry?.current !== null && String(entry.current).trim?.() !== "";
+    const nextCurrent = hasCurrent
+      ? Math.max(0, normalizeTrackerImportedNumber(entry.current, 0))
+      : existingItem?.current || 0;
+    const nextTarget = Math.max(
+      0,
+      normalizeTrackerImportedNumber(
+        entry.target ?? entry.qty ?? entry.count,
+        existingItem?.target || 0
+      )
+    );
+    const importedPrice = Math.max(0, normalizeTrackerImportedNumber(entry.price, 0));
+    const nextPrice =
+      importedPrice > 0 ? importedPrice : existingItem?.price || 0;
 
     if (existingItem) {
       existingItem.displayName = catalogItem.displayName;
@@ -508,6 +640,23 @@ function applyTrackerImport() {
 
   saveTrackerState();
   renderTracker();
+  return { addedCount, updatedCount, skippedCount };
+}
+
+function applyTrackerImport() {
+  const { text } = getTrackerTransferElements();
+  if (!text) return;
+
+  let importedItems;
+  try {
+    importedItems = parseTrackerTransferItems(text.value.trim());
+  } catch (error) {
+    alert(`导入失败：${error.message}`);
+    return;
+  }
+
+  const { addedCount, updatedCount, skippedCount } =
+    mergeTrackerTransferItems(importedItems);
   closeTrackerTransferModal();
 
   const summary = `追踪器导入完成：新增 ${addedCount}，更新 ${updatedCount}，跳过 ${skippedCount}。`;
@@ -943,6 +1092,11 @@ function closeTrackerModal() {
 }
 
 window.toggleTrackerLossMode = toggleTrackerLossMode;
+window.findTrackerCatalogItem = findTrackerCatalogItem;
+window.getTrackerCatalogItemIconPath = getTrackerCatalogItemIconPath;
+window.buildTransferItemFromCatalogItem = buildTransferItemFromCatalogItem;
+window.getPrimaryChineseLabel = getPrimaryChineseLabel;
+window.mergeTrackerTransferItems = mergeTrackerTransferItems;
 window.openTrackerTransferModal = openTrackerTransferModal;
 window.closeTrackerTransferModal = closeTrackerTransferModal;
 window.copyTrackerTransferText = copyTrackerTransferText;

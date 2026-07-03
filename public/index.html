@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>沃土伴侣 | T2薯条</title>
     <link rel="stylesheet" href="assets/vendor/driverjs/driver.css?v=20260630a" />
-    <link rel="stylesheet" href="assets/css/style.css?v=20260703c" />
+    <link rel="stylesheet" href="assets/css/style.css?v=20260704c" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
   </head>
   <body>
@@ -947,6 +947,10 @@
           <div class="tracker-transfer-note" id="tracker-transfer-note"></div>
           <textarea id="tracker-transfer-text" class="tracker-transfer-textarea" spellcheck="false"></textarea>
           <div class="tracker-transfer-actions">
+            <label id="tracker-transfer-file-btn" class="tracker-action-btn tracker-transfer-file-btn">
+              选择文件
+              <input id="tracker-transfer-file-input" type="file" accept=".json,.txt,application/json,text/plain" hidden />
+            </label>
             <button id="tracker-transfer-copy-btn" class="tracker-action-btn" onclick="copyTrackerTransferText()">复制</button>
             <button id="tracker-transfer-apply-btn" class="add-track-btn" onclick="applyTrackerImport()">导入并合并</button>
           </div>
@@ -964,6 +968,10 @@
           <div class="tracker-transfer-note" id="prof-transfer-note"></div>
           <textarea id="prof-transfer-text" class="tracker-transfer-textarea" spellcheck="false"></textarea>
           <div class="tracker-transfer-actions">
+            <label id="prof-transfer-file-btn" class="tracker-action-btn tracker-transfer-file-btn">
+              选择文件
+              <input id="prof-transfer-file-input" type="file" accept=".json,.txt,application/json,text/plain" hidden />
+            </label>
             <button id="prof-transfer-copy-btn" class="tracker-action-btn" onclick="copyProfessionTransferText()">复制</button>
             <button id="prof-transfer-apply-btn" class="add-track-btn" onclick="applyProfessionImport()">导入并覆盖</button>
           </div>
@@ -1066,14 +1074,14 @@
     <script src="assets/js/modules/chat.js?v=20260701b"></script>
     <script src="assets/js/modules/broadcast.js?v=20260701d"></script>
     <script src="assets/js/modules/combat.js?v=20260621f"></script>
-    <script src="assets/js/modules/tracker.js?v=20260619b"></script>
+    <script src="assets/js/modules/tracker.js?v=20260704c"></script>
     <script src="assets/js/modules/forecast.js?v=20260619b"></script>
     <script src="assets/js/modules/ui.js?v=20260619b"></script>
     <script src="assets/vendor/driverjs/driver.js.iife.js?v=20260630a"></script>
     <script src="assets/js/modules/onboarding.js?v=20260630b"></script>
 
     <!-- Core -->
-    <script src="assets/js/core/professions.js?v=20260703b"></script>
+    <script src="assets/js/core/professions.js?v=20260704g"></script>
     <script src="assets/js/core/main.js?v=20260703b"></script>
   </body>
 </html>
