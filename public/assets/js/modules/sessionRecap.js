@@ -162,16 +162,11 @@ function isRelevantKamaContextMessage(message) {
   const text = String(message || "").trim();
   if (!text || isStandaloneKamaMessage(text)) return false;
 
-  if (
-    /^(?:\[(?:系统|System|Trade|交易)\])/.test(text) ||
-    /\b(?:MARKET|market|échange|exchange|kamas?)\b/i.test(text)
-  ) {
+  if (/\b(?:MARKET|market|échange|exchange)\b/i.test(text)) {
     return true;
   }
 
-  if (
-    /^(?:你获得了|你失去了|获得了|失去了).*(?:x\d+|x\d+[。.]?)$/i.test(text)
-  ) {
+  if (/^(?:\[(?:系统|System)\]\s*)?(?:你获得了|你失去了|获得了|失去了).*(?:x\d+|x\d+[。.]?)$/i.test(text)) {
     return true;
   }
 
