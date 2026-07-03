@@ -158,6 +158,26 @@ function isStandaloneKamaMessage(message) {
   );
 }
 
+function isRelevantKamaContextMessage(message) {
+  const text = String(message || "").trim();
+  if (!text || isStandaloneKamaMessage(text)) return false;
+
+  if (
+    /^(?:\[(?:系统|System|Trade|交易)\])/.test(text) ||
+    /\b(?:MARKET|market|échange|exchange|kamas?)\b/i.test(text)
+  ) {
+    return true;
+  }
+
+  if (
+    /^(?:你获得了|你失去了|获得了|失去了).*(?:x\d+|x\d+[。.]?)$/i.test(text)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 function toSessionTimeSeconds(value) {
   const match = String(value || "").match(/^(\d{2}):(\d{2}):(\d{2})$/);
   if (!match) return null;
@@ -184,7 +204,8 @@ function buildSessionKamaDetail(kind, amount, line) {
     isStandaloneKamaMessage(message) &&
     lastSessionContextLine?.message &&
     lastSessionContextLine.message !== message &&
-    isNearbySessionTime(time, lastSessionContextLine.time)
+    isNearbySessionTime(time, lastSessionContextLine.time) &&
+    isRelevantKamaContextMessage(lastSessionContextLine.message)
   ) {
     source = `${lastSessionContextLine.message} / ${message}`;
   }
@@ -452,7 +473,7 @@ function processSessionLog(line) {
   }
 
   const message = extractSessionMessage(line);
-  if (message && !isStandaloneKamaMessage(message)) {
+  if (isRelevantKamaContextMessage(message)) {
     lastSessionContextLine = {
       time: extractSessionLogTime(line),
       message,
