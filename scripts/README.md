@@ -99,6 +99,7 @@ node scripts/resolve-resource-asset-chain.js --input-file "D:\tool\download\Reso
 - 批量解析资源条目。
 - 对照 `public/assets/js/data/items.js` 和 `public/assets/js/data/item_i18n_map.js`。
 - 找出追踪器还没收录的条目。
+- 默认会尝试从 `artifacts/wakfu-i18n/wakfu_i18n_en_zh.json` 自动补中文映射。
 
 默认行为：
 - 只报告缺项，不写文件。
@@ -113,9 +114,13 @@ node scripts/sync-resource-list-to-tracker-data.js --input-file "...html" --appl
 node scripts/sync-resource-list-to-tracker-data.js --input-file "...html" --zh-map-file ".\tmp\resource_zh_map.json" --apply
 ```
 
+说明：
+- `--zh-map-file` 是覆盖层，优先级高于自动读取到的 `wakfu_i18n` 中文。
+- 适合手工修正自动翻译不理想、或 `wakfu_i18n` 没命中的条目。
+
 规则：
 - `items.js` 缺项时，按 `monsterResources` 现有格式追加。
-- `item_i18n_map.js` 只有提供中文映射时才自动补。
+- `item_i18n_map.js` 会优先使用本地 `wakfu_i18n` 自动补；若还缺，再看 `--zh-map-file`。
 - encyclopedia 的 `Unusual` 会映射为项目里的 `Common`。
 
 ## 手动运行脚本

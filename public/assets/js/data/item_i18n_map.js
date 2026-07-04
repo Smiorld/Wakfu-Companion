@@ -3809,4 +3809,64 @@ const ITEM_I18N_MAP = {
   "Shards": [
     "\u9644\u9b54\u788e\u7247\u3000Shards"
   ]
+  ,
+  "Sour Sea Breath": [
+    "海腥之息　Sour Sea Breath"
+  ]
+  ,
+  "Tuft of Boohemoth Hairs": [
+    "雪狼毛发　Tuft of Boohemoth Hairs"
+  ]
+  ,
+  "Brrrbli Leather": [
+    "寒冰猪皮　Brrrbli Leather"
+  ]
+  ,
+  "Neo Black Crow's Feather": [
+    "新世黑鸦骑士的羽毛　Neo Black Crow's Feather"
+  ]
+  ,
+  "Black Crow's Feather": [
+    "黑鸦骑士的羽毛　Black Crow's Feather"
+  ]
+  ,
+  "Gobbalrog Embers": [
+    "熔岩绵球余烬　Gobbalrog Embers"
+  ]
+  ,
+  "Hushed Metal": [
+    "寂静金属　Hushed Metal"
+  ]
+  ,
+  "Living Sweet Gum": [
+    "重生的蜜胶　Living Sweet Gum"
+  ]
+  ,
+  "Brrrbli Septum Ring": [
+    "寒冰咕哩隔膜戒指　Brrrbli Septum Ring"
+  ]
+  ,
+  "Riktus Cloth": [
+    "土匪布料　Riktus Cloth"
+  ]
+  ,
+  "Riktus Scalp": [
+    "土匪的头皮　Riktus Scalp"
+  ]
+  ,
+  "Royal Jelly": [
+    "皇家者喱精华　Royal Jelly"
+  ]
+  ,
+  "Spare Tile": [
+    "碎青砖　Spare Tile"
+  ]
+  ,
+  "Brrrbley Spears Leather": [
+    "五花皮　Brrrbley Spears Leather"
+  ]
+  ,
+  "Riktus Standard": [
+    "土匪旗帜　Riktus Standard"
+  ]
 };

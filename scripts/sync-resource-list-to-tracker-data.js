@@ -12,6 +12,12 @@ const I18N_MAP_PATH = path.join(
   "data",
   "item_i18n_map.js"
 );
+const DEFAULT_WAKFU_I18N_JSON_PATH = path.join(
+  ROOT_DIR,
+  "artifacts",
+  "wakfu-i18n",
+  "wakfu_i18n_en_zh.json"
+);
 
 function parseArgs(argv) {
   const options = {
@@ -101,6 +107,7 @@ function parseManualListItems(text) {
 function normalizeRarity(encyclopediaRarity) {
   const value = String(encyclopediaRarity || "").trim().toLowerCase();
   if (value === "unusual") return "Common";
+  if (value === "common quality" || value === "common") return "Common";
   if (value === "rare") return "Rare";
   if (value === "mythical") return "Mythical";
   if (value === "legendary") return "Legendary";
@@ -115,6 +122,43 @@ function loadZhMap(filePath) {
     throw new Error(`zh map file not found: ${resolvedPath}`);
   }
   return JSON.parse(fs.readFileSync(resolvedPath, "utf8"));
+}
+
+function extractPrimaryChineseLabel(value, englishName = "") {
+  const rawValue = String(value || "").trim();
+  if (!rawValue) return "";
+
+  const suffixPattern = englishName
+    ? new RegExp(`(?:\\s|　)+${escapeRegex(String(englishName).trim())}\\s*$`, "i")
+    : null;
+
+  const stripped = suffixPattern ? rawValue.replace(suffixPattern, "").trim() : rawValue;
+  if (stripped) return stripped;
+  return rawValue;
+}
+
+function escapeRegex(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function loadAutoZhMap() {
+  if (!fs.existsSync(DEFAULT_WAKFU_I18N_JSON_PATH)) {
+    return {};
+  }
+
+  const rows = JSON.parse(fs.readFileSync(DEFAULT_WAKFU_I18N_JSON_PATH, "utf8"));
+  const map = {};
+
+  rows.forEach((row) => {
+    const english = String(row?.english || "").trim();
+    const chinese = extractPrimaryChineseLabel(row?.chinese, english);
+    if (!english || !chinese) return;
+    if (!map[english]) {
+      map[english] = chinese;
+    }
+  });
+
+  return map;
 }
 
 function buildMissingPlan(listItems, monsterResources, itemI18nMap, zhMap) {
@@ -207,7 +251,12 @@ function main() {
   const listItems = parseManualListItems(html);
   const { monsterResources } = loadScriptGlobals(ITEMS_DATA_PATH, ["monsterResources"]);
   const { ITEM_I18N_MAP } = loadScriptGlobals(I18N_MAP_PATH, ["ITEM_I18N_MAP"]);
-  const zhMap = loadZhMap(options.zhMapFile);
+  const autoZhMap = loadAutoZhMap();
+  const manualZhMap = loadZhMap(options.zhMapFile);
+  const zhMap = {
+    ...autoZhMap,
+    ...manualZhMap,
+  };
 
   const plan = buildMissingPlan(listItems, monsterResources, ITEM_I18N_MAP, zhMap);
 
@@ -227,6 +276,8 @@ function main() {
         missingItems: plan.missingItems,
         missingI18nCount: plan.missingI18n.length,
         missingI18n: plan.missingI18n,
+        autoZhMapCount: Object.keys(autoZhMap).length,
+        manualZhMapCount: Object.keys(manualZhMap).length,
         applied: options.apply,
         wroteItems,
         wroteI18n,

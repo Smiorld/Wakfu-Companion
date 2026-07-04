@@ -1118,6 +1118,32 @@ function getProfessionAuthorityPrice(englishName) {
     : 0;
 }
 
+function syncProfessionAuthorityPriceForRow(row) {
+  const input = row?.querySelector(".prof-material-name");
+  const priceInput = row?.querySelector(".prof-material-price");
+  const englishName = String(input?.dataset.englishName || "").trim();
+  if (!englishName || !priceInput) return false;
+  if (typeof window.setTrackerAuthoritativePrice !== "function") return false;
+
+  const parsedPrice = parseProfessionRoundedInteger(priceInput.value, null);
+  if (parsedPrice === null || Number.isNaN(parsedPrice)) return false;
+
+  return window.setTrackerAuthoritativePrice(englishName, parsedPrice, {
+    allowZeroOverride: false,
+  });
+}
+
+function syncProfessionAuthorityPricesFromMaterials() {
+  const rows = Array.from(
+    document.querySelectorAll?.("#prof-material-rows .prof-material-row") || []
+  );
+  let changed = false;
+  rows.forEach((row) => {
+    changed = syncProfessionAuthorityPriceForRow(row) || changed;
+  });
+  return changed;
+}
+
 function applyProfessionMaterialPriceSource(row, matchedItem, options = {}) {
   const priceInput = row?.querySelector(".prof-material-price");
   if (!priceInput || !matchedItem?.name) return;
@@ -1193,6 +1219,7 @@ function syncProfessionMaterialRow(row, options = {}) {
       priceSource: options.priceSource || "authority",
       fillIfEmpty: options.fillIfEmpty,
     });
+    syncProfessionAuthorityPriceForRow(row);
     row.classList.remove("is-invalid");
     return;
   }
@@ -1332,6 +1359,7 @@ function buildProfessionTransferPayload() {
 }
 
 function sendProfessionMaterialsToTracker() {
+  syncProfessionAuthorityPricesFromMaterials();
   const snapshot = getProfessionCalculationSnapshot();
   if (snapshot.error) {
     alert(snapshot.error);
@@ -1358,19 +1386,8 @@ function sendProfessionMaterialsToTracker() {
     alert("追踪器尚未初始化。");
     return;
   }
-
-  const needsPricePrompt = items.some((item) => {
-    const localPrice = getProfessionAuthorityPrice(item.englishName);
-    return item.price > 0 && localPrice > 0 && localPrice !== item.price;
-  });
-  const priceMode = needsPricePrompt
-    ? confirm("是否使用生产计算单价覆盖本地单价？")
-      ? "overwrite"
-      : "keep"
-    : "keep";
-
   const { addedCount, updatedCount, skippedCount } =
-    window.mergeTrackerTransferItems(items, { priceMode });
+    window.mergeTrackerTransferItems(items, { priceMode: "keep" });
   const summary = `追踪器已同步：新增 ${addedCount}，更新 ${updatedCount}，跳过 ${skippedCount}。`;
   if (typeof window.showTrackerNotification === "function") {
     window.showTrackerNotification(null, summary, "custom");
@@ -1496,6 +1513,10 @@ function finalizeProfessionExpressionInput(input) {
   if (!trimmedValue) {
     input.value = "";
     input.dataset.prevCommittedValue = "";
+    if (input.classList.contains("prof-material-price")) {
+      const row = input.closest(".prof-material-row");
+      if (row) syncProfessionAuthorityPriceForRow(row);
+    }
     saveProfessionCalculatorState();
     runProfessionCalculationIfEnabled();
     return;
@@ -1508,6 +1529,11 @@ function finalizeProfessionExpressionInput(input) {
   } else {
     input.value = String(parsedValue);
     input.dataset.prevCommittedValue = input.value;
+  }
+
+  if (input.classList.contains("prof-material-price")) {
+    const row = input.closest(".prof-material-row");
+    if (row) syncProfessionAuthorityPriceForRow(row);
   }
 
   saveProfessionCalculatorState();
