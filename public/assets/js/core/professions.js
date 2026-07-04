@@ -1054,19 +1054,37 @@ function bindProfessionSidebarDropZone() {
       isSupportedTransferFile(file)
     );
 
+  const isEventInsideSidebar = (event) => {
+    if (sidebar.contains(event.target)) return true;
+    if (typeof event.composedPath === "function") {
+      return event.composedPath().includes(sidebar);
+    }
+    return false;
+  };
+
   ["dragenter", "dragover"].forEach((eventName) => {
-    sidebar.addEventListener(eventName, (event) => {
-      if (!getDroppedTransferFile(event)) return;
-      event.preventDefault();
-    });
+    document.addEventListener(
+      eventName,
+      (event) => {
+        if (!isEventInsideSidebar(event)) return;
+        if (!getDroppedTransferFile(event)) return;
+        event.preventDefault();
+      },
+      true
+    );
   });
 
-  sidebar.addEventListener("drop", (event) => {
-    const file = getDroppedTransferFile(event);
-    if (!file) return;
-    event.preventDefault();
-    loadProfessionTransferFile(file);
-  });
+  document.addEventListener(
+    "drop",
+    (event) => {
+      if (!isEventInsideSidebar(event)) return;
+      const file = getDroppedTransferFile(event);
+      if (!file) return;
+      event.preventDefault();
+      loadProfessionTransferFile(file);
+    },
+    true
+  );
 }
 
 function bindTransferDropZone(modal, textArea, onFileDrop) {
