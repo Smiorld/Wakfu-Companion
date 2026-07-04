@@ -14,6 +14,9 @@ scripts/*
 !scripts/build-tribe-zone-map.js
 !scripts/check-chachassistant-tribes.js
 !scripts/extract-wakfu-i18n.js
+!scripts/resolve-resource-asset-chain.js
+!scripts/sync-resource-list-to-tracker-data.js
+!scripts/README.md
 wakfu_chat.log*.sample
 *.sample
 AGENT.md

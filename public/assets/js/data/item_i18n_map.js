@@ -2786,7 +2786,8 @@ const ITEM_I18N_MAP = {
     "捕蝇草　Venutian Trap"
   ],
   "Vesperal Tusk": [
-    "夜暮獠牙　Vesperal Tusk"
+    "夜暮獠牙　Vesperal Tusk",
+    "夜幕獠牙　Vesperal Tusk"
   ],
   "Vine Leaf": [
     "葡萄藤叶　Vine Leaf"
