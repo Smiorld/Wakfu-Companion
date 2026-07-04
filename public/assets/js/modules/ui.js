@@ -707,13 +707,13 @@ function renderTracker() {
             </div>
         </div>
         <div class="t-input-container">
-            <input type="number" class="t-input" value="${
+            <input type="text" inputmode="numeric" class="t-input tracker-expression-input" value="${
               item.current
-            }" onchange="updateItemValue(${item.id}, 'current', this.value)">
+            }">
             <span class="t-separator">/</span>
-            <input type="number" class="t-input" value="${
+            <input type="text" inputmode="numeric" class="t-input tracker-expression-input" value="${
               item.target
-            }" onchange="updateItemValue(${item.id}, 'target', this.value)">
+            }">
         </div>
         <div class="t-right-group">
             <img src="${profIconPath}" class="t-job-icon" onerror="this.style.display='none'">
@@ -726,6 +726,16 @@ function renderTracker() {
         </div>
       `;
       const infoArea = row.querySelector(".t-left-group");
+      const currentInput = row.querySelectorAll(".tracker-expression-input")[0];
+      const targetInput = row.querySelectorAll(".tracker-expression-input")[1];
+      if (typeof window.bindTrackerExpressionInput === "function") {
+        window.bindTrackerExpressionInput(currentInput, {
+          onCommit: (value) => updateItemValue(item.id, "current", value),
+        });
+        window.bindTrackerExpressionInput(targetInput, {
+          onCommit: (value) => updateItemValue(item.id, "target", value),
+        });
+      }
       infoArea.onmouseenter = (e) => showTooltip(tooltipText, e);
       infoArea.onmousemove = (e) => updateTooltipPosition(e);
       infoArea.onmouseleave = () => hideTooltip();

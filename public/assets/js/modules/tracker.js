@@ -547,8 +547,89 @@ function parseTrackerTransferItems(rawText) {
 }
 
 function normalizeTrackerImportedNumber(value, fallback = 0) {
-  const parsed = parseInt(value, 10);
-  return Number.isNaN(parsed) ? fallback : parsed;
+  const parsed = parseTrackerRoundedInteger(value, fallback);
+  return parsed === null || Number.isNaN(parsed) ? fallback : parsed;
+}
+
+function normalizeTrackerMathExpression(value) {
+  return String(value)
+    .trim()
+    .replace(/[（﹙｟❨❪❬❮❰〔【［｛〈《「『]/g, "(")
+    .replace(/[）﹚｠❩❫❭❯❱〕】］｝〉》」』]/g, ")")
+    .replace(/[xX×＊*]/g, "*")
+    .replace(/[／÷]/g, "/")
+    .replace(/[＋]/g, "+")
+    .replace(/[－—–]/g, "-")
+    .replace(/[，]/g, ".")
+    .replace(/\s+/g, " ");
+}
+
+function parseTrackerRoundedInteger(value, fallback = null) {
+  if (value === undefined || value === null) return fallback;
+  const normalized = normalizeTrackerMathExpression(String(value));
+  if (!normalized) return fallback;
+  if (!/^[\d+\-*/().\s^]*$/.test(normalized)) return fallback;
+
+  const jsExpression = normalized.replace(/\^/g, "**");
+  try {
+    const result = Function(`"use strict"; return (${jsExpression});`)();
+    if (!Number.isFinite(result)) return fallback;
+    return Math.max(0, Math.round(result));
+  } catch {
+    return fallback;
+  }
+}
+
+function finalizeTrackerExpressionValue(rawValue, previousValue = "", emptyFallback = "0") {
+  const trimmedValue = String(rawValue ?? "").trim();
+  if (!trimmedValue) {
+    return String(emptyFallback);
+  }
+
+  const parsedValue = parseTrackerRoundedInteger(trimmedValue, null);
+  if (parsedValue === null || Number.isNaN(parsedValue)) {
+    return String(previousValue ?? emptyFallback);
+  }
+
+  return String(parsedValue);
+}
+
+function bindTrackerExpressionInput(input, options = {}) {
+  if (!input || input.dataset.trackerExpressionBound === "true") return;
+  input.dataset.trackerExpressionBound = "true";
+  input.dataset.prevCommittedValue = input.value || "0";
+
+  const commit = () => {
+    const nextValue = finalizeTrackerExpressionValue(
+      input.value,
+      input.dataset.prevCommittedValue ?? "0",
+      options.emptyFallback ?? "0"
+    );
+    input.value = nextValue;
+    input.dataset.prevCommittedValue = nextValue;
+    if (typeof options.onCommit === "function") {
+      options.onCommit(nextValue, input);
+    }
+  };
+
+  input.addEventListener("focus", () => {
+    input.dataset.prevCommittedValue = input.value || "0";
+  });
+
+  input.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    commit();
+    input.blur();
+  });
+
+  input.addEventListener("blur", commit);
+
+  if (typeof options.onInput === "function") {
+    input.addEventListener("input", () => {
+      options.onInput(input.value, input);
+    });
+  }
 }
 
 function findImportedTrackerCatalogItem(entry) {
@@ -685,7 +766,7 @@ function addTrackedItem() {
 
   let target = prompt("目标数量？", "0");
   if (target === null) return;
-  const parsedTarget = parseInt(target, 10);
+  const parsedTarget = parseTrackerRoundedInteger(target, 0);
 
   trackedItems.push({
     id: Date.now(),
@@ -693,7 +774,7 @@ function addTrackedItem() {
     displayName: foundItem.displayName,
     chineseAliases: foundItem.chineseAliases,
     current: 0,
-    target: Number.isNaN(parsedTarget) ? 0 : parsedTarget,
+    target: parsedTarget === null || Number.isNaN(parsedTarget) ? 0 : parsedTarget,
     level: foundItem.level,
     rarity: foundItem.rarity,
     profession: foundItem.profession,
@@ -709,7 +790,8 @@ function addTrackedItem() {
 function updateItemValue(id, key, val) {
   const item = trackedItems.find((t) => t.id === id);
   if (item) {
-    item[key] = parseInt(val) || 0;
+    const parsedValue = parseTrackerRoundedInteger(val, 0);
+    item[key] = parsedValue === null || Number.isNaN(parsedValue) ? 0 : parsedValue;
     saveTrackerState();
     renderTracker();
   }
@@ -1042,9 +1124,9 @@ function openTrackerModal(itemId) {
   const calcTargetEl = document.getElementById("modal-calc-target");
 
   function updateModalCalc() {
-    const c = parseInt(curInput.value) || 0;
-    const t = parseInt(tarInput.value) || 0;
-    const p = parseInt(priceInput.value) || 0;
+    const c = parseTrackerRoundedInteger(curInput.value, 0) || 0;
+    const t = parseTrackerRoundedInteger(tarInput.value, 0) || 0;
+    const p = parseTrackerRoundedInteger(priceInput.value, 0) || 0;
 
     const totalCur = c * p;
     const totalTar = t * p;
@@ -1054,19 +1136,36 @@ function openTrackerModal(itemId) {
     calcTargetEl.textContent = totalTar.toLocaleString() + " ₭";
   }
 
-  // Real-time listeners
-  curInput.oninput = updateModalCalc;
-  tarInput.oninput = updateModalCalc;
-  priceInput.oninput = updateModalCalc;
+  bindTrackerExpressionInput(curInput, {
+    onCommit: (value) => {
+      curInput.value = value;
+      updateModalCalc();
+    },
+    onInput: updateModalCalc,
+  });
+  bindTrackerExpressionInput(tarInput, {
+    onCommit: (value) => {
+      tarInput.value = value;
+      updateModalCalc();
+    },
+    onInput: updateModalCalc,
+  });
+  bindTrackerExpressionInput(priceInput, {
+    onCommit: (value) => {
+      priceInput.value = value;
+      updateModalCalc();
+    },
+    onInput: updateModalCalc,
+  });
 
   // Run calculation immediately
   updateModalCalc();
 
   // SAVE BUTTON
   document.getElementById("modal-save-btn").onclick = () => {
-    const newCur = parseInt(curInput.value) || 0;
-    const newTar = parseInt(tarInput.value) || 0;
-    const newPrice = parseInt(priceInput.value) || 0;
+    const newCur = parseTrackerRoundedInteger(curInput.value, 0) || 0;
+    const newTar = parseTrackerRoundedInteger(tarInput.value, 0) || 0;
+    const newPrice = parseTrackerRoundedInteger(priceInput.value, 0) || 0;
 
     item.current = newCur;
     item.target = newTar;
@@ -1101,3 +1200,4 @@ window.openTrackerTransferModal = openTrackerTransferModal;
 window.closeTrackerTransferModal = closeTrackerTransferModal;
 window.copyTrackerTransferText = copyTrackerTransferText;
 window.applyTrackerImport = applyTrackerImport;
+window.bindTrackerExpressionInput = bindTrackerExpressionInput;
