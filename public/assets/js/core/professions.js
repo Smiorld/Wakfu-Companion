@@ -1296,17 +1296,17 @@ function resolveProfessionImportMaterialPrices(materials, priceMode = "local") {
 function buildProfessionTransferPayload() {
   const state = getProfessionCalculatorState();
   const materials = state.materials.map((material, index) => ({
-    name: material.displayName || material.name || `材料${index + 1}`,
+    name: material.displayName || material.name || "",
     englishName: material.englishName || "",
     chineseName: material.chineseName || "",
     qty:
-      material.englishName || String(material.displayName || "").trim()
-        ? String(parseInt(material.qty, 10) || 1)
-        : "",
+      material.qty === undefined || material.qty === null || String(material.qty).trim() === ""
+        ? ""
+        : String(parseInt(material.qty, 10) || 1),
     price:
-      material.englishName || String(material.displayName || "").trim()
-        ? String(parseInt(material.price, 10) || 0)
-        : "",
+      material.price === undefined || material.price === null || String(material.price).trim() === ""
+        ? ""
+        : String(parseInt(material.price, 10) || 0),
   }));
 
   return {
