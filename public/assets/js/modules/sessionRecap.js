@@ -162,7 +162,11 @@ function isRelevantKamaContextMessage(message) {
   const text = String(message || "").trim();
   if (!text || isStandaloneKamaMessage(text)) return false;
 
-  if (/\b(?:MARKET|market|échange|exchange)\b/i.test(text)) {
+  if (
+    /\b(?:MARKET|market|échange|exchange|auction|ench[eè]re|vente|achat)\b/i.test(
+      text
+    )
+  ) {
     return true;
   }
 
@@ -190,10 +194,46 @@ function isNearbySessionTime(a, b, maxDeltaSeconds = 10) {
   return Math.abs(aSeconds - bSeconds) <= maxDeltaSeconds;
 }
 
+function normalizeSessionKamaSourceSegment(message) {
+  const text = String(message || "").trim();
+  if (!text) return "";
+
+  if (/^\[(?:系统|System)\]\s*你失去了\s*[\d\s.,\u00A0]+\s*卡玛[。.]?$/i.test(text)) {
+    return text;
+  }
+
+  if (/^\[(?:系统|System)\]\s*你获得了\s*[\d\s.,\u00A0]+\s*卡玛[。.]?$/i.test(text)) {
+    return text;
+  }
+
+  if (/Lancement de l'occupation MARKET/i.test(text)) {
+    return "市场板操作";
+  }
+
+  if (/\bMARKET\b/i.test(text)) {
+    return "市场操作";
+  }
+
+  if (/\b(?:vente|achat|ench[eè]re|auction|exchange|échange)\b/i.test(text)) {
+    return "交易操作";
+  }
+
+  return text;
+}
+
+function normalizeSessionKamaSourceText(source) {
+  return String(source || "")
+    .split(/\s*\/\s*/)
+    .map((segment) => normalizeSessionKamaSourceSegment(segment))
+    .filter(Boolean)
+    .join(" / ");
+}
+
 function buildSessionKamaDetail(kind, amount, line) {
   const time = extractSessionLogTime(line);
   const message = extractSessionMessage(line);
   let source = message;
+  let usedContext = false;
 
   if (
     isStandaloneKamaMessage(message) &&
@@ -203,9 +243,14 @@ function buildSessionKamaDetail(kind, amount, line) {
     isRelevantKamaContextMessage(lastSessionContextLine.message)
   ) {
     source = `${lastSessionContextLine.message} / ${message}`;
+    usedContext = true;
   }
 
-  return { time, amount, source };
+  if (usedContext) {
+    lastSessionContextLine = null;
+  }
+
+  return { time, amount, source: normalizeSessionKamaSourceText(source) };
 }
 
 function appendSessionKamaDetail(kind, amount, line) {
@@ -473,6 +518,8 @@ function processSessionLog(line) {
       time: extractSessionLogTime(line),
       message,
     };
+  } else if (isStandaloneKamaMessage(message)) {
+    lastSessionContextLine = null;
   }
 }
 
