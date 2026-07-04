@@ -3792,4 +3792,12 @@ const ITEM_I18N_MAP = {
   "Starvannah Seed": [
     "\u661f\u539f\u517d\u79cd\u5b50\u3000Starvannah Seed"
   ]
+  ,
+  "Powder": [
+    "\u5f69\u8679\u7c89\u672b\u3000Powder"
+  ]
+  ,
+  "Shards": [
+    "\u9644\u9b54\u788e\u7247\u3000Shards"
+  ]
 };

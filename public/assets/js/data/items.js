@@ -3,6 +3,10 @@ const monsterResources = [
   // CRAFTED & REFINED MATERIALS
   // ==========================================
 
+  // --- ENCHANTMENT MATERIALS ---
+  { name: "Powder", level: 0, rarity: "Legendary", imgId: "27093" },
+  { name: "Shards", level: 1, rarity: "Legendary", imgId: "27083" },
+
   // --- LEVEL 230-245 (Ancestral / Infernal) ---
   { name: "Ancestral Plank", level: 245, rarity: "Common", imgId: "32731795" },
   { name: "Ancestral Flour", level: 245, rarity: "Common", imgId: "39331792" },
