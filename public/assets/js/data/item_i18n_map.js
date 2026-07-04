@@ -1146,6 +1146,10 @@ const ITEM_I18N_MAP = {
     "碎遗石",
     "碎遗石　Fragmonnite"
   ],
+  "Ex-Lex": [
+    "雷克斯遗石",
+    "雷克斯遗石　Ex-Lex"
+  ],
   "Fresh Mandibles": [
     "新鲜上颚　Fresh Mandibles"
   ],

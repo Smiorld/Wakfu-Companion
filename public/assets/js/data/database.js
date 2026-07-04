@@ -60,6 +60,7 @@ const professionItems = {
     { name: "Symbiotic Stone", level: 145, rarity: "Common" },
     { name: "Zircomet", level: 150, rarity: "Common" },
     { name: "Fragmonnite", level: 155, rarity: "Common" },
+    { name: "Ex-Lex", level: 155, rarity: "Rare", imgName: "Fragmonnite" },
   ],
   Lumberjack: [
     { name: "Ash Cutting", level: 1, rarity: "Common", imgName: "Ash Wood" },
