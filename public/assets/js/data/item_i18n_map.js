@@ -3518,6 +3518,10 @@ const ITEM_I18N_MAP = {
     "\u65cb\u9e1f\u8089\u6392\u3000Whirloin Steak"
   ]
   ,
+  "Whispered Metal": [
+    "\u4f4e\u8bed\u91d1\u5c5e\u3000Whispered Metal"
+  ]
+  ,
   "Blackspore Seed": [
     "\u9ed1\u6697\u5b62\u5b50\u79cd\u5b50\u3000Blackspore Seed"
   ]

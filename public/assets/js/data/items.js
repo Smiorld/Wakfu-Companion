@@ -1213,6 +1213,12 @@ const monsterResources = [
     imgId: "53114357",
   },
   {
+    name: "Whispered Metal",
+    level: 96,
+    rarity: "Rare",
+    imgId: "53114359",
+  },
+  {
     name: "Beach Fabric",
     level: 96,
     rarity: "Common",
