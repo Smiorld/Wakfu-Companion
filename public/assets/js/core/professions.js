@@ -720,7 +720,7 @@ function getLevelXpRequirement(level, range) {
   );
 }
 
-function addProfessionMaterialRow(name = "", qty = "", price = "") {
+function addProfessionMaterialRow(name = "", qty = "", price = "", options = {}) {
   const rowsContainer = document.getElementById("prof-material-rows");
   if (!rowsContainer) return;
 
@@ -774,7 +774,7 @@ function addProfessionMaterialRow(name = "", qty = "", price = "") {
 
   rowsContainer.appendChild(row);
   bindProfessionCalculatorInputs(row);
-  syncProfessionMaterialRow(row, { silent: true });
+  syncProfessionMaterialRow(row, { silent: true, priceSource: options.priceSource || "preserve" });
 
   const removeBtn = row.querySelector(".prof-remove-material-btn");
   if (removeBtn) {
@@ -903,7 +903,9 @@ function applyProfessionCalculatorState(inputState) {
     rowsContainer.innerHTML = "";
     materialRowId = 0;
     state.materials.forEach((material) => {
-      addProfessionMaterialRow(material, material.qty, material.price);
+      addProfessionMaterialRow(material, material.qty, material.price, {
+        priceSource: "preserve",
+      });
     });
   }
 
@@ -984,7 +986,17 @@ function applyProfessionImport() {
   try {
     const parsed = JSON.parse(text.value || "{}");
     const payload = parseProfessionImportPayload(parsed);
-    applyProfessionCalculatorState(payload);
+    const materials = Array.isArray(payload.materials) ? payload.materials : [];
+    const priceMode = shouldAskProfessionImportPriceChoice(materials)
+      ? confirm("是否使用文件单价覆盖本地单价？")
+        ? "file"
+        : "local"
+      : "local";
+    const nextPayload = {
+      ...payload,
+      materials: resolveProfessionImportMaterialPrices(materials, priceMode),
+    };
+    applyProfessionCalculatorState(nextPayload);
     saveProfessionCalculatorState();
     if (professionCalcAutoCalculate) {
       renderProfessionCalculationResult();
@@ -1100,6 +1112,43 @@ function syncProfessionMaterialRarity(row, catalogItem) {
   rareBadge.style.display = isRare ? "" : "none";
 }
 
+function getProfessionAuthorityPrice(englishName) {
+  return typeof window.getTrackerAuthoritativePrice === "function"
+    ? window.getTrackerAuthoritativePrice(englishName, 0)
+    : 0;
+}
+
+function applyProfessionMaterialPriceSource(row, matchedItem, options = {}) {
+  const priceInput = row?.querySelector(".prof-material-price");
+  if (!priceInput || !matchedItem?.name) return;
+
+  const authorityPrice = getProfessionAuthorityPrice(matchedItem.name);
+  const currentValue = String(priceInput.value || "").trim();
+  const nextPrice =
+    options.priceSource === "authority"
+      ? authorityPrice
+      : options.priceSource === "preserve"
+        ? currentValue
+        : currentValue;
+
+  if (options.priceSource === "authority") {
+    priceInput.value = authorityPrice > 0 ? String(authorityPrice) : currentValue;
+    priceInput.dataset.prevCommittedValue = priceInput.value;
+    return;
+  }
+
+  if (!currentValue && authorityPrice > 0 && options.fillIfEmpty !== false) {
+    priceInput.value = String(authorityPrice);
+    priceInput.dataset.prevCommittedValue = priceInput.value;
+    return;
+  }
+
+  if (nextPrice !== currentValue) {
+    priceInput.value = String(nextPrice || "");
+    priceInput.dataset.prevCommittedValue = priceInput.value;
+  }
+}
+
 function syncProfessionMaterialRow(row, options = {}) {
   const input = row?.querySelector(".prof-material-name");
   const icon = row?.querySelector(".prof-material-icon");
@@ -1140,6 +1189,10 @@ function syncProfessionMaterialRow(row, options = {}) {
     icon.style.display = "";
     iconWrap.classList.remove("is-empty");
     syncProfessionMaterialRarity(row, matchedItem);
+    applyProfessionMaterialPriceSource(row, matchedItem, {
+      priceSource: options.priceSource || "authority",
+      fillIfEmpty: options.fillIfEmpty,
+    });
     row.classList.remove("is-invalid");
     return;
   }
@@ -1204,9 +1257,44 @@ function readProfessionMaterialRow(row, index) {
   };
 }
 
+function shouldAskProfessionImportPriceChoice(materials) {
+  return materials.some((material) => {
+    const englishName = String(material?.englishName || "").trim();
+    if (!englishName) return false;
+    const localPrice = getProfessionAuthorityPrice(englishName);
+    const importedPrice = Math.max(
+      0,
+      parseProfessionRoundedInteger(material?.price, 0) || 0
+    );
+    return localPrice > 0 && importedPrice > 0 && localPrice !== importedPrice;
+  });
+}
+
+function resolveProfessionImportMaterialPrices(materials, priceMode = "local") {
+  return materials.map((material) => {
+    const englishName = String(material?.englishName || "").trim();
+    const localPrice = englishName ? getProfessionAuthorityPrice(englishName) : 0;
+    const importedPrice = Math.max(
+      0,
+      parseProfessionRoundedInteger(material?.price, 0) || 0
+    );
+
+    let nextPrice = importedPrice;
+    if (priceMode === "local") {
+      nextPrice = localPrice > 0 ? localPrice : importedPrice;
+    } else if (priceMode === "file") {
+      nextPrice = importedPrice > 0 ? importedPrice : localPrice;
+    }
+
+    return {
+      ...material,
+      price: String(nextPrice > 0 ? nextPrice : ""),
+    };
+  });
+}
+
 function buildProfessionTransferPayload() {
   const state = getProfessionCalculatorState();
-  const snapshot = getProfessionCalculationSnapshot();
   const materials = state.materials.map((material, index) => ({
     name: material.displayName || material.name || `材料${index + 1}`,
     englishName: material.englishName || "",
@@ -1224,7 +1312,7 @@ function buildProfessionTransferPayload() {
   return {
     schema: PROFESSION_TRANSFER_SCHEMA,
     version: PROFESSION_TRANSFER_VERSION,
-    source: "profession-calc",
+    source: "profession-recipe",
     exportedAt: new Date().toISOString(),
     output: {
       name: state.outputName,
@@ -1232,27 +1320,14 @@ function buildProfessionTransferPayload() {
       price: String(parseInt(state.outputPrice, 10) || 0),
     },
     materials,
-    calculator: state,
-    calculation:
-      !snapshot.error && Number.isFinite(snapshot.craftsNeeded)
-        ? { craftsNeeded: snapshot.craftsNeeded }
-        : null,
-    items: materials
-      .map((material) => {
-        if (!material.englishName || typeof window.findTrackerCatalogItem !== "function") {
-          return null;
-        }
-        const catalogItem = window.findTrackerCatalogItem(material.englishName);
-        if (!catalogItem || typeof window.buildTransferItemFromCatalogItem !== "function") {
-          return null;
-        }
-        return window.buildTransferItemFromCatalogItem(catalogItem, {
-          current: 0,
-          target: material.qty || 0,
-          price: material.price || 0,
-        });
-      })
-      .filter(Boolean),
+    recipe: {
+      output: {
+        name: state.outputName,
+        qty: String(parseInt(state.outputQty, 10) || 1),
+        price: String(parseInt(state.outputPrice, 10) || 0),
+      },
+      materials,
+    },
   };
 }
 
@@ -1284,8 +1359,18 @@ function sendProfessionMaterialsToTracker() {
     return;
   }
 
+  const needsPricePrompt = items.some((item) => {
+    const localPrice = getProfessionAuthorityPrice(item.englishName);
+    return item.price > 0 && localPrice > 0 && localPrice !== item.price;
+  });
+  const priceMode = needsPricePrompt
+    ? confirm("是否使用生产计算单价覆盖本地单价？")
+      ? "overwrite"
+      : "keep"
+    : "keep";
+
   const { addedCount, updatedCount, skippedCount } =
-    window.mergeTrackerTransferItems(items);
+    window.mergeTrackerTransferItems(items, { priceMode });
   const summary = `追踪器已同步：新增 ${addedCount}，更新 ${updatedCount}，跳过 ${skippedCount}。`;
   if (typeof window.showTrackerNotification === "function") {
     window.showTrackerNotification(null, summary, "custom");
@@ -1299,31 +1384,27 @@ function parseProfessionImportPayload(parsed) {
     return parsed.data;
   }
 
-  const calculatorData =
-    (parsed?.source === "profession-calc" && parsed?.calculator) ||
-    (parsed?.calculator && typeof parsed.calculator === "object" ? parsed.calculator : null);
   const materialData =
     (Array.isArray(parsed?.materials) && parsed.materials) ||
-    (Array.isArray(calculatorData?.materials) && calculatorData.materials) ||
+    (Array.isArray(parsed?.recipe?.materials) && parsed.recipe.materials) ||
     (Array.isArray(parsed?.data?.materials) && parsed.data.materials);
 
-  if (calculatorData || materialData) {
+  if (materialData || parsed?.output || parsed?.recipe?.output) {
     return {
-      ...(calculatorData || parsed),
+      ...DEFAULT_PROF_CALC_STATE,
+      mode: currentProfCalcMode,
+      autoCalculate: professionCalcAutoCalculate,
       outputName:
         parsed?.output?.name ??
-        calculatorData?.outputName ??
-        parsed?.outputName ??
+        parsed?.recipe?.output?.name ??
         DEFAULT_PROF_CALC_STATE.outputName,
       outputQty:
         parsed?.output?.qty ??
-        calculatorData?.outputQty ??
-        parsed?.outputQty ??
+        parsed?.recipe?.output?.qty ??
         DEFAULT_PROF_CALC_STATE.outputQty,
       outputPrice:
         parsed?.output?.price ??
-        calculatorData?.outputPrice ??
-        parsed?.outputPrice ??
+        parsed?.recipe?.output?.price ??
         DEFAULT_PROF_CALC_STATE.outputPrice,
       materials: materialData || [],
     };

@@ -5,9 +5,11 @@ let trackerLookup = new Map();
 let trackerDecreaseOnLoss =
   localStorage.getItem("wakfu_tracker_decrease_on_loss") === "true";
 let trackerTransferMode = "export";
+let trackerPriceAuthority = {};
 
 const TRACKER_TRANSFER_SCHEMA = "wakfu-companion-transfer";
 const TRACKER_TRANSFER_VERSION = 1;
+const TRACKER_PRICE_AUTHORITY_STORAGE_KEY = "wakfu_tracker_price_authority";
 
 const PROFESSION_SORT_ORDER = {
   Armorer: 1,
@@ -196,10 +198,103 @@ function hydrateTrackedItem(item) {
   } else if (!item.displayName) {
     item.displayName = item.name;
   }
+  const authorityPrice = getTrackerAuthoritativePrice(item.name, 0);
+  if (authorityPrice > 0) {
+    item.price = authorityPrice;
+  } else if (Number(item.price || 0) > 0) {
+    setTrackerAuthoritativePrice(item.name, item.price);
+  }
   item._needsMigration =
     originalDisplayName !== item.displayName ||
     originalAliases !== JSON.stringify(item.chineseAliases || []);
   return item;
+}
+
+function loadTrackerPriceAuthority() {
+  try {
+    const raw = localStorage.getItem(TRACKER_PRICE_AUTHORITY_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    trackerPriceAuthority =
+      parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    trackerPriceAuthority = {};
+  }
+}
+
+function saveTrackerPriceAuthority() {
+  localStorage.setItem(
+    TRACKER_PRICE_AUTHORITY_STORAGE_KEY,
+    JSON.stringify(trackerPriceAuthority)
+  );
+}
+
+function normalizeTrackerAuthorityKey(itemName) {
+  return String(itemName || "").trim();
+}
+
+function getTrackerAuthoritativePrice(itemName, fallback = 0) {
+  const key = normalizeTrackerAuthorityKey(itemName);
+  if (!key) return fallback;
+  const value = trackerPriceAuthority[key];
+  const parsed = parseTrackerRoundedInteger(value, fallback);
+  return parsed === null || Number.isNaN(parsed) ? fallback : parsed;
+}
+
+function setTrackerAuthoritativePrice(itemName, price, options = {}) {
+  const key = normalizeTrackerAuthorityKey(itemName);
+  if (!key) return false;
+
+  const nextPrice = parseTrackerRoundedInteger(price, null);
+  if (nextPrice === null || Number.isNaN(nextPrice)) return false;
+
+  const currentPrice = getTrackerAuthoritativePrice(key, 0);
+  if (nextPrice === 0 && currentPrice > 0 && !options.allowZeroOverride) {
+    return false;
+  }
+
+  if (nextPrice === currentPrice) return false;
+
+  trackerPriceAuthority[key] = nextPrice;
+  saveTrackerPriceAuthority();
+  return true;
+}
+
+function syncTrackerPriceAuthorityFromTrackedItems() {
+  let changed = false;
+  trackedItems.forEach((item) => {
+    if (!item?.name) return;
+    const price = parseTrackerRoundedInteger(item.price, 0) || 0;
+    if (price > 0) {
+      changed =
+        setTrackerAuthoritativePrice(item.name, price, { allowZeroOverride: false }) ||
+        changed;
+    }
+  });
+  return changed;
+}
+
+function getTrackerPriceAuthorityEntries() {
+  return Object.entries(trackerPriceAuthority)
+    .map(([englishName, price]) => ({
+      englishName,
+      chineseName:
+        typeof window.getPrimaryChineseLabel === "function"
+          ? window.getPrimaryChineseLabel(englishName)
+          : "",
+      price: getTrackerAuthoritativePrice(englishName, 0),
+    }))
+    .filter((entry) => entry.englishName && entry.price >= 0);
+}
+
+function shouldAskTrackerPriceOverwrite(importedItems) {
+  return importedItems.some((entry) => {
+    const catalogItem = findImportedTrackerCatalogItem(entry);
+    if (!catalogItem) return false;
+    const importedPrice = Math.max(0, normalizeTrackerImportedNumber(entry.price, 0));
+    if (importedPrice <= 0) return false;
+    const localPrice = getTrackerAuthoritativePrice(catalogItem.name, 0);
+    return localPrice > 0 && localPrice !== importedPrice;
+  });
 }
 
 function findTrackerCatalogItem(query) {
@@ -249,6 +344,7 @@ function initTrackerDropdowns() {
   if (!itemDatalist || !itemInput) return;
 
   buildTrackerCatalog();
+  loadTrackerPriceAuthority();
   itemInput.value = "";
   itemDatalist.innerHTML = "";
 
@@ -332,6 +428,7 @@ function toggleTrackerView() {
 
 // --- Persistence Helpers ---
 function saveTrackerState() {
+  syncTrackerPriceAuthorityFromTrackedItems();
   localStorage.setItem("wakfu_tracker_data", JSON.stringify(trackedItems));
 }
 
@@ -345,6 +442,7 @@ function loadTrackerState() {
         saveTrackerState();
       } else {
         trackedItems.forEach((item) => delete item._needsMigration);
+        syncTrackerPriceAuthorityFromTrackedItems();
       }
       renderTracker();
     } catch (e) {
@@ -361,6 +459,7 @@ function buildTrackerExportPayload(nameMode = "bilingual") {
     source: "tracker",
     nameMode,
     exportedAt: new Date().toISOString(),
+    priceAuthority: getTrackerPriceAuthorityEntries(),
     items: trackedItems.map((item) => ({
       name: getTrackerExportName(item.name, nameMode),
       englishName: item.name,
@@ -656,7 +755,8 @@ function findImportedTrackerCatalogItem(entry) {
   return null;
 }
 
-function mergeTrackerTransferItems(importedItems) {
+function mergeTrackerTransferItems(importedItems, options = {}) {
+  const priceMode = options.priceMode === "overwrite" ? "overwrite" : "keep";
   let addedCount = 0;
   let updatedCount = 0;
   let skippedCount = 0;
@@ -684,8 +784,27 @@ function mergeTrackerTransferItems(importedItems) {
       )
     );
     const importedPrice = Math.max(0, normalizeTrackerImportedNumber(entry.price, 0));
+    const localAuthorityPrice = getTrackerAuthoritativePrice(catalogItem.name, 0);
+    const basePrice =
+      localAuthorityPrice > 0 ? localAuthorityPrice : existingItem?.price || 0;
     const nextPrice =
-      importedPrice > 0 ? importedPrice : existingItem?.price || 0;
+      priceMode === "overwrite"
+        ? importedPrice > 0
+          ? importedPrice
+          : basePrice
+        : basePrice > 0
+          ? basePrice
+          : importedPrice;
+
+    if (priceMode === "overwrite" && importedPrice > 0) {
+      setTrackerAuthoritativePrice(catalogItem.name, importedPrice, {
+        allowZeroOverride: false,
+      });
+    } else if (nextPrice > 0 && localAuthorityPrice <= 0) {
+      setTrackerAuthoritativePrice(catalogItem.name, nextPrice, {
+        allowZeroOverride: false,
+      });
+    }
 
     if (existingItem) {
       existingItem.displayName = catalogItem.displayName;
@@ -729,15 +848,38 @@ function applyTrackerImport() {
   if (!text) return;
 
   let importedItems;
+  let parsedPayload;
   try {
-    importedItems = parseTrackerTransferItems(text.value.trim());
+    parsedPayload = JSON.parse(text.value.trim());
+    importedItems = parseTrackerTransferItems(JSON.stringify(parsedPayload));
   } catch (error) {
     alert(`导入失败：${error.message}`);
     return;
   }
 
+  let priceMode = "keep";
+  if (shouldAskTrackerPriceOverwrite(importedItems)) {
+    priceMode = confirm("是否使用导入单价覆盖本地单价？")
+      ? "overwrite"
+      : "keep";
+  }
+
+  if (Array.isArray(parsedPayload?.priceAuthority)) {
+    parsedPayload.priceAuthority.forEach((entry) => {
+      const catalogItem = findImportedTrackerCatalogItem(entry);
+      if (!catalogItem) return;
+      const importedPrice = Math.max(0, normalizeTrackerImportedNumber(entry.price, 0));
+      const localPrice = getTrackerAuthoritativePrice(catalogItem.name, 0);
+      if (importedPrice > 0 && (priceMode === "overwrite" || localPrice <= 0)) {
+        setTrackerAuthoritativePrice(catalogItem.name, importedPrice, {
+          allowZeroOverride: false,
+        });
+      }
+    });
+  }
+
   const { addedCount, updatedCount, skippedCount } =
-    mergeTrackerTransferItems(importedItems);
+    mergeTrackerTransferItems(importedItems, { priceMode });
   closeTrackerTransferModal();
 
   const summary = `追踪器导入完成：新增 ${addedCount}，更新 ${updatedCount}，跳过 ${skippedCount}。`;
@@ -775,6 +917,7 @@ function addTrackedItem() {
     chineseAliases: foundItem.chineseAliases,
     current: 0,
     target: parsedTarget === null || Number.isNaN(parsedTarget) ? 0 : parsedTarget,
+    price: getTrackerAuthoritativePrice(foundItem.name, 0),
     level: foundItem.level,
     rarity: foundItem.rarity,
     profession: foundItem.profession,
@@ -1195,6 +1338,8 @@ window.findTrackerCatalogItem = findTrackerCatalogItem;
 window.getTrackerCatalogItemIconPath = getTrackerCatalogItemIconPath;
 window.buildTransferItemFromCatalogItem = buildTransferItemFromCatalogItem;
 window.getPrimaryChineseLabel = getPrimaryChineseLabel;
+window.getTrackerAuthoritativePrice = getTrackerAuthoritativePrice;
+window.setTrackerAuthoritativePrice = setTrackerAuthoritativePrice;
 window.mergeTrackerTransferItems = mergeTrackerTransferItems;
 window.openTrackerTransferModal = openTrackerTransferModal;
 window.closeTrackerTransferModal = closeTrackerTransferModal;
