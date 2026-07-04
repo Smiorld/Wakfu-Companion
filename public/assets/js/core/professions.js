@@ -182,8 +182,8 @@ function buildProfessionCalculatorLayout() {
         </div>
         <div class="prof-output-row">
           <input type="text" id="prof-output-name" class="prof-level-input prof-output-name" value="产物" />
-          <input type="number" id="prof-output-qty" class="prof-level-input prof-output-qty" min="0" step="1" placeholder="1" />
-          <input type="number" id="prof-output-price" class="prof-level-input prof-output-price" min="0" step="1" placeholder="0" />
+          <input type="text" id="prof-output-qty" class="prof-level-input prof-output-qty prof-expression-input" inputmode="numeric" placeholder="1" />
+          <input type="text" id="prof-output-price" class="prof-level-input prof-output-price prof-expression-input" inputmode="numeric" placeholder="0" />
         </div>
       </div>
     `;
@@ -329,6 +329,11 @@ function bindProfessionCalculatorInputs(root) {
     if (input.dataset.profCalcBound === "true") return;
     input.dataset.profCalcBound = "true";
 
+    if (input.classList.contains("prof-expression-input")) {
+      bindProfessionExpressionInput(input);
+      return;
+    }
+
     const handler = () => {
       saveProfessionCalculatorState();
       runProfessionCalculationIfEnabled();
@@ -375,6 +380,26 @@ function bindProfessionCalculatorInputs(root) {
       saveProfessionCalculatorState();
       runProfessionCalculationIfEnabled();
     });
+  });
+}
+
+function bindProfessionExpressionInput(input) {
+  if (!input || input.dataset.profExpressionBound === "true") return;
+  input.dataset.profExpressionBound = "true";
+  input.dataset.prevCommittedValue = input.value || "";
+
+  input.addEventListener("focus", () => {
+    input.dataset.prevCommittedValue = input.value || "";
+  });
+
+  input.addEventListener("blur", () => {
+    finalizeProfessionExpressionInput(input);
+  });
+
+  input.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    input.blur();
   });
 }
 
@@ -554,14 +579,14 @@ function readProfessionMaterialRows() {
   return rows.map((row, index) => {
     const qtyInput = row.querySelector(".prof-material-qty");
     const priceInput = row.querySelector(".prof-material-price");
-    const qty = parseInt(qtyInput?.value || "", 10);
-    const price = parseInt(priceInput?.value || "", 10);
+    const qty = parseProfessionRoundedInteger(qtyInput?.value, null);
+    const price = parseProfessionRoundedInteger(priceInput?.value, null);
     const materialMeta = readProfessionMaterialRow(row, index);
 
     return {
       ...materialMeta,
-      qty: Number.isNaN(qty) ? 1 : qty,
-      price: Number.isNaN(price) ? 0 : price,
+      qty: qty === null || Number.isNaN(qty) ? 1 : qty,
+      price: price === null || Number.isNaN(price) ? 0 : price,
     };
   });
 }
@@ -738,10 +763,10 @@ function addProfessionMaterialRow(name = "", qty = "", price = "") {
     )}" data-chinese-name="${escapeHtmlAttribute(chineseName)}" title="${escapeHtmlAttribute(
       displayName
     )}" />
-    <input type="number" class="prof-level-input prof-material-qty" min="0" step="1" placeholder="1" value="${escapeHtmlAttribute(
+    <input type="text" class="prof-level-input prof-material-qty prof-expression-input" inputmode="numeric" placeholder="1" value="${escapeHtmlAttribute(
       qty
     )}" />
-    <input type="number" class="prof-level-input prof-material-price" min="0" step="1" placeholder="0" value="${escapeHtmlAttribute(
+    <input type="text" class="prof-level-input prof-material-price prof-expression-input" inputmode="numeric" placeholder="0" value="${escapeHtmlAttribute(
       price
     )}" />
     <button type="button" class="prof-add-btn prof-remove-material-btn">-</button>
@@ -1377,8 +1402,64 @@ function parseOptionalInteger(id, fallback = null) {
   if (value === undefined || value === null || String(value).trim() === "") {
     return fallback;
   }
-  const parsed = parseInt(value, 10);
-  return Number.isNaN(parsed) ? fallback : parsed;
+  const parsed = parseProfessionRoundedInteger(value, fallback);
+  return parsed === null || Number.isNaN(parsed) ? fallback : parsed;
+}
+
+function finalizeProfessionExpressionInput(input) {
+  if (!input) return;
+  const rawValue = String(input.value ?? "");
+  const trimmedValue = rawValue.trim();
+  const previousValue = input.dataset.prevCommittedValue ?? "";
+
+  if (!trimmedValue) {
+    input.value = "";
+    input.dataset.prevCommittedValue = "";
+    saveProfessionCalculatorState();
+    runProfessionCalculationIfEnabled();
+    return;
+  }
+
+  const parsedValue = parseProfessionRoundedInteger(trimmedValue, null);
+  if (parsedValue === null || Number.isNaN(parsedValue)) {
+    input.value = previousValue;
+    input.dataset.prevCommittedValue = previousValue;
+  } else {
+    input.value = String(parsedValue);
+    input.dataset.prevCommittedValue = input.value;
+  }
+
+  saveProfessionCalculatorState();
+  runProfessionCalculationIfEnabled();
+}
+
+function parseProfessionRoundedInteger(value, fallback = null) {
+  if (value === undefined || value === null) return fallback;
+  const normalized = normalizeProfessionMathExpression(String(value));
+  if (!normalized) return fallback;
+  if (!/^[\d+\-*/().\s^]*$/.test(normalized)) return fallback;
+
+  const jsExpression = normalized.replace(/\^/g, "**");
+  try {
+    const result = Function(`"use strict"; return (${jsExpression});`)();
+    if (!Number.isFinite(result)) return fallback;
+    return Math.max(0, Math.round(result));
+  } catch {
+    return fallback;
+  }
+}
+
+function normalizeProfessionMathExpression(value) {
+  return String(value)
+    .trim()
+    .replace(/[（﹙｟❨❪❬❮❰〔【［｛〈《「『]/g, "(")
+    .replace(/[）﹚｠❩❫❭❯❱〕】］｝〉》」』]/g, ")")
+    .replace(/[xX×＊*]/g, "*")
+    .replace(/[／÷]/g, "/")
+    .replace(/[＋]/g, "+")
+    .replace(/[－—–]/g, "-")
+    .replace(/[，]/g, ".")
+    .replace(/\s+/g, " ");
 }
 
 function formatNumber(value) {
