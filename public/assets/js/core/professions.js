@@ -293,6 +293,8 @@ function bindProfessionCalculatorEvents() {
     };
   }
 
+  bindProfessionSidebarDropZone();
+
   const transferFileInput = document.getElementById("prof-transfer-file-input");
   if (transferFileInput && transferFileInput.dataset.bound !== "true") {
     transferFileInput.dataset.bound = "true";
@@ -979,12 +981,9 @@ async function copyProfessionTransferText() {
   }
 }
 
-function applyProfessionImport() {
-  const { text } = getProfessionTransferElements();
-  if (!text) return;
-
+function importProfessionTransferText(rawText) {
   try {
-    const parsed = JSON.parse(text.value || "{}");
+    const parsed = JSON.parse(String(rawText || "{}"));
     const payload = parseProfessionImportPayload(parsed);
     const materials = Array.isArray(payload.materials) ? payload.materials : [];
     const priceMode = shouldAskProfessionImportPriceChoice(materials)
@@ -1010,19 +1009,64 @@ function applyProfessionImport() {
   }
 }
 
+function applyProfessionImport() {
+  const { text } = getProfessionTransferElements();
+  if (!text) return;
+  importProfessionTransferText(text.value);
+}
+
 async function loadProfessionTransferFile(file) {
   try {
     const text = await file.text();
     const elements = getProfessionTransferElements();
-    if (!elements.text) return;
-    elements.text.value = text;
+    if (elements.text) {
+      elements.text.value = text;
+    }
     if (professionTransferMode === "import") {
       applyProfessionImport();
+      return;
     }
+    importProfessionTransferText(text);
   } catch (error) {
     console.error("Failed to read profession transfer file:", error);
     alert("读取生产计算导入文件失败。");
   }
+}
+
+function bindProfessionSidebarDropZone() {
+  const sidebar = document.getElementById("professions-sidebar");
+  if (!sidebar || sidebar.dataset.professionSidebarDropBound === "true") return;
+  sidebar.dataset.professionSidebarDropBound = "true";
+
+  const isSupportedTransferFile = (file) => {
+    const fileName = String(file?.name || "").toLowerCase();
+    const fileType = String(file?.type || "").toLowerCase();
+    return (
+      fileName.endsWith(".json") ||
+      fileName.endsWith(".txt") ||
+      fileType.includes("json") ||
+      fileType.startsWith("text/")
+    );
+  };
+
+  const getDroppedTransferFile = (event) =>
+    Array.from(event.dataTransfer?.files || []).find((file) =>
+      isSupportedTransferFile(file)
+    );
+
+  ["dragenter", "dragover"].forEach((eventName) => {
+    sidebar.addEventListener(eventName, (event) => {
+      if (!getDroppedTransferFile(event)) return;
+      event.preventDefault();
+    });
+  });
+
+  sidebar.addEventListener("drop", (event) => {
+    const file = getDroppedTransferFile(event);
+    if (!file) return;
+    event.preventDefault();
+    loadProfessionTransferFile(file);
+  });
 }
 
 function bindTransferDropZone(modal, textArea, onFileDrop) {
