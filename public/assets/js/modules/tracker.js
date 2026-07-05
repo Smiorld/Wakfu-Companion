@@ -305,30 +305,40 @@ function findTrackerCatalogItem(query) {
   return null;
 }
 
+function parseTrackerLogQuantity(rawValue) {
+  const normalized = String(rawValue || "").replace(/[,\s]/g, "");
+  const parsed = parseInt(normalized, 10);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
 function parseTrackedItemLog(line) {
-  const englishMatch = line.match(/picked up\s+(\d+)x\s+(.+?)\s*[.。]?$/i);
+  const englishMatch = line.match(/picked up\s+([\d,\s]+)x\s+(.+?)\s*[.。]?$/i);
   if (englishMatch) {
     return {
       type: "gain",
-      qty: parseInt(englishMatch[1], 10),
+      qty: parseTrackerLogQuantity(englishMatch[1]),
       variants: extractTrackerNameVariants(englishMatch[2]),
     };
   }
 
-  const chineseGainMatch = line.match(/\u4f60\u5f97\u5230\u4e86\s*(.+?)\s+x(\d+)\s*[。.]?$/);
+  const chineseGainMatch = line.match(
+    /\u4f60\u5f97\u5230\u4e86\s*(.+?)\s+x([\d,\s]+)\s*[。.]?$/
+  );
   if (chineseGainMatch) {
     return {
       type: "gain",
-      qty: parseInt(chineseGainMatch[2], 10),
+      qty: parseTrackerLogQuantity(chineseGainMatch[2]),
       variants: extractTrackerNameVariants(chineseGainMatch[1]),
     };
   }
 
-  const chineseLossMatch = line.match(/\u4f60\u5931\u53bb\u4e86\s*(.+?)\s+x(\d+)\s*[。.]?$/);
+  const chineseLossMatch = line.match(
+    /\u4f60\u5931\u53bb\u4e86\s*(.+?)\s+x([\d,\s]+)\s*[。.]?$/
+  );
   if (chineseLossMatch) {
     return {
       type: "loss",
-      qty: parseInt(chineseLossMatch[2], 10),
+      qty: parseTrackerLogQuantity(chineseLossMatch[2]),
       variants: extractTrackerNameVariants(chineseLossMatch[1]),
     };
   }
