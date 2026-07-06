@@ -1933,6 +1933,751 @@ button.aux-btn:hover {
   text-align: right;
 }
 
+.fissure-sidebar {
+  width: min(760px, calc(100vw - 24px));
+  right: calc(-1 * min(760px, calc(100vw - 24px)) - 20px);
+  z-index: 1045;
+}
+
+.fissure-sidebar.open {
+  right: 0;
+}
+
+.fissure-sidebar-content {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 16px 18px 18px;
+}
+
+.fissure-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  flex: 1;
+}
+
+.fissure-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.fissure-mode-group,
+.fissure-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fissure-sort-select {
+  min-width: 148px;
+}
+
+.tracker-action-btn.is-active {
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 14px rgba(0, 225, 255, 0.18);
+}
+
+.tracker-action-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.fissure-parameter-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.fissure-parameter-grid-compare {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.fissure-single-parameter-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.fissure-table-inline-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  align-content: start;
+}
+
+.fissure-inline-btn {
+  min-height: 72px;
+  min-width: 0;
+  padding: 12px 10px;
+  border-radius: 16px;
+  white-space: normal;
+  line-height: 1.25;
+  justify-content: center;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.fissure-parameter-grid-compare .fissure-plan-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.fissure-parameter-grid-compare .fissure-plan-field span {
+  line-height: 1.2;
+  text-align: center;
+}
+
+.fissure-parameter-grid-compare .fissure-plan-field-compression .fissure-param-select,
+.fissure-parameter-grid-compare .fissure-param-input {
+  width: 100%;
+}
+
+.fissure-plan-card {
+  border: 1px solid #2f2f2f;
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)),
+    rgba(18, 18, 18, 0.96);
+  padding: 16px 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.fissure-plan-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.fissure-plan-title {
+  color: var(--accent);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.fissure-plan-subtitle {
+  color: #7a7a7a;
+  font-size: 0.76rem;
+}
+
+.fissure-plan-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.fissure-plan-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  text-align: center;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid #2c2c2c;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.032), rgba(255, 255, 255, 0.015));
+}
+
+.fissure-plan-field span {
+  color: #d2d2d2;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.fissure-plan-field-compression .fissure-param-select {
+  width: 100%;
+  min-width: 0;
+  height: 50px;
+  padding: 0 42px 0 16px;
+  font-size: 1rem;
+  line-height: 48px;
+  text-align: center;
+  text-align-last: center;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #d8d8d8 50%),
+    linear-gradient(135deg, #d8d8d8 50%, transparent 50%);
+  background-position:
+    calc(100% - 22px) calc(50% - 3px),
+    calc(100% - 14px) calc(50% - 3px);
+  background-size: 8px 8px, 8px 8px;
+  background-repeat: no-repeat;
+}
+
+.fissure-plan-field-wip {
+  min-width: 0;
+}
+
+.fissure-param-input,
+.fissure-param-select,
+.fissure-price-input {
+  width: 100%;
+  min-width: 0;
+  height: 50px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid #3a3a3a;
+  background: rgba(12, 12, 12, 0.5);
+  color: #f5f5f5;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.fissure-param-select {
+  padding-right: 32px;
+  text-align: center;
+  text-align-last: center;
+}
+
+.fissure-param-input {
+  text-align: center;
+}
+
+.fissure-wip-switch {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  cursor: pointer;
+  user-select: none;
+}
+
+.fissure-wip-switch:focus {
+  outline: none;
+}
+
+.fissure-wip-switch:focus-visible .fissure-wip-switch-track {
+  box-shadow: 0 0 0 2px rgba(0, 225, 255, 0.16);
+}
+
+.fissure-wip-switch-track {
+  position: relative;
+  width: 54px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #3b3b3b;
+  border: 1px solid #4a4a4a;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.fissure-wip-switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  transition: transform 0.18s ease;
+}
+
+.fissure-wip-switch.is-on .fissure-wip-switch-track {
+  background: linear-gradient(135deg, #00bae6, #00e1ff);
+  border-color: rgba(0, 225, 255, 0.7);
+}
+
+.fissure-wip-switch.is-on .fissure-wip-switch-thumb {
+  transform: translateX(24px);
+}
+
+.fissure-param-input:focus,
+.fissure-param-select:focus,
+.fissure-price-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(0, 225, 255, 0.12);
+}
+
+.fissure-results {
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
+  flex: 1;
+}
+
+.fissure-results::-webkit-scrollbar {
+  width: 8px;
+}
+
+.fissure-results::-webkit-scrollbar-thumb {
+  background: #383838;
+  border-radius: 999px;
+}
+
+.fissure-summary-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fissure-detail-panel-card {
+  border: 1px solid rgba(0, 225, 255, 0.16);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02)),
+    rgba(18, 18, 18, 0.96);
+  padding: 16px 18px;
+}
+
+.fissure-detail-panel-header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.fissure-detail-panel-title-wrap {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fissure-summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.fissure-summary-title {
+  color: #f2f2f2;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.fissure-summary-meta {
+  color: #8e8e8e;
+  font-size: 0.78rem;
+}
+
+.fissure-summary-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.fissure-hover-preview {
+  position: fixed;
+  z-index: 1048;
+  pointer-events: auto;
+  max-width: min(660px, 40vw);
+}
+
+.fissure-summary-card {
+  position: relative;
+  align-items: center;
+  padding: 12px 14px;
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.fissure-summary-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(0, 225, 255, 0.35);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
+}
+
+.fissure-summary-badge {
+  min-width: 72px;
+}
+
+.fissure-summary-badge.normal {
+  background: linear-gradient(135deg, #0ea4d4, #00d7ff);
+}
+
+.fissure-summary-badge.ultimate {
+  background: linear-gradient(135deg, #d66b18, #ffb347);
+}
+
+.fissure-summary-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.fissure-summary-topline {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.fissure-summary-name {
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.fissure-summary-value {
+  color: var(--accent);
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.fissure-summary-subline {
+  margin-top: 8px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: #8b8b8b;
+  font-size: 0.76rem;
+}
+
+.fissure-detail-popover-title {
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+
+.fissure-detail-table {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fissure-detail-head,
+.fissure-detail-row {
+  display: grid;
+  grid-template-columns: minmax(116px, 0.98fr) repeat(3, minmax(112px, 1fr));
+  gap: 12px;
+}
+
+.fissure-detail-head {
+  color: #8d8d8d;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.fissure-detail-head span:first-child {
+  text-align: left;
+}
+
+.fissure-detail-sublimation {
+  display: flex;
+  align-items: center;
+  color: #f0f0f0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.35;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.fissure-tier-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid #2b2b2b;
+}
+
+.fissure-tier-card.is-band-1 {
+  background: rgba(171, 216, 132, 0.22);
+  border-color: rgba(190, 234, 145, 0.5);
+}
+
+.fissure-tier-card.is-band-1 .fissure-tier-price {
+  color: #d8f3b8;
+}
+
+.fissure-tier-card.is-band-2 {
+  background: rgba(255, 210, 92, 0.22);
+  border-color: rgba(255, 221, 120, 0.48);
+}
+
+.fissure-tier-card.is-band-2 .fissure-tier-price {
+  color: #ffe7a3;
+}
+
+.fissure-tier-card.is-band-3 {
+  background: rgba(255, 154, 98, 0.22);
+  border-color: rgba(255, 176, 128, 0.48);
+}
+
+.fissure-tier-card.is-band-3 .fissure-tier-price {
+  color: #ffd0b8;
+}
+
+.fissure-tier-card.is-band-4 {
+  background: rgba(223, 116, 180, 0.24);
+  border-color: rgba(241, 151, 210, 0.5);
+}
+
+.fissure-tier-card.is-band-4 .fissure-tier-price {
+  color: #ffd0ea;
+}
+
+.fissure-tier-card.is-locked {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: #2b2b2b;
+}
+
+.fissure-tier-card.is-locked .fissure-tier-price {
+  color: #d7d7d7;
+}
+
+.fissure-tier-price {
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.fissure-tier-meta {
+  color: #8e8e8e;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.fissure-compare-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.fissure-compare-column {
+  min-width: 0;
+}
+
+.fissure-table-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fissure-table-note {
+  color: #8d8d8d;
+  font-size: 0.78rem;
+}
+
+.fissure-table-scroll {
+  overflow: auto;
+  border-radius: 10px;
+  padding-bottom: 4px;
+}
+
+.fissure-table-scroll::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.fissure-table-scroll::-webkit-scrollbar-thumb {
+  background: #3b3b3b;
+  border-radius: 999px;
+}
+
+.fissure-info-table {
+  width: 100%;
+  min-width: 676px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.85rem;
+  color: #ccc;
+  background: #222;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.fissure-info-table td {
+  vertical-align: middle;
+}
+
+.fissure-info-table .fissure-col-level {
+  width: 54px;
+}
+
+.fissure-info-table .fissure-col-name {
+  width: 62px;
+}
+
+.fissure-info-table .fissure-col-price {
+  width: 108px;
+}
+
+.fissure-info-table .fissure-col-expected {
+  width: 92px;
+}
+
+.fissure-info-table th,
+.fissure-info-table td {
+  padding: 10px 6px;
+  vertical-align: middle;
+  text-align: center;
+  border-bottom: 1px solid #333;
+}
+
+.fissure-info-table thead th {
+  background: #2a2a2a;
+  font-weight: 700;
+  color: #fff;
+  text-transform: none;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.fissure-info-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.fissure-info-table tbody tr:hover {
+  background: #2a2a2a;
+}
+
+.fissure-info-table td:nth-child(1),
+.fissure-info-table td:nth-child(2) {
+  white-space: normal;
+  word-break: break-word;
+}
+
+.fissure-info-table td:nth-child(1) {
+  font-weight: 700;
+  color: #fff;
+}
+
+.fissure-table-level-cell {
+  line-height: 1.1;
+}
+
+.fissure-table-level-sub {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #9fdff0;
+}
+
+.fissure-info-table thead th:nth-child(3),
+.fissure-info-table thead th:nth-child(4),
+.fissure-info-table thead th:nth-child(5),
+.fissure-info-table td:nth-child(3),
+.fissure-info-table td:nth-child(4),
+.fissure-info-table td:nth-child(5) {
+  text-align: center !important;
+}
+
+.fissure-info-table td:nth-child(3),
+.fissure-info-table td:nth-child(4),
+.fissure-info-table td:nth-child(5),
+.fissure-info-table td:nth-child(6) {
+  color: #f2f2f2;
+  font-family: inherit;
+  font-weight: 700;
+  text-align: center !important;
+}
+
+.fissure-info-table thead th:nth-child(6),
+.fissure-info-table td:nth-child(6) {
+  text-align: center;
+}
+
+.fissure-info-table thead th:nth-child(6) {
+  text-align: center;
+}
+
+.fissure-info-table .fissure-price-input {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  padding: 6px 8px;
+  text-align: center;
+  font-size: 0.84rem;
+}
+
+.fissure-price-cell {
+  text-align: center !important;
+}
+
+.fissure-info-table .fissure-price-locked {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.fissure-price-locked {
+  color: #7d7d7d;
+  font-weight: 700;
+}
+
+.fissure-price-locked-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 38px;
+  height: 38px;
+  padding: 6px 8px;
+  box-sizing: border-box;
+  border: 1px solid #3a3a3a;
+  border-radius: 18px;
+  background: rgba(18, 18, 18, 0.96);
+}
+
+@media (max-width: 960px) {
+  .fissure-parameter-grid-compare,
+  .fissure-compare-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fissure-single-parameter-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fissure-table-inline-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .fissure-sidebar {
+    width: min(100vw, 720px);
+    right: -100vw;
+  }
+}
+
+@media (max-width: 720px) {
+  .fissure-plan-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fissure-summary-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fissure-detail-head,
+  .fissure-detail-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* Info Table */
 .info-table {
   width: 100%;
@@ -2784,6 +3529,20 @@ body.pip-window .empty-state {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.tracker-transfer-actions > .tracker-action-btn,
+.tracker-transfer-actions > .add-track-btn,
+.tracker-transfer-actions > .tracker-transfer-file-btn {
+  min-width: 116px;
+  height: 42px;
+  padding: 0 16px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 0.92rem;
 }
 
 .tracker-transfer-file-btn {

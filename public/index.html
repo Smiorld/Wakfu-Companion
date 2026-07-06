@@ -759,6 +759,8 @@
 
         <span class="footer-btn" id="session-window-btn" onclick="toggleSessionWindow()" style="margin-right: 10px">会话总结</span>
 
+        <span class="footer-btn" id="fissure-expectation-btn" onclick="openFissureExpectationModal()" style="margin-right: 10px">裂缝期望</span>
+
         <span class="footer-btn" id="sound-settings-btn" onclick="openSoundSettingsModal()" style="margin-right: 10px">声音设置</span>
         </span>
 
@@ -979,6 +981,63 @@
       </div>
     </div>
 
+    <div id="fissure-expectation-sidebar" class="sidebar fissure-sidebar">
+      <div class="sidebar-header">
+        <h3>裂缝期望</h3>
+        <button class="close-sidebar-btn" onclick="closeFissureExpectationModal()">×</button>
+      </div>
+      <div class="sidebar-content fissure-sidebar-content">
+        <div class="fissure-shell">
+          <div class="fissure-toolbar">
+            <div class="fissure-mode-group">
+              <button id="fissure-mode-summary-btn" class="tracker-action-btn" type="button">裂缝汇总</button>
+              <button id="fissure-mode-table-btn" class="tracker-action-btn" type="button">总表模式</button>
+              <button id="fissure-compare-btn" class="tracker-action-btn" type="button">比对</button>
+            </div>
+            <div class="fissure-toolbar-actions">
+              <select id="fissure-sort-select" class="translation-select fissure-sort-select">
+                <option value="fissure-asc">裂缝升序</option>
+                <option value="fissure-desc">裂缝降序</option>
+                <option value="expected-desc">期望降序</option>
+                <option value="expected-asc">期望升序</option>
+              </select>
+              <button id="fissure-import-btn" class="tracker-action-btn" type="button">导入</button>
+              <button id="fissure-export-btn" class="tracker-action-btn" type="button">导出</button>
+              <button id="fissure-reset-btn" class="tracker-action-btn" type="button">重置价格</button>
+            </div>
+          </div>
+
+          <div id="fissure-parameter-grid" class="fissure-parameter-grid"></div>
+
+          <div id="fissure-results" class="fissure-results"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="fissure-hover-preview" class="fissure-hover-preview" style="display: none"></div>
+
+    <div id="fissure-transfer-modal" class="custom-modal" style="display: none">
+      <div class="modal-content tracker-transfer-modal-content">
+        <div class="modal-header">
+          <h3>裂缝期望导入</h3>
+          <button class="close-modal" onclick="closeFissureExpectationImportModal()">×</button>
+        </div>
+        <div class="modal-body tracker-transfer-body">
+          <div id="fissure-transfer-note" class="tracker-transfer-note">
+            支持把 CSV 文本粘贴到这里，或把导出的 `.csv/.txt` 文件拖进来。锁死价格项会自动忽略。
+          </div>
+          <textarea id="fissure-transfer-text" class="tracker-transfer-textarea" spellcheck="false"></textarea>
+          <div class="tracker-transfer-actions">
+            <label id="fissure-transfer-file-btn" class="tracker-action-btn tracker-transfer-file-btn">
+              选择文件
+              <input id="fissure-transfer-file-input" type="file" accept=".csv,.txt,text/csv,text/plain" hidden />
+            </label>
+            <button id="fissure-transfer-apply-btn" class="add-track-btn" onclick="applyFissureExpectationImport()">导入并覆盖</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div id="broadcast-modal" class="floating-window broadcast-window" style="display: none"></div>
 
     <div id="sound-settings-modal" class="floating-window sound-settings-window" style="display: none; left: 50%; top: 16%; transform: translateX(-50%); width: 520px">
@@ -1060,6 +1119,7 @@
     <script src="assets/js/data/items.js?v=20260704h"></script>
     <script src="assets/js/data/item_i18n_map.js?v=20260704j"></script>
     <script src="assets/js/data/wakfu_monsters.js?v=20260619b"></script>
+    <script src="assets/js/data/fissure_expectation_data.js?v=20260706a"></script>
     <script src="assets/js/data/area_challenge_i18n.js?v=20260701a"></script>
     <script src="assets/js/data/tribe_challenge_zones.js?v=20260701b"></script>
     <script src="assets/data/daily_dungeon_rotation.js?v=20260619b"></script>
@@ -1075,6 +1135,7 @@
     <script src="assets/js/modules/broadcast.js?v=20260701d"></script>
     <script src="assets/js/modules/combat.js?v=20260621f"></script>
     <script src="assets/js/modules/tracker.js?v=20260705a"></script>
+    <script src="assets/js/modules/fissureExpectations.js?v=20260706a"></script>
     <script src="assets/js/modules/forecast.js?v=20260619b"></script>
     <script src="assets/js/modules/ui.js?v=20260704a"></script>
     <script src="assets/vendor/driverjs/driver.js.iife.js?v=20260630a"></script>
