@@ -5,6 +5,7 @@ const ONBOARDING_CONTEXTS = {
   combat: "combat",
   tracker: "tracker",
   professions: "professions",
+  fissure: "fissure",
   tribe: "tribe",
   chat: "chat",
   footer: "footer",
@@ -166,7 +167,7 @@ function buildOverviewSteps() {
     createOnboardingStep(
       "#footer-tool-buttons",
       "\u5b9e\u7528\u5de5\u5177",
-      "\u4e2d\u4e0b\u65b9\u7684\u84dd\u8272\u6309\u94ae\u662f\u5404\u7c7b\u5b9e\u7528\u5de5\u5177\u5165\u53e3\uff0c\u5305\u62ec\u751f\u4ea7\u8ba1\u7b97\u3001\u5feb\u6377\u4fe1\u606f\u3001\u4f1a\u8bdd\u603b\u7ed3\u4ee5\u53ca\u58f0\u97f3\u8bbe\u7f6e\u3002",
+      "\u4e2d\u4e0b\u65b9\u7684\u84dd\u8272\u6309\u94ae\u662f\u5404\u7c7b\u5b9e\u7528\u5de5\u5177\u5165\u53e3\uff0c\u5305\u62ec\u751f\u4ea7\u8ba1\u7b97\u3001\u5feb\u6377\u4fe1\u606f\u3001\u4f1a\u8bdd\u603b\u7ed3\u3001\u88c2\u7f1d\u671f\u671b\u4ee5\u53ca\u58f0\u97f3\u8bbe\u7f6e\u3002",
       "top",
       "center"
     ),
@@ -293,6 +294,57 @@ function buildContextSteps(contextKey) {
         "\u751f\u4ea7\u8ba1\u7b97\u4e0e\u8ffd\u8e2a\u5668\u7684\u5bfc\u5165\u5bfc\u51fa\u73b0\u5728\u662f\u4e92\u901a\u7684\u3002\u751f\u4ea7\u8ba1\u7b97\u5bfc\u5165\u8ffd\u8e2a\u5668\u5bfc\u51fa\u65f6\uff0c\u4f1a\u628a\u8ffd\u8e2a\u76ee\u6807\u53d8\u6210\u539f\u6750\u6599\u6570\u91cf\uff1b\u53cd\u8fc7\u6765\u5bfc\u5165\u5230\u8ffd\u8e2a\u5668\u65f6\uff0c\u4f1a\u7528\u539f\u6750\u6599\u6570\u91cf\u548c\u5355\u4ef7\u5408\u5e76\u66f4\u65b0\u8ffd\u8e2a\u6761\u76ee\u3002",
         "top",
         "start"
+      ),
+    ],
+    [ONBOARDING_CONTEXTS.fissure]: [
+      createOnboardingStep(
+        "#fissure-expectation-btn",
+        "\u88c2\u7f1d\u671f\u671b",
+        "\u8fd9\u91cc\u4f1a\u6253\u5f00\u88c2\u7f1d\u671f\u671b\u4fa7\u8fb9\u680f\uff0c\u7528\u6765\u6309\u5f53\u524d\u53c2\u6570\u4f30\u7b97\u4e0d\u540c\u88c2\u7f1d\u7684\u6536\u76ca\u671f\u671b\u3002",
+        "top",
+        "center"
+      ),
+      createOnboardingStep(
+        "#fissure-parameter-grid",
+        "\u53c2\u6570\u533a",
+        "\u8fd9\u91cc\u586b\u5199\u52d8\u63a2\u3001WIP\u3001\u538b\u7ea7\u7b49\u7ea7\u548c\u51fb\u6740\u6ce2\u6570\u3002\u4fee\u6539\u540e\u4f1a\u7acb\u5373\u91cd\u7b97\uff0c\u5176\u4e2d\u52d8\u63a2\u53ea\u5141\u8bb8 0-200 \u7684\u6574\u6570\u3002",
+        "bottom",
+        "start"
+      ),
+      createOnboardingStep(
+        "#fissure-mode-summary-btn",
+        "\u88c2\u7f1d\u6c47\u603b",
+        "\u9ed8\u8ba4\u6a21\u5f0f\u4f1a\u53ea\u663e\u793a\u5f53\u524d\u538b\u7ea7\u53ef\u5237\u7684\u88c2\u7f1d\uff0c\u53ef\u4ee5\u6309\u88c2\u7f1d\u7b49\u7ea7\u6216\u603b\u671f\u671b\u6392\u5e8f\u3002",
+        "bottom",
+        "center"
+      ),
+      createOnboardingStep(
+        "#fissure-results",
+        "\u60ac\u6d6e\u660e\u7ec6",
+        "\u628a\u9f20\u6807\u505c\u5728\u88c2\u7f1d\u6761\u76ee\u4e0a\uff0c\u5de6\u4fa7\u4f1a\u6d6e\u51fa\u5b8c\u6574\u660e\u7ec6\uff0c\u53ef\u4ee5\u770b\u5230\u5404\u5347\u534e\u7684 1/2/3 \u7ea7\u4ef7\u683c\u3001\u5e73\u5747\u51e0\u628a/\u5f20 \u4ee5\u53ca\u671f\u671b\u6536\u76ca\u3002",
+        "left",
+        "start"
+      ),
+      createOnboardingStep(
+        "#fissure-mode-table-btn",
+        "\u603b\u8868\u6a21\u5f0f",
+        "\u8fd9\u91cc\u53ef\u4ee5\u5207\u5230\u603b\u8868\u6279\u91cf\u6539\u4ef7\u3002\u53ea\u6709\u5728\u603b\u8868\u6a21\u5f0f\u4e0b\uff0c\u53f3\u4fa7\u624d\u4f1a\u51fa\u73b0\u201c\u5bfc\u5165\u3001\u5bfc\u51fa\u3001\u91cd\u7f6e\u4ef7\u683c\u201d\u4e09\u4e2a\u6309\u94ae\u3002",
+        "bottom",
+        "center"
+      ),
+      createOnboardingStep(
+        ".fissure-table-inline-actions",
+        "\u4ef7\u683c\u7ba1\u7406",
+        "\u201c\u5bfc\u5165\u201d\u652f\u6301 CSV \u6587\u4ef6\u3001\u9009\u6587\u4ef6\u6216\u5b57\u7b26\u4e32\u5bfc\u5165\uff1b\u201c\u5bfc\u51fa\u201d\u4f1a\u5bfc\u51fa\u5b8c\u6574\u4ef7\u683c\u8868\uff1b\u201c\u91cd\u7f6e\u4ef7\u683c\u201d\u4f1a\u6062\u590d\u5230\u5185\u7f6e\u9ed8\u8ba4\u503c\u3002",
+        "left",
+        "center"
+      ),
+      createOnboardingStep(
+        "#fissure-compare-btn",
+        "\u6bd4\u5bf9",
+        "\u6253\u5f00\u6bd4\u5bf9\u540e\uff0c\u4f1a\u540c\u65f6\u663e\u793a\u4e24\u5957\u53c2\u6570\u548c\u4e24\u4efd\u88c2\u7f1d\u6c47\u603b\uff0c\u4fbf\u4e8e\u5bf9\u6bd4\u4e0d\u540c\u914d\u7f6e\u7684\u671f\u671b\u6536\u76ca\u3002",
+        "bottom",
+        "center"
       ),
     ],
     [ONBOARDING_CONTEXTS.chat]: [
@@ -454,6 +506,7 @@ function findOnboardingContextAtPoint(clientX, clientY) {
   if (target.closest("#bug-report-btn, #oopz-link-btn")) return ONBOARDING_CONTEXTS.support;
   if (target.closest("#chat-broadcast-strip-anchor")) return ONBOARDING_CONTEXTS.tribe;
   if (target.closest("#chat-panel")) return ONBOARDING_CONTEXTS.chat;
+  if (target.closest("#fissure-expectation-sidebar, #fissure-expectation-btn")) return ONBOARDING_CONTEXTS.fissure;
   if (target.closest("#professions-sidebar, #prof-sidebar-btn")) return ONBOARDING_CONTEXTS.professions;
   if (target.closest("#tracker-panel")) return ONBOARDING_CONTEXTS.tracker;
   if (target.closest("#combat-panel")) return ONBOARDING_CONTEXTS.combat;
