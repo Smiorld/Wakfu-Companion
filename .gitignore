@@ -10,10 +10,12 @@ Thumbs.db
 artifacts/
 scripts/*
 !scripts/build-wakfu-term-glossary.js
+!scripts/build-class-spell-zh-map.js
 !scripts/build-area-challenge-map.js
 !scripts/build-tribe-zone-map.js
 !scripts/check-chachassistant-tribes.js
 !scripts/extract-wakfu-i18n.js
+!scripts/find-spell-i18n-candidates.js
 !scripts/resolve-resource-asset-chain.js
 !scripts/sync-resource-list-to-tracker-data.js
 !scripts/README.md

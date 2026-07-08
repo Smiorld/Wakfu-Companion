@@ -691,6 +691,8 @@ function updateCombatData(dataSet, player, spell, amount, element) {
 
   // Mark as dirty so we know we have data to save
   hasUnsavedChanges = true;
+  liveCombatStateDirty = true;
+  scheduleLiveCombatStateSave();
 }
 
 function detectClass(playerName, spellName) {
@@ -751,6 +753,7 @@ function saveFightToHistory() {
 function performReset(isAuto = false) {
   // 1. Save to history before clearing
   saveFightToHistory();
+  clearScheduledLiveCombatStateSave();
 
   // 2. Clear Live Data
   fightData = {};
@@ -780,6 +783,7 @@ function performReset(isAuto = false) {
 
   // 4. CLEAR STORAGE
   localStorage.removeItem("wakfu_live_combat_state");
+  liveCombatStateDirty = false;
 
   // 5. Reset Views
   currentViewIndex = "live";
@@ -909,32 +913,42 @@ function clearSummonBindings() {
   if (typeof renderMeter === "function") renderMeter();
 }
 
+function registerClassSpellSource(sourceMap) {
+  if (!sourceMap || typeof sourceMap !== "object") return;
+
+  for (const [className, langData] of Object.entries(sourceMap)) {
+    if (typeof langData === "object" && !Array.isArray(langData)) {
+      for (const spells of Object.values(langData)) {
+        if (!Array.isArray(spells)) continue;
+        spells.forEach((spell) => {
+          const normalizedSpell = String(spell || "").trim();
+          if (!normalizedSpell) return;
+          spellToClassMap[normalizedSpell] = className;
+          allKnownSpells.add(normalizedSpell);
+        });
+      }
+      continue;
+    }
+
+    if (Array.isArray(langData)) {
+      langData.forEach((spell) => {
+        const normalizedSpell = String(spell || "").trim();
+        if (!normalizedSpell) return;
+        spellToClassMap[normalizedSpell] = className;
+        allKnownSpells.add(normalizedSpell);
+      });
+    }
+  }
+}
+
 function generateSpellMap() {
   if (typeof classSpells === "undefined") return;
   spellToClassMap = {};
   allKnownSpells = new Set(); // Ensure this is initialized
 
-  // Iterate over each class (e.g., "feca", "iop")
-  for (const [className, langData] of Object.entries(classSpells)) {
-    // Handle the new structure: Object with languages { en: [], fr: [] }
-    if (typeof langData === "object" && !Array.isArray(langData)) {
-      // Iterate over each language array
-      for (const spells of Object.values(langData)) {
-        if (Array.isArray(spells)) {
-          spells.forEach((spell) => {
-            spellToClassMap[spell] = className;
-            allKnownSpells.add(spell);
-          });
-        }
-      }
-    }
-    // Fallback for flat structure if data is mixed (e.g. array of strings)
-    else if (Array.isArray(langData)) {
-      langData.forEach((spell) => {
-        spellToClassMap[spell] = className;
-        allKnownSpells.add(spell);
-      });
-    }
+  registerClassSpellSource(classSpells);
+  if (typeof classSpellsZh !== "undefined") {
+    registerClassSpellSource(classSpellsZh);
   }
 
   // --- MANUAL INJECTIONS ---
@@ -962,6 +976,8 @@ function generateSpellMap() {
   // ECAFLIP
   spellToClassMap["Blackjack"] = "ecaflip";
   allKnownSpells.add("Blackjack");
+  spellToClassMap["二十一点"] = "ecaflip";
+  allKnownSpells.add("二十一点");
 }
 
 function normalizeElement(el) {
@@ -1430,6 +1446,8 @@ function processLine(line) {
     clearExitReactiveSelfHit();
     saveFightToHistory();
     awaitingNewFight = true;
+    liveCombatStateDirty = true;
+    scheduleLiveCombatStateSave(true);
     updateWatchdogUI();
   }
 
@@ -1456,7 +1474,11 @@ function processLine(line) {
 }
 
 function saveLiveCombatState() {
-  if (Object.keys(fightData).length === 0 && Object.keys(healData).length === 0) return;
+  if (Object.keys(fightData).length === 0 && Object.keys(healData).length === 0) {
+    localStorage.removeItem("wakfu_live_combat_state");
+    liveCombatStateDirty = false;
+    return;
+  }
 
   const state = {
     fightData: cloneSerializableState(fightData),
@@ -1469,6 +1491,39 @@ function saveLiveCombatState() {
     awaitingNewFight,
   };
   localStorage.setItem("wakfu_live_combat_state", JSON.stringify(state));
+  liveCombatStateDirty = false;
+  lastLiveCombatSaveAt = Date.now();
+}
+
+function clearScheduledLiveCombatStateSave() {
+  if (liveCombatSaveTimerId) {
+    clearTimeout(liveCombatSaveTimerId);
+    liveCombatSaveTimerId = null;
+  }
+}
+
+function flushLiveCombatStateSave() {
+  clearScheduledLiveCombatStateSave();
+  saveLiveCombatState();
+}
+
+function scheduleLiveCombatStateSave(force = false) {
+  if (!liveCombatStateDirty && !force) return;
+
+  const now = Date.now();
+  const elapsed = now - lastLiveCombatSaveAt;
+
+  if (force || elapsed >= liveCombatSaveDelayMs) {
+    flushLiveCombatStateSave();
+    return;
+  }
+
+  if (liveCombatSaveTimerId) return;
+
+  liveCombatSaveTimerId = setTimeout(() => {
+    liveCombatSaveTimerId = null;
+    flushLiveCombatStateSave();
+  }, liveCombatSaveDelayMs - elapsed);
 }
 
 function cloneSerializableState(value) {
@@ -1507,7 +1562,17 @@ function loadLiveCombatState() {
 
 // Auto-save when closing the page/tab
 window.addEventListener("beforeunload", () => {
-  saveLiveCombatState();
+  flushLiveCombatStateSave();
+});
+
+window.addEventListener("pagehide", () => {
+  flushLiveCombatStateSave();
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    flushLiveCombatStateSave();
+  }
 });
 
 // Export for main.js

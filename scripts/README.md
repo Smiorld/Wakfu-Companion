@@ -33,6 +33,26 @@
 node scripts/build-wakfu-term-glossary.js [source.json] [output.json]
 ```
 
+### `npm run build:class-spells-zh`
+
+用途：
+- 从 `database.js` 里的英文职业技能表抽技能名。
+- 去 `artifacts/wakfu-i18n/wakfu_i18n_en_zh.json` 里反查中文技能名。
+- 生成战斗模块可直接使用的中文职业技能表。
+
+输入：
+- `public/assets/js/data/database.js`
+- `artifacts/wakfu-i18n/wakfu_i18n_en_zh.json`
+
+输出：
+- `public/assets/js/data/class_spells_zh.js`
+- `artifacts/class-spells-zh-report.json`
+
+说明：
+- 当前主要按英文完全匹配反查中文。
+- 候选项会优先选 `content.3.*` 这类更像技能名的文本键。
+- 未命中的技能会写进 `artifacts/class-spells-zh-report.json`，便于后续人工补洞。
+
 ### `npm run build:area-challenges`
 
 用途：
@@ -71,6 +91,23 @@ node scripts/build-wakfu-term-glossary.js [source.json] [output.json]
 适用场景：
 - 检查 Chachassistant 是否补了新的部族 `wakfuId`
 - 调查桥接来源是否变化
+
+### `npm run lookup:spell-zh -- "英文技能名"`
+
+用途：
+- 输入英文技能名。
+- 去 `artifacts/wakfu-i18n/wakfu_i18n_en_zh.json` 里查所有候选中文和文本键。
+- 方便核对职业技能表汉化时的候选项。
+
+示例：
+```powershell
+npm run lookup:spell-zh -- "Twilight"
+node scripts/find-spell-i18n-candidates.js "Twilight"
+```
+
+输出：
+- 命中项的 `key / english / chinese`
+- 若没有完全匹配，也会给出包含匹配候选
 
 ### `npm run lookup:resource-assets`
 

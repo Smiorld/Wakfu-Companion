@@ -559,7 +559,7 @@ async function startTracking(mainLogHandle, nextChatHandle) {
   chatLineCache.clear();
 
   if (parseIntervalId) clearInterval(parseIntervalId);
-  parseIntervalId = setInterval(parseTrackedFiles, 1000);
+  parseIntervalId = setInterval(parseTrackedFiles, 500);
   parseTrackedFiles();
   startWatchdog();
 

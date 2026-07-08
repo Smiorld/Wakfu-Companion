@@ -7,9 +7,11 @@
     "start": "npx serve -l $PORT",
     "extract:i18n": "node scripts/extract-wakfu-i18n.js",
     "build:glossary": "node scripts/build-wakfu-term-glossary.js",
+    "build:class-spells-zh": "node scripts/build-class-spell-zh-map.js",
     "build:area-challenges": "node scripts/build-area-challenge-map.js",
     "build:tribe-zones": "node scripts/build-tribe-zone-map.js",
     "check:chachassistant-tribes": "node scripts/check-chachassistant-tribes.js",
+    "lookup:spell-zh": "node scripts/find-spell-i18n-candidates.js",
     "lookup:resource-assets": "node scripts/resolve-resource-asset-chain.js",
     "sync:resource-list": "node scripts/sync-resource-list-to-tracker-data.js",
     "combat:replay": "node tools/combat/replay-log.js"
