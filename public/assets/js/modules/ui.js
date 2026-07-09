@@ -387,8 +387,10 @@ function toggleSidebar() {
   const sidebar = document.getElementById("info-sidebar");
   const dungeonSidebar = document.getElementById("dungeon-sidebar");
   const profSidebar = document.getElementById("professions-sidebar");
+  const helperSidebar = document.getElementById("helper-sidebar");
   if (dungeonSidebar) dungeonSidebar.classList.remove("open");
   if (profSidebar) profSidebar.classList.remove("open");
+  if (helperSidebar) helperSidebar.classList.remove("open");
   sidebar.classList.toggle("open");
 }
 
@@ -396,9 +398,11 @@ async function toggleDungeonSidebar() {
   const sidebar = document.getElementById("dungeon-sidebar");
   const infoSidebar = document.getElementById("info-sidebar");
   const profSidebar = document.getElementById("professions-sidebar");
+  const helperSidebar = document.getElementById("helper-sidebar");
 
   if (infoSidebar) infoSidebar.classList.remove("open");
   if (profSidebar) profSidebar.classList.remove("open");
+  if (helperSidebar) helperSidebar.classList.remove("open");
 
   if (sidebar) {
     //  Only load data when opening the sidebar
@@ -422,9 +426,11 @@ async function toggleProfSidebar() {
   const sidebar = document.getElementById("professions-sidebar");
   const infoSidebar = document.getElementById("info-sidebar");
   const dungeonSidebar = document.getElementById("dungeon-sidebar");
+  const helperSidebar = document.getElementById("helper-sidebar");
 
   if (infoSidebar) infoSidebar.classList.remove("open");
   if (dungeonSidebar) dungeonSidebar.classList.remove("open");
+  if (helperSidebar) helperSidebar.classList.remove("open");
 
   // Only load data when opening
   if (!sidebar.classList.contains("open")) {

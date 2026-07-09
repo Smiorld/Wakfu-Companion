@@ -4820,7 +4820,7 @@ body.pip-window .empty-state {
   font-size: 0.78rem;
   line-height: 1.5;
   text-align: left;
-  white-space: normal;
+  white-space: pre-line;
   z-index: 1085;
   pointer-events: none;
 }

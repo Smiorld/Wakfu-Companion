@@ -432,6 +432,9 @@ if (reconnectBtn) {
 
       if (!mainGranted || !chatGranted) {
         alert("\u8bfb\u53d6\u6743\u9650\u88ab\u62d2\u7edd\uff0c\u8bf7\u91cd\u65b0\u9009\u62e9\u6587\u4ef6\u3002");
+        if (typeof window.resetHelperIntegrationState === "function") {
+          window.resetHelperIntegrationState();
+        }
         resetPendingDropHandles();
         renderPendingDropStatus();
         reconnectContainer.style.display = "none";
@@ -444,6 +447,9 @@ if (reconnectBtn) {
       await startTracking(fileHandle, chatFileHandle);
     } catch (error) {
       console.error("Permission error:", error);
+      if (typeof window.resetHelperIntegrationState === "function") {
+        window.resetHelperIntegrationState();
+      }
       reconnectContainer.style.display = "none";
       dropZone.style.display = "block";
     }
@@ -452,6 +458,9 @@ if (reconnectBtn) {
 
 if (newFileBtn) {
   newFileBtn.addEventListener("click", () => {
+    if (typeof window.resetHelperIntegrationState === "function") {
+      window.resetHelperIntegrationState();
+    }
     resetPendingDropHandles();
     renderPendingDropStatus();
     reconnectContainer.style.display = "none";
@@ -562,6 +571,10 @@ async function startTracking(mainLogHandle, nextChatHandle) {
   parseIntervalId = setInterval(parseTrackedFiles, 500);
   parseTrackedFiles();
   startWatchdog();
+
+  if (typeof window.onHelperLogsImported === "function") {
+    await window.onHelperLogsImported();
+  }
 
   if (typeof window.enableBroadcastNetwork === "function") {
     window.enableBroadcastNetwork("logs-imported");

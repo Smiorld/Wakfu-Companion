@@ -1088,6 +1088,9 @@ function applyParsedFissureImport(entries) {
 function openFissureExpectationModal() {
   const sidebar = document.getElementById("fissure-expectation-sidebar");
   if (!sidebar) return;
+  if (typeof window.closeHelperSidebar === "function") {
+    window.closeHelperSidebar();
+  }
   sidebar.classList.add("open");
   renderFissureExpectationModal();
 }
