@@ -249,7 +249,7 @@ const monsterResources = [
   { name: "Refined Leather", level: 80, rarity: "Common", imgId: "57421048" },
   { name: "Refined Handle", level: 80, rarity: "Common", imgId: "57121061" },
   { name: "Refined Plate", level: 80, rarity: "Common", imgId: "57521074" },
-  { name: "Refined Gem", level: 80, rarity: "Common", imgId: "57621087" },
+  { name: "Refined Gem", level: 80, rarity: "Common", imgId: "57621084" },
   { name: "Refined Oil", level: 80, rarity: "Common", imgId: "57721100" },
   { name: "Refined Bracket", level: 80, rarity: "Common", imgId: "57821113" },
   {
