@@ -6,6 +6,7 @@ const DATABASE_JS = path.join(__dirname, "..", "public", "assets", "js", "data",
 const I18N_JSON = path.join(__dirname, "..", "artifacts", "wakfu-i18n", "wakfu_i18n_en_zh.json");
 const OUTPUT_JS = path.join(__dirname, "..", "public", "assets", "js", "data", "class_spells_zh.js");
 const REPORT_JSON = path.join(__dirname, "..", "artifacts", "class-spells-zh-report.json");
+const MANUAL_ZH_JSON = path.join(__dirname, "..", ".local", "class_spells_zh_manual_input.json");
 
 function loadClassSpells() {
   const source = fs.readFileSync(DATABASE_JS, "utf8");
@@ -27,6 +28,19 @@ function loadI18nEntries() {
   if (!Array.isArray(parsed)) {
     throw new Error("wakfu_i18n_en_zh.json is not an array.");
   }
+  return parsed;
+}
+
+function loadManualZhEntries() {
+  if (!fs.existsSync(MANUAL_ZH_JSON)) {
+    return {};
+  }
+
+  const parsed = JSON.parse(fs.readFileSync(MANUAL_ZH_JSON, "utf8"));
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("class_spells_zh_manual_input.json must be an object.");
+  }
+
   return parsed;
 }
 
@@ -91,9 +105,10 @@ function buildEnglishLookup(entries) {
   return lookup;
 }
 
-function buildZhSpellMap(classSpells, englishLookup) {
+function buildZhSpellMap(classSpells, englishLookup, manualZhEntries) {
   const output = {};
   const unresolved = [];
+  const manualMergeSummary = [];
   let resolvedCount = 0;
   let totalCount = 0;
 
@@ -114,9 +129,23 @@ function buildZhSpellMap(classSpells, englishLookup) {
       }
     });
 
+    const manualZhSpells = Array.isArray(manualZhEntries?.[className])
+      ? manualZhEntries[className].map((value) => normalizeText(value)).filter(Boolean)
+      : [];
+    const finalZhSpells = [...new Set([...zhSpells, ...manualZhSpells])];
+
     output[className] = {
-      zh: [...new Set(zhSpells)],
+      zh: finalZhSpells,
     };
+
+    if (manualZhSpells.length) {
+      const autoZhSet = new Set(zhSpells);
+      manualMergeSummary.push({
+        className,
+        manualCount: manualZhSpells.length,
+        addedCount: manualZhSpells.filter((spell) => !autoZhSet.has(spell)).length,
+      });
+    }
 
     if (missing.length) {
       unresolved.push({
@@ -129,6 +158,7 @@ function buildZhSpellMap(classSpells, englishLookup) {
   return {
     output,
     unresolved,
+    manualMergeSummary,
     resolvedCount,
     totalCount,
   };
@@ -146,8 +176,9 @@ const classSpellsZh = Object.freeze(${JSON.stringify(classSpellsZh, null, 2)});
 function main() {
   const classSpells = loadClassSpells();
   const entries = loadI18nEntries();
+  const manualZhEntries = loadManualZhEntries();
   const englishLookup = buildEnglishLookup(entries);
-  const result = buildZhSpellMap(classSpells, englishLookup);
+  const result = buildZhSpellMap(classSpells, englishLookup, manualZhEntries);
 
   fs.writeFileSync(OUTPUT_JS, buildOutputJs(result.output), "utf8");
   fs.writeFileSync(
@@ -158,6 +189,7 @@ function main() {
         resolvedCount: result.resolvedCount,
         unresolvedCount: result.totalCount - result.resolvedCount,
         unresolved: result.unresolved,
+        manualMergeSummary: result.manualMergeSummary,
       },
       null,
       2
@@ -173,6 +205,7 @@ function main() {
         totalCount: result.totalCount,
         resolvedCount: result.resolvedCount,
         unresolvedCount: result.totalCount - result.resolvedCount,
+        manualMergeSummary: result.manualMergeSummary,
       },
       null,
       2
