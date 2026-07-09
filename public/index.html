@@ -775,6 +775,10 @@
       onclick="window.open('https://oopz.cn/i/rRTDSZ', '_blank', 'noopener,noreferrer')">
       OOPZ单人服语音频道
     </button>
+    <button class="helper-control-fab" id="helper-control-btn" type="button" style="display: none" onclick="openHelperSidebar()">
+      <span id="helper-control-indicator" class="helper-control-indicator is-offline" aria-hidden="true"></span>
+      <span class="helper-control-label">挂机神器</span>
+    </button>
     <button class="onboarding-help-fab" id="onboarding-help-btn" type="button" style="display: none">使用教程</button>
 
     <!-- Session Recap -->
@@ -1016,6 +1020,79 @@
 
     <div id="fissure-hover-preview" class="fissure-hover-preview" style="display: none"></div>
 
+    <div id="helper-sidebar" class="sidebar helper-sidebar">
+      <div class="sidebar-header">
+        <div class="session-header-group">
+          <img src="./assets/img/resources/Breaded_Fish.png" class="sidebar-header-icon" onerror="this.style.display='none'" />
+          <h3>挂机神器</h3>
+        </div>
+        <button class="close-sidebar-btn" type="button" onclick="closeHelperSidebar()">×</button>
+      </div>
+      <div class="sidebar-content helper-sidebar-content">
+        <div id="helper-overview-card" class="helper-overview-card">
+          <div class="helper-overview-topline">
+            <span id="helper-service-badge" class="helper-pill is-offline">未连接</span>
+            <span id="helper-worker-badge" class="helper-pill is-muted">挂机监听未启动</span>
+            <span id="helper-mode-badge" class="helper-pill is-muted">模式：关闭</span>
+          </div>
+          <div id="helper-summary-line" class="helper-summary-line">等待日志导入后探测本地 helper…</div>
+          <div id="helper-launch-row" class="helper-launch-row" style="display: none">
+            <button id="helper-launch-btn" class="tracker-action-btn helper-launch-btn" type="button">启动本地helper</button>
+          </div>
+          <div id="helper-meta-grid" class="helper-meta-grid"></div>
+        </div>
+
+        <div class="helper-section">
+          <div class="helper-section-title">模式切换</div>
+          <div class="helper-mode-buttons">
+            <button id="helper-mode-off-btn" class="tracker-action-btn helper-mode-btn" type="button" data-helper-mode="off">关闭</button>
+            <button
+              id="helper-mode-activate-btn"
+              class="tracker-action-btn helper-mode-btn"
+              type="button"
+              data-helper-mode="activate-only"
+              data-tooltip="玩家回合开始的时候自动切换到沃土游戏窗口。"
+            >
+              自动激活
+            </button>
+            <button
+              id="helper-mode-space-btn"
+              class="tracker-action-btn helper-mode-btn"
+              type="button"
+              data-helper-mode="space-burst-return"
+              data-tooltip="玩家回合开始的时候自动切到沃土按空格跳过，并切换回原窗口。"
+            >
+              自动跳过
+            </button>
+          </div>
+        </div>
+
+        <div class="helper-section">
+          <div class="helper-section-title">快捷控制</div>
+          <div class="helper-action-grid">
+            <button id="helper-start-worker-btn" class="tracker-action-btn helper-action-btn" type="button">启动监听</button>
+            <button id="helper-stop-worker-btn" class="tracker-action-btn helper-action-btn" type="button">停止监听</button>
+            <button id="helper-detect-window-btn" class="tracker-action-btn helper-action-btn" type="button">识别窗口</button>
+            <button id="helper-dry-run-btn" class="tracker-action-btn helper-action-btn" type="button">测试跳过</button>
+            <button id="helper-refresh-btn" class="tracker-action-btn helper-action-btn" type="button">刷新状态</button>
+            <button id="helper-shutdown-btn" class="tracker-action-btn helper-action-btn helper-danger-btn" type="button">关闭本地helper</button>
+          </div>
+        </div>
+
+        <div class="helper-section">
+          <div class="helper-section-title">最近返回</div>
+          <div id="helper-result-card" class="helper-result-card is-empty">暂无操作结果。</div>
+        </div>
+
+        <div class="helper-section helper-events-section">
+          <div class="helper-section-title">最近事件</div>
+          <div id="helper-events-list" class="helper-events-list">
+            <div class="empty-state-mini">暂无事件。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div id="fissure-transfer-modal" class="custom-modal" style="display: none">
       <div class="modal-content tracker-transfer-modal-content">
         <div class="modal-header">
@@ -1131,6 +1208,7 @@
     <script src="assets/js/modules/utils.js?v=20260619b"></script>
     <script src="assets/js/modules/filesystem.js?v=20260709c"></script>
     <script src="assets/js/modules/soundSettings.js?v=20260620a"></script>
+    <script src="assets/js/modules/helperIntegration.js?v=20260709a"></script>
     <script src="assets/docs/azure-translator-setup-guide.js?v=20260619b"></script>
     <script src="assets/js/modules/chat.js?v=20260701b"></script>
     <script src="assets/js/modules/broadcast.js?v=20260701d"></script>
