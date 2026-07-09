@@ -3869,4 +3869,72 @@ const ITEM_I18N_MAP = {
   "Riktus Standard": [
     "土匪旗帜　Riktus Standard"
   ]
+  ,
+  "Ancestral Treechnid Bark": [
+    "远古树皮　Ancestral Treechnid Bark"
+  ]
+  ,
+  "Wuby Fabwic": [
+    "血红布匹　Wuby Fabwic"
+  ]
+  ,
+  "Black Enewgy": [
+    "黑色能量　Black Enewgy"
+  ]
+  ,
+  "Fanatic Bone": [
+    "摄魂之骨　Fanatic Bone"
+  ]
+  ,
+  "Fanatic Outgrowth": [
+    "摄魂残留　Fanatic Outgrowth"
+  ]
+  ,
+  "Rascal Fang": [
+    "捣蛋兽牙　Rascal Fang"
+  ]
+  ,
+  "Treechnid Bud": [
+    "树精幼芽　Treechnid Bud"
+  ]
+  ,
+  "Mutant Sepal": [
+    "变种花萼　Mutant Sepal"
+  ]
+  ,
+  "Royal Mycelium": [
+    "皇家菌体　Royal Mycelium"
+  ]
+  ,
+  "Zomkin Juice": [
+    "烹大师汁液　Zomkin Juice"
+  ]
+  ,
+  "Luxulious Ful": [
+    "奢华毛皮　Luxulious Ful"
+  ]
+  ,
+  "Gween Dye": [
+    "绿色染料　Gween Dye"
+  ]
+  ,
+  "Neo Ancestral Treechnid Bark": [
+    "新世远古树皮　Neo Ancestral Treechnid Bark"
+  ]
+  ,
+  "Lenald Tail": [
+    "福狸尾巴　Lenald Tail"
+  ]
+  ,
+  "Pompom Tail": [
+    "蓬松尾巴　Pompom Tail"
+  ]
+  ,
+  "Blackspore Poison": [
+    "黑暗孢子毒药　Blackspore Poison"
+  ]
+  ,
+  "Fanatic Fragment": [
+    "摄魂碎片　Fanatic Fragment"
+  ]
 };
