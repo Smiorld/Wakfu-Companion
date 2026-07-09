@@ -505,12 +505,9 @@ function openTrackerTransferModal(mode = "export") {
 
   if (trackerTransferMode === "export") {
     const defaultName = sanitizeTrackerTransferFilename("追踪器导出");
-    const promptedName = prompt("导出文件名：", defaultName);
-    if (promptedName === null) return;
-    const fileName = promptedName || defaultName;
     downloadTrackerTransferFile(
       buildTrackerExportPayload("bilingual"),
-      sanitizeTrackerTransferFilename(fileName) || defaultName
+      defaultName
     );
     closeTrackerTransferModal();
     return;
@@ -623,13 +620,37 @@ function downloadTrackerTransferFile(payload, baseName) {
   const blob = new Blob([JSON.stringify(payload, null, 2)], {
     type: "application/json;charset=utf-8",
   });
+  const downloadName = `${baseName || "追踪器导出"}.json`;
+
+  if (typeof window.saveBlobWithPicker === "function") {
+    return window.saveBlobWithPicker(blob, {
+      downloadName,
+      pickerId: "wakfu-tracker-transfer-export",
+      types: [
+        {
+          description: "JSON Files",
+          accept: {
+            "application/json": [".json"],
+          },
+        },
+        {
+          description: "Text Files",
+          accept: {
+            "text/plain": [".txt"],
+          },
+        },
+      ],
+    });
+  }
+
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = `${baseName || "追踪器导出"}.json`;
+  link.download = downloadName;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  return Promise.resolve({ method: "download-fallback" });
 }
 
 function parseTrackerTransferItems(rawText) {

@@ -83,6 +83,42 @@ async function getSavedHandles() {
   }
 }
 
+async function saveHandleToDB(key, value) {
+  try {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const store = tx.objectStore(STORE_NAME);
+
+    return new Promise((resolve, reject) => {
+      store.put(value || null, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = (event) => {
+        console.error("Transaction failed:", event);
+        reject(event);
+      };
+    });
+  } catch (error) {
+    console.error("Failed to save handle:", error);
+  }
+}
+
+async function getHandleFromDB(key) {
+  try {
+    const db = await openDB();
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.get(key);
+
+      tx.oncomplete = () => resolve(request.result || null);
+      tx.onerror = () => resolve(null);
+    });
+  } catch (error) {
+    console.error("Failed to get handle:", error);
+    return null;
+  }
+}
+
 async function checkPreviousFile() {
   const handles = await getSavedHandles();
   if (!handles.mainLogHandle || !handles.chatLogHandle) return;
@@ -200,6 +236,126 @@ function downloadBlob(blob, downloadName) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+async function ensureDirectoryPermission(directoryHandle) {
+  if (!directoryHandle || typeof directoryHandle.queryPermission !== "function") {
+    return false;
+  }
+
+  try {
+    const current = await directoryHandle.queryPermission({ mode: "readwrite" });
+    if (current === "granted") return true;
+    const requested = await directoryHandle.requestPermission({ mode: "readwrite" });
+    return requested === "granted";
+  } catch (error) {
+    console.error("Failed to verify directory permission:", error);
+    return false;
+  }
+}
+
+async function saveBlobToDirectoryHandle(blob, directoryHandle, fileName) {
+  const fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
+  const writable = await fileHandle.createWritable();
+  await writable.write(blob);
+  await writable.close();
+  return fileHandle;
+}
+
+async function saveBlobWithPicker(blob, options = {}) {
+  const downloadName = String(options.downloadName || "导出").trim() || "导出";
+  const types = Array.isArray(options.types) ? options.types : [];
+  const pickerId = String(options.pickerId || "").trim();
+  const directoryHandleKey = String(options.directoryHandleKey || "").trim();
+
+  if (directoryHandleKey) {
+    const savedDirectoryHandle = await getHandleFromDB(directoryHandleKey);
+    if (savedDirectoryHandle) {
+      const hasPermission = await ensureDirectoryPermission(savedDirectoryHandle);
+      if (hasPermission) {
+        try {
+          const fileHandle = await saveBlobToDirectoryHandle(
+            blob,
+            savedDirectoryHandle,
+            downloadName
+          );
+          return {
+            method: "directory-handle",
+            directoryHandle: savedDirectoryHandle,
+            fileHandle,
+          };
+        } catch (error) {
+          console.error("Saved export directory handle is no longer usable:", error);
+          await saveHandleToDB(directoryHandleKey, null);
+        }
+      }
+    }
+
+    if (typeof window.showDirectoryPicker === "function") {
+      try {
+        const directoryHandle = await window.showDirectoryPicker({
+          id: pickerId || undefined,
+          startIn: "documents",
+          mode: "readwrite",
+        });
+        const hasPermission = await ensureDirectoryPermission(directoryHandle);
+        if (hasPermission) {
+          await saveHandleToDB(directoryHandleKey, directoryHandle);
+          const fileHandle = await saveBlobToDirectoryHandle(
+            blob,
+            directoryHandle,
+            downloadName
+          );
+          return {
+            method: "directory-handle",
+            directoryHandle,
+            fileHandle,
+          };
+        }
+      } catch (error) {
+        if (error?.name === "AbortError") {
+          return { method: "cancelled" };
+        }
+        console.error("Save with directory picker failed:", error);
+      }
+    }
+  }
+
+  if (typeof window.showSaveFilePicker !== "function") {
+    downloadBlob(blob, downloadName);
+    return { method: "download-fallback" };
+  }
+
+  try {
+    const fileHandle = await window.showSaveFilePicker({
+      id: pickerId || undefined,
+      suggestedName: downloadName,
+      startIn: "documents",
+      types:
+        types.length > 0
+          ? types
+          : [
+              {
+                description: "All Files",
+                accept: {
+                  "application/octet-stream": [".bin"],
+                },
+              },
+            ],
+    });
+
+    const writable = await fileHandle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+    return { method: "file-system", fileHandle };
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      return { method: "cancelled" };
+    }
+    console.error("Save with picker failed, falling back to download:", error);
+    downloadBlob(blob, downloadName);
+    return { method: "download-fallback", error };
+  }
+}
+
 async function exportBugReportLog() {
   if (!fileHandle || !chatFileHandle) {
     alert("请先连接 `wakfu.log` 与 `wakfu_chat.log`，再导出反馈日志。");
@@ -228,8 +384,22 @@ async function exportBugReportLog() {
         lastModified: chatFile.lastModified,
       },
     ]);
-
-    downloadBlob(zipBlob, "把这个发送给T2薯条.zip");
+    if (typeof window.saveBlobWithPicker === "function") {
+      await window.saveBlobWithPicker(zipBlob, {
+        downloadName: "把这个发送给T2薯条.zip",
+        pickerId: "wakfu-bug-report-export",
+        types: [
+          {
+            description: "ZIP Files",
+            accept: {
+              "application/zip": [".zip"],
+            },
+          },
+        ],
+      });
+    } else {
+      downloadBlob(zipBlob, "把这个发送给T2薯条.zip");
+    }
 
     alert(
       "已下载当前两个日志的压缩包。\n请把“把这个发送给T2薯条.zip”发给 T2薯条，并描述你遇到的具体问题。\nQQ：1541599745"
@@ -242,3 +412,4 @@ async function exportBugReportLog() {
 
 window.saveFileHandlesToDB = saveFileHandlesToDB;
 window.getSavedHandles = getSavedHandles;
+window.saveBlobWithPicker = saveBlobWithPicker;

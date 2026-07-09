@@ -950,12 +950,9 @@ function openProfessionTransferModal(mode = "export") {
     const suggestedName = sanitizeTransferFilename(
       normalizedOutputName || "生产计算导出"
     );
-    const promptedName = prompt("导出文件名：", suggestedName);
-    if (promptedName === null) return;
-    const fileName = promptedName || suggestedName;
     downloadTransferFile(
       buildProfessionTransferPayload(),
-      sanitizeTransferFilename(fileName) || suggestedName
+      suggestedName
     );
     closeProfessionTransferModal();
     return;
@@ -1136,13 +1133,37 @@ function downloadTransferFile(payload, baseName) {
   const blob = new Blob([JSON.stringify(payload, null, 2)], {
     type: "application/json;charset=utf-8",
   });
+  const downloadName = `${baseName || "导出"}.json`;
+
+  if (typeof window.saveBlobWithPicker === "function") {
+    return window.saveBlobWithPicker(blob, {
+      downloadName,
+      pickerId: "wakfu-profession-transfer-export",
+      types: [
+        {
+          description: "JSON Files",
+          accept: {
+            "application/json": [".json"],
+          },
+        },
+        {
+          description: "Text Files",
+          accept: {
+            "text/plain": [".txt"],
+          },
+        },
+      ],
+    });
+  }
+
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = `${baseName || "导出"}.json`;
+  link.download = downloadName;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  return Promise.resolve({ method: "download-fallback" });
 }
 
 function isProfessionMaterialPlaceholderName(value) {

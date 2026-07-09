@@ -933,11 +933,31 @@ function toCsvLine(values) {
 
 function exportFissureExpectationCsv() {
   const defaultName = "裂缝期望价格表";
-  const promptedName = prompt("导出文件名：", defaultName);
-  if (promptedName === null) return;
-  const fileName = sanitizeFissureFileName(promptedName || defaultName) || defaultName;
+  const fileName = sanitizeFissureFileName(defaultName) || defaultName;
   const csv = buildFissureCsvRows().map(toCsvLine).join("\r\n");
   const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+
+  if (typeof window.saveBlobWithPicker === "function") {
+    return window.saveBlobWithPicker(blob, {
+      downloadName: `${fileName}.csv`,
+      pickerId: "wakfu-fissure-export",
+      types: [
+        {
+          description: "CSV Files",
+          accept: {
+            "text/csv": [".csv"],
+          },
+        },
+        {
+          description: "Text Files",
+          accept: {
+            "text/plain": [".txt"],
+          },
+        },
+      ],
+    });
+  }
+
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
   link.download = `${fileName}.csv`;
@@ -945,6 +965,7 @@ function exportFissureExpectationCsv() {
   link.click();
   document.body.removeChild(link);
   setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  return Promise.resolve({ method: "download-fallback" });
 }
 
 function sanitizeFissureFileName(value) {
