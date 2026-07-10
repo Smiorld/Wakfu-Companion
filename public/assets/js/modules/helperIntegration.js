@@ -599,11 +599,8 @@ function bindHelperControls() {
         }),
     },
     "helper-refresh-btn": {
-      title: "刷新状态",
-      request: async () => {
-        await refreshHelperSnapshot({ full: true });
-        return { ok: true, message: "状态已刷新。" };
-      },
+      title: "重新适配当前UI",
+      request: () => helperFetchJson("api/v1/vision/reset-lock", { method: "POST", body: "{}" }),
     },
     "helper-shutdown-btn": {
       title: "关闭本地helper",
