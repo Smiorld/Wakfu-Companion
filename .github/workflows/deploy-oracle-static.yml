@@ -1,0 +1,76 @@
+name: Deploy Oracle Static Site
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: oracle-static
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+      ORACLE_PORT: ${{ secrets.ORACLE_PORT }}
+      ORACLE_USER: ${{ secrets.ORACLE_USER }}
+      ORACLE_SSH_KEY: ${{ secrets.ORACLE_SSH_KEY }}
+      ORACLE_STATIC_PATH: /var/www/wakfu-companion
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare SSH key
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$ORACLE_SSH_KEY" > ~/.ssh/oracle_actions_key
+          chmod 600 ~/.ssh/oracle_actions_key
+
+      - name: Trust Oracle host key
+        shell: bash
+        run: |
+          set -euo pipefail
+          PORT="${ORACLE_PORT:-22}"
+          ssh-keyscan -p "$PORT" -H "$ORACLE_HOST" >> ~/.ssh/known_hosts
+
+      - name: Ensure target directory exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          PORT="${ORACLE_PORT:-22}"
+          ssh \
+            -i ~/.ssh/oracle_actions_key \
+            -p "$PORT" \
+            -o BatchMode=yes \
+            "$ORACLE_USER@$ORACLE_HOST" \
+            "sudo mkdir -p '$ORACLE_STATIC_PATH' && sudo chown -R '$ORACLE_USER':'$ORACLE_USER' '$ORACLE_STATIC_PATH'"
+
+      - name: Deploy static files
+        shell: bash
+        run: |
+          set -euo pipefail
+          PORT="${ORACLE_PORT:-22}"
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/oracle_actions_key -p $PORT -o BatchMode=yes" \
+            public/ \
+            "$ORACLE_USER@$ORACLE_HOST:$ORACLE_STATIC_PATH/"
+
+      - name: Verify remote index
+        shell: bash
+        run: |
+          set -euo pipefail
+          PORT="${ORACLE_PORT:-22}"
+          ssh \
+            -i ~/.ssh/oracle_actions_key \
+            -p "$PORT" \
+            -o BatchMode=yes \
+            "$ORACLE_USER@$ORACLE_HOST" \
+            "test -f '$ORACLE_STATIC_PATH/index.html' && ls -lh '$ORACLE_STATIC_PATH/index.html'"
