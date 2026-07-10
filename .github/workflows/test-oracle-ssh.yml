@@ -1,0 +1,46 @@
+name: Test Oracle SSH
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ssh-smoke-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Prepare SSH key
+        shell: bash
+        env:
+          ORACLE_SSH_KEY: ${{ secrets.ORACLE_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$ORACLE_SSH_KEY" > ~/.ssh/oracle_actions_key
+          chmod 600 ~/.ssh/oracle_actions_key
+
+      - name: Trust Oracle host key
+        shell: bash
+        env:
+          ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+          ORACLE_PORT: ${{ secrets.ORACLE_PORT }}
+        run: |
+          set -euo pipefail
+          PORT="${ORACLE_PORT:-22}"
+          ssh-keyscan -p "$PORT" -H "$ORACLE_HOST" >> ~/.ssh/known_hosts
+
+      - name: Verify SSH connectivity
+        shell: bash
+        env:
+          ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+          ORACLE_PORT: ${{ secrets.ORACLE_PORT }}
+          ORACLE_USER: ${{ secrets.ORACLE_USER }}
+        run: |
+          set -euo pipefail
+          PORT="${ORACLE_PORT:-22}"
+          ssh \
+            -i ~/.ssh/oracle_actions_key \
+            -p "$PORT" \
+            -o BatchMode=yes \
+            "$ORACLE_USER@$ORACLE_HOST" \
+            "hostname && whoami && pwd"
