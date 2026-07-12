@@ -207,6 +207,20 @@ function getBroadcastElement(id) {
   return document.getElementById(id);
 }
 
+function getBroadcastChallengeLevelInfo(record) {
+  const challengeId = String(record?.challengeId || "").trim();
+  if (!challengeId) return null;
+  if (typeof getTribeChallengeLevelInfo !== "function") return null;
+  return getTribeChallengeLevelInfo(challengeId);
+}
+
+function getBroadcastChallengeLevelLabel(record) {
+  const levelInfo = getBroadcastChallengeLevelInfo(record);
+  const displayLevel = Number(levelInfo?.displayLevel || 0);
+  if (!Number.isFinite(displayLevel) || displayLevel <= 0) return "";
+  return `${displayLevel}级`;
+}
+
 function getBroadcastChallengeMetaLabel(record) {
   const challengeId = String(record?.challengeId || "").trim();
   if (!challengeId) return "";
@@ -215,8 +229,11 @@ function getBroadcastChallengeMetaLabel(record) {
     typeof getTribeChallengeLocation === "function"
       ? String(getTribeChallengeLocation(challengeId) || "").trim()
       : "";
+  const levelLabel = getBroadcastChallengeLevelLabel(record);
 
+  if (location && levelLabel) return `${location} ${levelLabel}`;
   if (location) return location;
+  if (levelLabel) return levelLabel;
   return `ID ${challengeId}`;
 }
 
@@ -225,6 +242,41 @@ function getBroadcastHoverLocation(record) {
   if (!challengeId) return "";
   if (typeof getTribeChallengeLocation !== "function") return "";
   return String(getTribeChallengeLocation(challengeId) || "").trim();
+}
+
+function getBroadcastFilterTerms(record) {
+  const terms = new Set();
+  const name = String(record?.name || "").trim();
+  const location = getBroadcastHoverLocation(record);
+  const levelInfo = getBroadcastChallengeLevelInfo(record);
+  const displayLevel = Number(levelInfo?.displayLevel || 0);
+  const minLevel = Number(levelInfo?.minLevel || 0);
+  const maxLevel = Number(levelInfo?.maxLevel || 0);
+
+  if (name) {
+    terms.add(name);
+    terms.add(name.toLowerCase());
+  }
+  if (location) {
+    terms.add(location);
+    terms.add(location.toLowerCase());
+  }
+  if (Number.isFinite(displayLevel) && displayLevel > 0) {
+    terms.add(String(displayLevel));
+    terms.add(`${displayLevel}级`);
+  }
+  if (Number.isFinite(minLevel) && minLevel > 0 && Number.isFinite(maxLevel) && maxLevel > 0) {
+    terms.add(`${minLevel}-${maxLevel}`);
+    terms.add(`${minLevel}~${maxLevel}`);
+    terms.add(`${minLevel}至${maxLevel}`);
+  }
+  if (record?.challengeId) {
+    terms.add(String(record.challengeId));
+  }
+
+  return Array.from(terms)
+    .join(" ")
+    .toLowerCase();
 }
 
 function getCurrentBroadcastServerState() {
@@ -519,7 +571,7 @@ function getBroadcastRecords() {
   ]
     .filter((record) => {
       if (!filterValue) return true;
-      return String(record.name || "").toLowerCase().includes(filterValue);
+      return getBroadcastFilterTerms(record).includes(filterValue);
     })
     .sort((left, right) => {
       const leftValue = Number(left.updatedAt || left.activatedAt || 0);
@@ -1051,9 +1103,11 @@ function renderBroadcastStrip() {
     </button>
   `;
   const hoverLocation = getBroadcastHoverLocation(latestRecord);
+  const hoverLevel = getBroadcastChallengeLevelLabel(latestRecord);
   strip.title = [
     latestRecord.name,
     hoverLocation ? `地点：${hoverLocation}` : "",
+    hoverLevel ? `等级：${hoverLevel}` : "",
     `本轮开始于：${formatBroadcastTime(latestRecord.activatedAt)}`,
   ]
     .filter(Boolean)
@@ -1087,6 +1141,7 @@ function renderBroadcastList(target, records, emptyText, activeMode = false) {
         : buildInactiveRecordNote(record);
       const canRestore =
         !activeMode && !record.__preview && canRestoreRecord(record) && isLocallyDismissed(record.key);
+      const challengeMetaLabel = getBroadcastChallengeMetaLabel(record);
 
       return `
         <div class="broadcast-history-item ${activeMode ? "active" : "inactive"}">
@@ -1102,7 +1157,7 @@ function renderBroadcastList(target, records, emptyText, activeMode = false) {
                 record.challengeId
                   ? `<span class="broadcast-muted-note" title="ID ${escapeBroadcastHtml(
                       record.challengeId
-                    )}">${escapeBroadcastHtml(getBroadcastChallengeMetaLabel(record))}</span>`
+                    )}">${escapeBroadcastHtml(challengeMetaLabel)}</span>`
                   : ""
               }
               ${
@@ -1184,7 +1239,7 @@ function ensureBroadcastModalStructure() {
           id="broadcast-filter-input"
           class="translation-input"
           maxlength="40"
-          placeholder="筛选部族中文名..."
+          placeholder="筛选部族名、地点或等级..."
           oninput="updateBroadcastFilter(this.value)" />
       </div>
       <div class="broadcast-modal-note">中心服务持有唯一正式账本。开始/结束事件会同步到所有在线客户端；手动取消激活/恢复激活仅影响你自己的显示，不会同步给其他人。</div>
