@@ -3,6 +3,7 @@ const HELPER_SEEN_STORAGE_KEY = "wakfu_helper_seen_v1";
 const HELPER_PORT_SCAN_START = 18446;
 const HELPER_PORT_SCAN_END = 18456;
 const HELPER_LAUNCH_URI = "wakfuhelper://launch";
+const HELPER_LAUNCH_COOLDOWN_MS = 5000;
 const HELPER_PROBE_TIMEOUT_MS = 450;
 const HELPER_REQUEST_TIMEOUT_MS = 3000;
 const HELPER_POLL_INTERVAL_ACTIVE_MS = 5000;
@@ -36,6 +37,7 @@ let helperPollTimer = null;
 let helperPollInFlight = null;
 let helperActiveBaseUrl = null;
 let helperCurrentPollIntervalMs = 0;
+let helperLaunchCooldownUntil = 0;
 
 function loadStoredHelperPort() {
   try {
@@ -324,6 +326,7 @@ function renderHelperPanel() {
   const modeBadge = getHelperElement("helper-mode-badge");
   const summaryLine = getHelperElement("helper-summary-line");
   const launchRow = getHelperElement("helper-launch-row");
+  const launchButton = getHelperElement("helper-launch-btn");
 
   if (serviceBadge) {
     serviceBadge.className = `helper-pill ${helperState.available ? "is-online" : "is-offline"}`;
@@ -357,6 +360,10 @@ function renderHelperPanel() {
 
   if (launchRow) {
     launchRow.style.display = helperState.available ? "none" : "flex";
+  }
+
+  if (launchButton) {
+    launchButton.disabled = Date.now() < helperLaunchCooldownUntil;
   }
 
   renderHelperMetaGrid();
@@ -529,6 +536,16 @@ async function handleHelperAction(actionName, requestFactory, resultTitle) {
 }
 
 function launchLocalHelper() {
+  if (Date.now() < helperLaunchCooldownUntil) {
+    return;
+  }
+
+  helperLaunchCooldownUntil = Date.now() + HELPER_LAUNCH_COOLDOWN_MS;
+  renderHelperPanel();
+  window.setTimeout(() => {
+    renderHelperPanel();
+  }, HELPER_LAUNCH_COOLDOWN_MS + 50);
+
   try {
     window.location.href = HELPER_LAUNCH_URI;
     setHelperLastResult({
