@@ -95,7 +95,7 @@ const TRIBE_CHALLENGE_LEVEL_MAP = Object.freeze({
   "-1030": {minLevel:156,maxLevel:170,displayLevel:170,source:"Upper Slope - Kali's Henchmen"},
   "-987": {minLevel:21,maxLevel:35,displayLevel:35,source:"Astrub Mountains"},
   "-986": {minLevel:21,maxLevel:35,displayLevel:35,source:"Astrub Forest"},
-  "-985": {minLevel:1,maxLevel:20,displayLevel:15,source:"Astrub Sewers"},
+  "-985": {minLevel:1,maxLevel:20,displayLevel:20,source:"Astrub Sewers larva override"},
   "-980": {minLevel:1,maxLevel:20,displayLevel:15,source:"Astrub Fields"},
   "-965": {minLevel:1,maxLevel:20,displayLevel:15,source:"Tainela"}
 });
