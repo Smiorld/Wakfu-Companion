@@ -2,6 +2,9 @@ let fightStartTime = null;
 let pendingArmorDamage = null;
 let pendingReactiveDamageMatches = [];
 let pendingExitReactiveSelfHit = null;
+const COMBAT_BOOTSTRAP_INITIAL_WINDOW_BYTES = 4 * 1024 * 1024;
+const COMBAT_BOOTSTRAP_MAX_WINDOW_BYTES = 32 * 1024 * 1024;
+const COMBAT_BOOTSTRAP_END_ANCHOR_COUNT = MAX_FIGHT_HISTORY + 1;
 
 function isExplicitArmorSpellSource(spellName) {
   return !!String(spellName || "").trim();
@@ -700,6 +703,7 @@ function detectClass(playerName, spellName) {
 
   // Skip detection if this entity is known to be a monster
   if (monsterLookup[lowerName]) return;
+  if (!isLikelyEnglishPlayerName(playerName)) return;
 
   if (spellToClassMap[spellName]) {
     const detected = spellToClassMap[spellName];
@@ -711,7 +715,7 @@ function detectClass(playerName, spellName) {
   }
 }
 
-function saveFightToHistory() {
+function saveFightToHistory(options = {}) {
   // 1. Check if there is data
   if (Object.keys(fightData).length === 0 && Object.keys(healData).length === 0) return;
 
@@ -725,7 +729,7 @@ function saveFightToHistory() {
     armor: cloneSerializableState(armorData),
     classes: cloneSerializableState(playerClasses),
     overrides: cloneSerializableState(manualOverrides),
-    timestamp: new Date().toLocaleTimeString(),
+    timestamp: new Date(options.timestampMs || Date.now()).toLocaleTimeString(),
   };
 
   // Add to start of array
@@ -750,23 +754,19 @@ function saveFightToHistory() {
   updateHistoryButtons();
 }
 
-function performReset(isAuto = false) {
-  // 1. Save to history before clearing
-  saveFightToHistory();
+function clearCombatRuntimeState() {
   clearScheduledLiveCombatStateSave();
 
-  // 2. Clear Live Data
   fightData = {};
   healData = {};
   armorData = {};
 
-  // 3. Reset State
   currentCaster = "Unknown";
   currentSpell = "Unknown Spell";
   awaitingNewFight = false;
   hasUnsavedChanges = false;
   fightStartTime = null;
-  pendingArmorDamage = null; // Clear any hanging buffer
+  pendingArmorDamage = null;
   pendingIndirectAttribution = null;
   clearReactiveDamageCandidates();
   clearExitReactiveSelfHit();
@@ -781,9 +781,14 @@ function performReset(isAuto = false) {
   if (typeof logLineCache !== "undefined") logLineCache.clear();
   if (typeof combatLineCache !== "undefined") combatLineCache.clear();
 
-  // 4. CLEAR STORAGE
   localStorage.removeItem("wakfu_live_combat_state");
   liveCombatStateDirty = false;
+}
+
+function performReset(isAuto = false) {
+  // 1. Save to history before clearing
+  saveFightToHistory();
+  clearCombatRuntimeState();
 
   // 5. Reset Views
   currentViewIndex = "live";
@@ -1031,6 +1036,17 @@ function normalizeElement(el) {
 // Entities that should NEVER own subsequent damage procs
 const nonCombatantList = ["Gobgob", "Beacon", "Balise", "Standard-Bearing Puppet", "Microbot", "Cybot", "Dial", "Cadran", "Coney", "Lapino", "刺客分身"];
 
+function containsCjkCharacters(value) {
+  return /[\u3400-\u9fff\uf900-\ufaff]/u.test(String(value || ""));
+}
+
+function isLikelyEnglishPlayerName(value) {
+  const name = String(value || "").trim();
+  if (!name) return false;
+  if (containsCjkCharacters(name)) return false;
+  return /^[A-Za-z][A-Za-z '\-]*$/.test(name);
+}
+
 // Helper for elements normalization
 const elementMap = {
   aire: "Air",
@@ -1052,7 +1068,9 @@ const elementMap = {
 
 // Helper to find a player by their detected class
 function findFirstPlayerByClass(targetClass) {
-  return Object.keys(playerClasses).find((name) => playerClasses[name] === targetClass);
+  return Object.keys(playerClasses).find(
+    (name) => playerClasses[name] === targetClass && isLikelyEnglishPlayerName(name)
+  );
 }
 
 // Helper to ensure damage goes to the rightful class owner
@@ -1090,6 +1108,7 @@ function isPlayerAlly(p, contextClasses = null, contextOverrides = null) {
 
   // 2. Known Monsters & Bosses (Strict Enemy)
   if (monsterLookup[lowerName]) return false;
+  if (!isLikelyEnglishPlayerName(name)) return false;
 
   // 3. Enemy Families (Generic Logic)
   if (typeof wakfuEnemies !== "undefined") {
@@ -1444,7 +1463,7 @@ function processLine(line) {
   if (battleJustFinished) {
     clearReactiveDamageCandidates();
     clearExitReactiveSelfHit();
-    saveFightToHistory();
+    saveFightToHistory({ timestampMs: parseWakfuLogTimestamp(line) });
     awaitingNewFight = true;
     liveCombatStateDirty = true;
     scheduleLiveCombatStateSave(true);
@@ -1471,6 +1490,128 @@ function processLine(line) {
   } catch (err) {
     console.error("Parsing Error:", err);
   }
+}
+
+function processCombatReplayLine(line, options = {}) {
+  if (!line || line.trim() === "") return;
+
+  const lineLower = line.toLowerCase();
+  const battleJustFinished =
+    isCombatChannelLine(line, lineLower) && isBattleEndContent(line);
+
+  if (battleJustFinished) {
+    clearReactiveDamageCandidates();
+    clearExitReactiveSelfHit();
+
+    if (options.skipHistorySave) {
+      clearCombatRuntimeState();
+    } else {
+      saveFightToHistory({ timestampMs: options.timestampMs || Date.now() });
+      clearCombatRuntimeState();
+    }
+    updateWatchdogUI();
+    return;
+  }
+
+  processFightLog(line);
+}
+
+async function bootstrapCombatHistoryFromFile(file) {
+  if (!file || typeof file.slice !== "function") return;
+
+  let bytesToRead = Math.min(
+    Number(file.size || 0),
+    COMBAT_BOOTSTRAP_INITIAL_WINDOW_BYTES
+  );
+  let replayLines = [];
+  let anchorIndex = -1;
+  let reachedFileStart = false;
+
+  while (bytesToRead > 0) {
+    const sliceStart = Math.max(0, file.size - bytesToRead);
+    reachedFileStart = sliceStart === 0;
+
+    const text = await file.slice(sliceStart, file.size).text();
+    const lines = text.split(/\r?\n/);
+
+    const endIndexes = [];
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index];
+      if (!line || !line.trim()) continue;
+      const lower = line.toLowerCase();
+      if (!isCombatChannelLine(line, lower)) continue;
+      if (isBattleEndContent(line)) {
+        endIndexes.push(index);
+      }
+    }
+
+    if (endIndexes.length >= COMBAT_BOOTSTRAP_END_ANCHOR_COUNT) {
+      anchorIndex = endIndexes[endIndexes.length - COMBAT_BOOTSTRAP_END_ANCHOR_COUNT] + 1;
+      replayLines = lines;
+      break;
+    }
+
+    if (reachedFileStart || bytesToRead >= COMBAT_BOOTSTRAP_MAX_WINDOW_BYTES) {
+      anchorIndex = -1;
+      replayLines = lines;
+      break;
+    }
+
+    bytesToRead = Math.min(
+      file.size,
+      COMBAT_BOOTSTRAP_MAX_WINDOW_BYTES,
+      bytesToRead * 2
+    );
+  }
+
+  clearCombatRuntimeState();
+  fightHistory = [];
+  currentViewIndex = "live";
+  localStorage.removeItem("wakfu_fight_history");
+  updateHistoryButtons();
+
+  if (!replayLines.length) {
+    renderMeter();
+    updateWatchdogUI();
+    return;
+  }
+
+  const startIndex = anchorIndex >= 0 ? anchorIndex : 0;
+  let skipLeadingPartialFight = !reachedFileStart && anchorIndex < 0;
+
+  for (let index = startIndex; index < replayLines.length; index += 1) {
+    const line = replayLines[index];
+    if (!line || !line.trim()) continue;
+    const lower = line.toLowerCase();
+    if (!isCombatChannelLine(line, lower)) continue;
+    processCombatReplayLine(line, {
+      skipHistorySave: skipLeadingPartialFight,
+      timestampMs: parseWakfuLogTimestamp(line),
+    });
+
+    if (skipLeadingPartialFight && isBattleEndContent(line)) {
+      skipLeadingPartialFight = false;
+    }
+  }
+
+  if (fightHistory.length > MAX_FIGHT_HISTORY) {
+    fightHistory = fightHistory.slice(0, MAX_FIGHT_HISTORY);
+  }
+
+  try {
+    localStorage.setItem("wakfu_fight_history", JSON.stringify(fightHistory));
+  } catch (error) {
+    console.error("Failed to persist bootstrapped fight history:", error);
+  }
+
+  if (Object.keys(fightData).length > 0 || Object.keys(healData).length > 0) {
+    liveCombatStateDirty = true;
+    scheduleLiveCombatStateSave(true);
+  }
+
+  renderMeter();
+  updateHistoryButtons();
+  updateWatchdogUI();
 }
 
 function saveLiveCombatState() {
@@ -1578,3 +1719,4 @@ document.addEventListener("visibilitychange", () => {
 // Export for main.js
 window.loadLiveCombatState = loadLiveCombatState;
 window.parseTrackedFiles = parseTrackedFiles;
+window.bootstrapCombatHistoryFromFile = bootstrapCombatHistoryFromFile;

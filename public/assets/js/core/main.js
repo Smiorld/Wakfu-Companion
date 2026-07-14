@@ -536,12 +536,8 @@ async function startTracking(mainLogHandle, nextChatHandle) {
   activeFilename.textContent = `${mainLogHandle.name} + ${nextChatHandle.name}`;
   liveIndicator.style.display = "inline-block";
 
-  if (window.isRestoredSession) {
-    window.isRestoredSession = false;
-    renderMeter();
-  } else {
-    performReset(true);
-  }
+  window.isRestoredSession = false;
+  performReset(true);
 
   if (typeof window.startSessionTimer === "function") {
     window.startSessionTimer();
@@ -551,6 +547,9 @@ async function startTracking(mainLogHandle, nextChatHandle) {
 
   try {
     const mainFile = await mainLogHandle.getFile();
+    if (typeof window.bootstrapCombatHistoryFromFile === "function") {
+      await window.bootstrapCombatHistoryFromFile(mainFile);
+    }
     fileOffset = mainFile.size;
   } catch (error) {
     fileOffset = 0;
