@@ -114,6 +114,7 @@ let wakfuExternalGlossary = null;
 let wakfuExternalGlossaryPromise = null;
 let wakfuChatAbbrGlossary = null;
 let wakfuChatAbbrGlossaryPromise = null;
+let wakfuChatAbbrExactMap = null;
 let wakfuExactTermMap = null;
 let wakfuFuzzyAliasIndex = null;
 let azureGuideHtmlCache = "";
@@ -331,10 +332,7 @@ function shouldProtectLatinAliasInSentence(entry, normalizedAlias, normalizedLat
 
   if (words.length === 1) {
     if (entry.forceProtect) {
-      // Only curated chat abbreviations may be this short in normal sentences.
-      return entry.allowShortSentenceProtection
-        ? normalizedLatin.length >= 2
-        : normalizedLatin.length >= 4;
+      return normalizedLatin.length >= 4;
     }
 
     if (normalizedLatin.length < 5) return false;
@@ -360,9 +358,8 @@ function isLikelyStandaloneGlossaryInput(text) {
 
 function buildLatinBoundaryPattern(alias) {
   return new RegExp(
-    // Do not match abbreviations embedded in identifiers or non-ASCII words.
-    `(^|[^\\p{L}\\p{N}_])(${escapeTranslationRegex(alias)})(?=$|[^\\p{L}\\p{N}_])`,
-    "giu"
+    `(^|[^A-Za-z0-9])(${escapeTranslationRegex(alias)})(?=$|[^A-Za-z0-9])`,
+    "gi"
   );
 }
 
@@ -440,14 +437,14 @@ async function buildWakfuTranslationAliases() {
         chinese,
         aliases: new Set(),
         forceProtect: false,
-        allowShortSentenceProtection: false,
+        isChatAbbreviation: false,
         preserveEnglishInZh: true,
       };
 
       existing.chinese = existing.chinese || chinese;
       existing.forceProtect = existing.forceProtect || Boolean(options.forceProtect);
-      existing.allowShortSentenceProtection =
-        existing.allowShortSentenceProtection || Boolean(options.allowShortSentenceProtection);
+      existing.isChatAbbreviation =
+        existing.isChatAbbreviation || Boolean(options.isChatAbbreviation);
       if (typeof options.preserveEnglishInZh === "boolean") {
         existing.preserveEnglishInZh = options.preserveEnglishInZh;
       }
@@ -495,12 +492,13 @@ async function buildWakfuTranslationAliases() {
       if (!Array.isArray(pair) || pair.length < 2) return;
       registerTerm(pair[0], pair[1], [], {
         forceProtect: true,
-        allowShortSentenceProtection: true,
+        isChatAbbreviation: true,
         preserveEnglishInZh: false,
       });
     });
 
     const exactTermMap = new Map();
+    const chatAbbrExactMap = new Map();
     const fuzzyAliasIndex = new Map();
 
     wakfuTranslationAliases = [...termEntries.values()]
@@ -520,8 +518,17 @@ async function buildWakfuTranslationAliases() {
 
           if (latin && normalizedLatin) {
             exactTermMap.set(`latin:${normalizedLatin}`, entry);
+            if (entry.isChatAbbreviation) {
+              chatAbbrExactMap.set(normalizedLatin, entry);
+            }
           } else if (!latin) {
             exactTermMap.set(`text:${normalizedAlias}`, entry);
+          }
+
+          // Chat abbreviations are scanned once with a Map lookup below.
+          // Do not create one regular expression per abbreviation.
+          if (entry.isChatAbbreviation) {
+            return null;
           }
 
           if (latin) {
@@ -554,6 +561,7 @@ async function buildWakfuTranslationAliases() {
       .sort((a, b) => b.alias.length - a.alias.length);
 
     wakfuExactTermMap = exactTermMap;
+    wakfuChatAbbrExactMap = chatAbbrExactMap;
     wakfuFuzzyAliasIndex = fuzzyAliasIndex;
     // The processed indices above are enough for runtime matching.
     // Release the raw glossary array to reduce long-session memory pressure.
@@ -600,6 +608,15 @@ function replaceExactProtectedTerms(sourceText, aliasRows, placeholders, targetL
   });
 
   return protectedText;
+}
+
+function replaceChatAbbreviations(text, placeholders, targetLang) {
+  if (!wakfuChatAbbrExactMap?.size) return text;
+
+  return String(text).replace(/[A-Za-z0-9_]+/g, (token) => {
+    const entry = wakfuChatAbbrExactMap.get(normalizeLatinAlias(token));
+    return entry ? createProtectedToken(placeholders, entry, targetLang) : token;
+  });
 }
 
 function splitProtectedSegments(text) {
@@ -773,6 +790,7 @@ async function protectWakfuTerms(text, targetLang) {
     placeholders,
     targetLang
   );
+  protectedText = replaceChatAbbreviations(protectedText, placeholders, targetLang);
   protectedText = replaceFuzzyLatinTerms(protectedText, placeholders, targetLang);
 
   return { protectedText, placeholders, targetLang };
