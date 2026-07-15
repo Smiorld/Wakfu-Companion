@@ -331,7 +331,9 @@ function shouldProtectLatinAliasInSentence(entry, normalizedAlias, normalizedLat
 
   if (words.length === 1) {
     if (entry.forceProtect) {
-      return normalizedLatin.length >= 4;
+      // Chat abbreviations such as "gg" and "wts" are intentional glossary entries.
+      // Boundary matching keeps these short aliases from matching inside longer words.
+      return normalizedLatin.length >= 2;
     }
 
     if (normalizedLatin.length < 5) return false;
