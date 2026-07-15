@@ -28,6 +28,10 @@
 默认输出：
 - `public/assets/data/wakfu_term_glossary.json`
 
+补充词表：
+- `public/assets/data/wakfu_chat_abbr_glossary.json`
+- `public/assets/data/wakfu_chat_abbr_glossary.categorized.json`
+
 可手动调用：
 ```powershell
 node scripts/build-wakfu-term-glossary.js [source.json] [output.json]
@@ -181,6 +185,24 @@ node scripts/sync-resource-list-to-tracker-data.js --input-file "...html" --zh-m
 
 说明：
 - 这个入口在 `package.json` 里对应 `npm run combat:replay`。
+
+## 聊天缩写词表
+
+用途：
+- 补充通用翻译引擎对网络缩写、聊天短写、组队交易缩写的展开能力。
+- 只收录脱离上下文也基本能稳定翻到句子里的高频项目。
+
+文件：
+- `public/assets/data/wakfu_chat_abbr_glossary.json`
+  - 扁平数组格式，和现有 `wakfu_term_glossary.json` 风格一致，便于后续直接接进聊天翻译流程。
+- `public/assets/data/wakfu_chat_abbr_glossary.categorized.json`
+  - 分类维护版，包含筛选原则、来源和分组。
+
+当前筛选原则：
+- 只收录缩写、首字母词、聊天短写，不收普通单词。
+- 优先保留翻译引擎容易漏翻或不展开的项目。
+- 剔除强依赖上下文、歧义较大的项目。
+- 中文译法优先采用聊天里直接可读、可拼进句子的常用说法。
 
 ## 推荐顺序
 

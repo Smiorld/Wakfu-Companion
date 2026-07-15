@@ -112,11 +112,14 @@ let wakfuTranslationAliases = null;
 let wakfuTranslationAliasPromise = null;
 let wakfuExternalGlossary = null;
 let wakfuExternalGlossaryPromise = null;
+let wakfuChatAbbrGlossary = null;
+let wakfuChatAbbrGlossaryPromise = null;
 let wakfuExactTermMap = null;
 let wakfuFuzzyAliasIndex = null;
 let azureGuideHtmlCache = "";
 
 const WAKFU_GLOSSARY_URL = "assets/data/wakfu_term_glossary.json?v=20260619a";
+const WAKFU_CHAT_ABBR_GLOSSARY_URL = "assets/data/wakfu_chat_abbr_glossary.json?v=20260715a";
 const TRANSLATION_CONFIG_STORAGE_KEY = "wakfu_translation_config";
 const AZURE_TRANSLATOR_ENDPOINT =
   "https://api.cognitive.microsofttranslator.com/translate?api-version=3.0";
@@ -380,6 +383,27 @@ async function loadWakfuExternalGlossary() {
   return wakfuExternalGlossaryPromise;
 }
 
+async function loadWakfuChatAbbrGlossary() {
+  if (Array.isArray(wakfuChatAbbrGlossary)) return wakfuChatAbbrGlossary;
+  if (wakfuChatAbbrGlossaryPromise) return wakfuChatAbbrGlossaryPromise;
+
+  wakfuChatAbbrGlossaryPromise = fetch(WAKFU_CHAT_ABBR_GLOSSARY_URL)
+    .then((response) => (response.ok ? response.json() : []))
+    .then((data) => {
+      wakfuChatAbbrGlossary = Array.isArray(data) ? data : [];
+      return wakfuChatAbbrGlossary;
+    })
+    .catch(() => {
+      wakfuChatAbbrGlossary = [];
+      return wakfuChatAbbrGlossary;
+    })
+    .finally(() => {
+      wakfuChatAbbrGlossaryPromise = null;
+    });
+
+  return wakfuChatAbbrGlossaryPromise;
+}
+
 function extractPrimaryChineseTerm(rawValue, englishName) {
   const normalizedValue = normalizeTranslationAlias(rawValue);
   if (!normalizedValue) return "";
@@ -397,7 +421,10 @@ async function buildWakfuTranslationAliases() {
 
   wakfuTranslationAliasPromise = (async () => {
     const termEntries = new Map();
-    const externalGlossary = await loadWakfuExternalGlossary();
+    const [externalGlossary, chatAbbrGlossary] = await Promise.all([
+      loadWakfuExternalGlossary(),
+      loadWakfuChatAbbrGlossary(),
+    ]);
 
     const registerTerm = (englishName, chineseName, extraAliases = [], options = {}) => {
       const english = normalizeTranslationAlias(englishName);
@@ -409,13 +436,19 @@ async function buildWakfuTranslationAliases() {
         chinese,
         aliases: new Set(),
         forceProtect: false,
+        preserveEnglishInZh: true,
       };
 
       existing.chinese = existing.chinese || chinese;
       existing.forceProtect = existing.forceProtect || Boolean(options.forceProtect);
+      if (typeof options.preserveEnglishInZh === "boolean") {
+        existing.preserveEnglishInZh = options.preserveEnglishInZh;
+      }
       existing.aliases.add(english);
       existing.aliases.add(chinese);
-      existing.aliases.add(`${chinese} ${english}`);
+      if (existing.preserveEnglishInZh) {
+        existing.aliases.add(`${chinese} ${english}`);
+      }
 
       extraAliases.forEach((alias) => {
         const normalizedAlias = normalizeTranslationAlias(alias);
@@ -425,7 +458,9 @@ async function buildWakfuTranslationAliases() {
         const primaryChinese = extractPrimaryChineseTerm(normalizedAlias, english);
         if (primaryChinese) {
           existing.aliases.add(primaryChinese);
-          existing.aliases.add(`${primaryChinese} ${english}`);
+          if (existing.preserveEnglishInZh) {
+            existing.aliases.add(`${primaryChinese} ${english}`);
+          }
         }
       });
 
@@ -447,6 +482,14 @@ async function buildWakfuTranslationAliases() {
     externalGlossary.forEach((pair) => {
       if (!Array.isArray(pair) || pair.length < 2) return;
       registerTerm(pair[0], pair[1]);
+    });
+
+    chatAbbrGlossary.forEach((pair) => {
+      if (!Array.isArray(pair) || pair.length < 2) return;
+      registerTerm(pair[0], pair[1], [], {
+        forceProtect: true,
+        preserveEnglishInZh: false,
+      });
     });
 
     const exactTermMap = new Map();
@@ -507,6 +550,7 @@ async function buildWakfuTranslationAliases() {
     // The processed indices above are enough for runtime matching.
     // Release the raw glossary array to reduce long-session memory pressure.
     wakfuExternalGlossary = null;
+    wakfuChatAbbrGlossary = null;
     return wakfuTranslationAliases;
   })().finally(() => {
     wakfuTranslationAliasPromise = null;
@@ -518,7 +562,7 @@ async function buildWakfuTranslationAliases() {
 function getProtectedTermOutput(entry, targetLang) {
   const target = String(targetLang || "").toLowerCase();
   if (target.startsWith("zh")) {
-    return `${entry.chinese} ${entry.english}`;
+    return entry.preserveEnglishInZh ? `${entry.chinese} ${entry.english}` : entry.chinese;
   }
   return entry.english;
 }

@@ -1,0 +1,94 @@
+{
+  "generatedAt": "2026-07-15",
+  "description": "面向聊天翻译的通用网络缩写/游戏缩写词表。只收录脱离上下文也基本能稳定翻译到句子里的高频缩写项。",
+  "selectionPrinciples": [
+    "只收录缩写、首字母词、聊天短写，不收普通单词。",
+    "优先保留翻译引擎容易漏翻或不展开的项目。",
+    "剔除强依赖上下文、歧义较大的项目。",
+    "中文译法以聊天里直接可读、可拼进句子的通用说法为主。"
+  ],
+  "sources": [
+    {
+      "name": "Internet Matters Texting Dictionary",
+      "url": "https://www.internetmatters.org/resources/text-dictionary/",
+      "use": "通用聊天缩写种子词表"
+    },
+    {
+      "name": "Uswitch Gaming Terms Glossary",
+      "url": "https://www.uswitch.com/broadband/guides/gaming-terms-glossary/",
+      "use": "补充游戏聊天常见缩写"
+    },
+    {
+      "name": "PlayStation Ultimate Gaming Glossary",
+      "url": "https://www.playstation.com/en-us/editorial/playstation-ultimate-gaming-glossary/",
+      "use": "交叉校验常见游戏口语项"
+    },
+    {
+      "name": "awesome-internet-abbreviation-acronyms",
+      "url": "https://github.com/anubhavsrivastava/awesome-internet-abbreviation-acronyms",
+      "use": "补充常见网络缩写，按项目规则人工筛选"
+    }
+  ],
+  "categories": {
+    "chat_basic": [
+      ["afaik", "据我所知"],
+      ["aka", "也叫"],
+      ["asap", "尽快"],
+      ["atm", "现在"],
+      ["bc", "因为"],
+      ["btw", "顺便说一下"],
+      ["fyi", "供你参考"],
+      ["idk", "我不知道"],
+      ["ik", "我知道"],
+      ["imo", "我认为"],
+      ["imho", "恕我直言"],
+      ["irl", "现实里"],
+      ["jk", "开玩笑的"],
+      ["lmk", "告诉我"],
+      ["msg", "发消息"],
+      ["ngl", "说真的"],
+      ["nvm", "没事"],
+      ["omg", "天啊"],
+      ["pls", "请"],
+      ["plz", "请"],
+      ["rn", "现在"],
+      ["sry", "抱歉"],
+      ["tbh", "说实话"],
+      ["thx", "谢谢"],
+      ["ttyl", "回头聊"],
+      ["ty", "谢谢"],
+      ["tysm", "太感谢了"],
+      ["tyvm", "非常感谢"],
+      ["wth", "什么情况"],
+      ["wyd", "你在干嘛"],
+      ["yw", "不客气"]
+    ],
+    "presence_status": [
+      ["afk", "暂时离开"],
+      ["bbl", "晚点回来"],
+      ["brb", "马上回来"],
+      ["g2g", "得走了"],
+      ["gtg", "得走了"],
+      ["omw", "我在路上"],
+      ["w8", "等一下"],
+      ["wb", "欢迎回来"]
+    ],
+    "game_sportsmanship": [
+      ["gg", "打得不错"],
+      ["gj", "干得好"],
+      ["gl", "祝你好运"],
+      ["glhf", "祝你好运，玩得开心"],
+      ["hf", "玩得开心"],
+      ["np", "没事"],
+      ["wp", "打得好"]
+    ],
+    "group_trade": [
+      ["lfg", "来组队"],
+      ["lfm", "队伍缺人"],
+      ["wanna", "想要"],
+      ["wtb", "收购"],
+      ["wts", "出售"],
+      ["wtt", "交换"]
+    ]
+  }
+}
