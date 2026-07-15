@@ -331,9 +331,10 @@ function shouldProtectLatinAliasInSentence(entry, normalizedAlias, normalizedLat
 
   if (words.length === 1) {
     if (entry.forceProtect) {
-      // Chat abbreviations such as "gg" and "wts" are intentional glossary entries.
-      // Boundary matching keeps these short aliases from matching inside longer words.
-      return normalizedLatin.length >= 2;
+      // Only curated chat abbreviations may be this short in normal sentences.
+      return entry.allowShortSentenceProtection
+        ? normalizedLatin.length >= 2
+        : normalizedLatin.length >= 4;
     }
 
     if (normalizedLatin.length < 5) return false;
@@ -359,8 +360,9 @@ function isLikelyStandaloneGlossaryInput(text) {
 
 function buildLatinBoundaryPattern(alias) {
   return new RegExp(
-    `(^|[^A-Za-z0-9])(${escapeTranslationRegex(alias)})(?=$|[^A-Za-z0-9])`,
-    "gi"
+    // Do not match abbreviations embedded in identifiers or non-ASCII words.
+    `(^|[^\\p{L}\\p{N}_])(${escapeTranslationRegex(alias)})(?=$|[^\\p{L}\\p{N}_])`,
+    "giu"
   );
 }
 
@@ -438,11 +440,14 @@ async function buildWakfuTranslationAliases() {
         chinese,
         aliases: new Set(),
         forceProtect: false,
+        allowShortSentenceProtection: false,
         preserveEnglishInZh: true,
       };
 
       existing.chinese = existing.chinese || chinese;
       existing.forceProtect = existing.forceProtect || Boolean(options.forceProtect);
+      existing.allowShortSentenceProtection =
+        existing.allowShortSentenceProtection || Boolean(options.allowShortSentenceProtection);
       if (typeof options.preserveEnglishInZh === "boolean") {
         existing.preserveEnglishInZh = options.preserveEnglishInZh;
       }
@@ -490,6 +495,7 @@ async function buildWakfuTranslationAliases() {
       if (!Array.isArray(pair) || pair.length < 2) return;
       registerTerm(pair[0], pair[1], [], {
         forceProtect: true,
+        allowShortSentenceProtection: true,
         preserveEnglishInZh: false,
       });
     });
