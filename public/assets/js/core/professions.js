@@ -275,7 +275,7 @@ function bindProfessionCalculatorEvents() {
   const importBtn = document.getElementById("prof-import-btn");
   if (importBtn) {
     importBtn.onclick = () => {
-      openProfessionTransferModal("import");
+      triggerProfessionImport();
     };
   }
 
@@ -299,6 +299,9 @@ function bindProfessionCalculatorEvents() {
   if (transferFileInput && transferFileInput.dataset.bound !== "true") {
     transferFileInput.dataset.bound = "true";
     transferFileInput.addEventListener("change", async (event) => {
+      if (event.target?.dataset?.proxyImportSelection === "true") {
+        return;
+      }
       const file = event.target?.files?.[0];
       if (!file) return;
       await loadProfessionTransferFile(file);
@@ -966,6 +969,16 @@ function closeProfessionTransferModal() {
   if (modal) modal.style.display = "none";
 }
 
+function canImportProfessionTransferText(rawText) {
+  try {
+    const parsed = JSON.parse(String(rawText || "").trim());
+    parseProfessionImportPayload(parsed);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function copyProfessionTransferText() {
   const { text } = getProfessionTransferElements();
   if (!text) return;
@@ -1003,6 +1016,36 @@ function importProfessionTransferText(rawText) {
   } catch (error) {
     console.error("Failed to import profession calculator state:", error);
     alert("生产计算导入失败，请确认内容是完整的导出文本。");
+  }
+}
+
+async function triggerProfessionImport() {
+  const { fileInput } = getProfessionTransferElements();
+  if (typeof window.openImportFilePicker !== "function") {
+    openProfessionTransferModal("import");
+    return;
+  }
+
+  try {
+    const file = await window.openImportFilePicker({
+      fileInput,
+      pickerId: "wakfu-profession-transfer-import",
+      types: [
+        {
+          description: "JSON Files",
+          accept: {
+            "application/json": [".json"],
+            "text/plain": [".txt"],
+          },
+        },
+      ],
+    });
+    if (!file) return;
+    const text = await file.text();
+    importProfessionTransferText(text);
+  } catch (error) {
+    console.error("Profession import trigger failed:", error);
+    alert("生产计算导入失败，请确认文件内容正确。");
   }
 }
 
@@ -1681,6 +1724,7 @@ function escapeHtmlAttribute(value) {
 
 window.openProfessionTransferModal = openProfessionTransferModal;
 window.closeProfessionTransferModal = closeProfessionTransferModal;
+window.triggerProfessionImport = triggerProfessionImport;
 window.copyProfessionTransferText = copyProfessionTransferText;
 window.applyProfessionImport = applyProfessionImport;
 window.refreshProfessionMaterialCatalogBindings = refreshProfessionMaterialCatalogBindings;

@@ -818,7 +818,7 @@ function bindFissureInlineTableActions(container) {
     button.addEventListener("click", () => {
       const action = button.dataset.fissureInlineAction;
       if (action === "import") {
-        openFissureExpectationImportModal();
+        triggerFissureExpectationImport();
         return;
       }
       if (action === "export") {
@@ -888,7 +888,7 @@ function bindFissureToolbarEvents() {
 
   if (importBtn && importBtn.dataset.bound !== "true") {
     importBtn.dataset.bound = "true";
-    importBtn.addEventListener("click", () => openFissureExpectationImportModal());
+    importBtn.addEventListener("click", () => triggerFissureExpectationImport());
   }
 
   if (exportBtn && exportBtn.dataset.bound !== "true") {
@@ -1041,6 +1041,15 @@ function parseFissureImportText(rawText) {
   });
 }
 
+function canImportFissureExpectationText(rawText) {
+  try {
+    parseFissureImportText(rawText);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function findFissureImportTarget(entry) {
   if (entry.rowKey && fissureRowMap.has(String(entry.rowKey))) {
     return fissureRowMap.get(String(entry.rowKey));
@@ -1083,6 +1092,20 @@ function applyParsedFissureImport(entries) {
   });
 
   return { updated, skipped, ignoredLocked };
+}
+
+function importFissureExpectationText(rawText) {
+  try {
+    const entries = parseFissureImportText(rawText);
+    const summary = applyParsedFissureImport(entries);
+    closeFissureExpectationImportModal();
+    renderFissureExpectationModal();
+    alert(`导入完成：更新 ${summary.updated} 项，跳过 ${summary.skipped} 项，忽略锁死价格 ${summary.ignoredLocked} 项。`);
+    return true;
+  } catch (error) {
+    alert(`导入失败：${error.message}`);
+    return false;
+  }
 }
 
 function openFissureExpectationModal() {
@@ -1173,14 +1196,36 @@ function bindFissureImportDropZone(modal, textArea) {
 function applyFissureExpectationImport() {
   const { text } = getFissureImportElements();
   if (!text) return;
+  importFissureExpectationText(text.value);
+}
+
+async function triggerFissureExpectationImport() {
+  const { fileInput } = getFissureImportElements();
+  if (typeof window.openImportFilePicker !== "function") {
+    openFissureExpectationImportModal();
+    return;
+  }
+
   try {
-    const entries = parseFissureImportText(text.value);
-    const summary = applyParsedFissureImport(entries);
-    closeFissureExpectationImportModal();
-    renderFissureExpectationModal();
-    alert(`导入完成：更新 ${summary.updated} 项，跳过 ${summary.skipped} 项，忽略锁死价格 ${summary.ignoredLocked} 项。`);
+    const file = await window.openImportFilePicker({
+      fileInput,
+      pickerId: "wakfu-fissure-transfer-import",
+      types: [
+        {
+          description: "CSV Files",
+          accept: {
+            "text/csv": [".csv"],
+            "text/plain": [".txt"],
+          },
+        },
+      ],
+    });
+    if (!file) return;
+    const text = await file.text();
+    importFissureExpectationText(text);
   } catch (error) {
-    alert(`导入失败：${error.message}`);
+    console.error("Fissure import trigger failed:", error);
+    alert("裂缝价格导入失败，请确认文件内容正确。");
   }
 }
 

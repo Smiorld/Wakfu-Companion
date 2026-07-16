@@ -676,6 +676,16 @@ function parseTrackerTransferItems(rawText) {
   throw new Error("未找到可导入的 items 数组。");
 }
 
+function canImportTrackerTransferText(rawText) {
+  try {
+    const parsed = JSON.parse(String(rawText || "").trim());
+    parseTrackerTransferItems(JSON.stringify(parsed));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function normalizeTrackerImportedNumber(value, fallback = 0) {
   const parsed = parseTrackerRoundedInteger(value, fallback);
   return parsed === null || Number.isNaN(parsed) ? fallback : parsed;
@@ -874,18 +884,15 @@ function mergeTrackerTransferItems(importedItems, options = {}) {
   return { addedCount, updatedCount, skippedCount };
 }
 
-function applyTrackerImport() {
-  const { text } = getTrackerTransferElements();
-  if (!text) return;
-
+function importTrackerTransferText(rawText) {
   let importedItems;
   let parsedPayload;
   try {
-    parsedPayload = JSON.parse(text.value.trim());
+    parsedPayload = JSON.parse(String(rawText || "").trim());
     importedItems = parseTrackerTransferItems(JSON.stringify(parsedPayload));
   } catch (error) {
     alert(`导入失败：${error.message}`);
-    return;
+    return false;
   }
 
   let priceMode = "keep";
@@ -915,6 +922,43 @@ function applyTrackerImport() {
 
   const summary = `追踪器导入完成：新增 ${addedCount}，更新 ${updatedCount}，跳过 ${skippedCount}。`;
   showTrackerNotification(null, summary, "custom");
+  return true;
+}
+
+function applyTrackerImport() {
+  const { text } = getTrackerTransferElements();
+  if (!text) return;
+  importTrackerTransferText(text.value);
+}
+
+async function triggerTrackerImport() {
+  const { fileInput } = getTrackerTransferElements();
+  if (typeof window.openImportFilePicker !== "function") {
+    openTrackerTransferModal("import");
+    return;
+  }
+
+  try {
+    const file = await window.openImportFilePicker({
+      fileInput,
+      pickerId: "wakfu-tracker-transfer-import",
+      types: [
+        {
+          description: "JSON Files",
+          accept: {
+            "application/json": [".json"],
+            "text/plain": [".txt"],
+          },
+        },
+      ],
+    });
+    if (!file) return;
+    const text = await file.text();
+    importTrackerTransferText(text);
+  } catch (error) {
+    console.error("Tracker import trigger failed:", error);
+    alert("追踪器导入失败，请确认文件内容正确。");
+  }
 }
 
 // --- Actions ---
@@ -1374,6 +1418,7 @@ window.setTrackerAuthoritativePrice = setTrackerAuthoritativePrice;
 window.mergeTrackerTransferItems = mergeTrackerTransferItems;
 window.openTrackerTransferModal = openTrackerTransferModal;
 window.closeTrackerTransferModal = closeTrackerTransferModal;
+window.triggerTrackerImport = triggerTrackerImport;
 window.copyTrackerTransferText = copyTrackerTransferText;
 window.applyTrackerImport = applyTrackerImport;
 window.bindTrackerExpressionInput = bindTrackerExpressionInput;

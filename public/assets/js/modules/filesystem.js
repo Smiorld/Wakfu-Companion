@@ -356,6 +356,111 @@ async function saveBlobWithPicker(blob, options = {}) {
   }
 }
 
+async function readClipboardTextSafe() {
+  if (
+    typeof navigator === "undefined" ||
+    !navigator.clipboard ||
+    typeof navigator.clipboard.readText !== "function"
+  ) {
+    return "";
+  }
+
+  try {
+    return String((await navigator.clipboard.readText()) || "");
+  } catch (error) {
+    console.warn("Failed to read clipboard text:", error);
+    return "";
+  }
+}
+
+function pickImportFileWithInput(fileInput) {
+  if (!fileInput) {
+    return Promise.resolve(null);
+  }
+
+  return new Promise((resolve) => {
+    const handleChange = (event) => {
+      fileInput.removeEventListener("change", handleChange);
+      delete fileInput.dataset.proxyImportSelection;
+      const file = event.target?.files?.[0] || null;
+      fileInput.value = "";
+      resolve(file);
+    };
+
+    fileInput.dataset.proxyImportSelection = "true";
+    fileInput.addEventListener("change", handleChange, { once: true });
+    fileInput.click();
+  });
+}
+
+async function openImportFilePicker(options = {}) {
+  const pickerTypes = Array.isArray(options.types) ? options.types : [];
+  const pickerId = String(options.pickerId || "").trim();
+  const fileInput = options.fileInput || null;
+
+  if (typeof window.showOpenFilePicker === "function") {
+    try {
+      const [fileHandle] = await window.showOpenFilePicker({
+        id: pickerId || undefined,
+        startIn: "documents",
+        multiple: false,
+        types:
+          pickerTypes.length > 0
+            ? pickerTypes
+            : [
+                {
+                  description: "Text Files",
+                  accept: {
+                    "text/plain": [".txt"],
+                  },
+                },
+              ],
+      });
+      return fileHandle ? await fileHandle.getFile() : null;
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        return null;
+      }
+      console.error("Open file picker failed, falling back to input:", error);
+    }
+  }
+
+  return pickImportFileWithInput(fileInput);
+}
+
+async function chooseClipboardOrFileImport(options = {}) {
+  const validateClipboardText =
+    typeof options.validateClipboardText === "function"
+      ? options.validateClipboardText
+      : () => false;
+  const importText =
+    typeof options.importText === "function" ? options.importText : null;
+  if (!importText) {
+    throw new Error("Missing importText callback.");
+  }
+
+  const clipboardText = await readClipboardTextSafe();
+  const normalizedClipboardText = String(clipboardText || "").trim();
+  if (normalizedClipboardText && validateClipboardText(normalizedClipboardText)) {
+    const shouldImportClipboard = window.confirm(
+      String(options.clipboardConfirmMessage || "检测到剪贴板里有可导入内容，是否直接从剪贴板导入？")
+    );
+    if (shouldImportClipboard) {
+      await importText(normalizedClipboardText, { source: "clipboard" });
+      return { method: "clipboard" };
+    }
+  }
+
+  const file = await openImportFilePicker(options);
+  if (!file) {
+    return { method: "cancelled" };
+  }
+
+  const fileText = await file.text();
+  await importText(fileText, { source: "file", file });
+  return { method: "file" };
+}
+
 async function exportBugReportLog() {
   if (!fileHandle || !chatFileHandle) {
     alert("请先连接 `wakfu.log` 与 `wakfu_chat.log`，再导出反馈日志。");
@@ -412,4 +517,6 @@ async function exportBugReportLog() {
 
 window.saveFileHandlesToDB = saveFileHandlesToDB;
 window.getSavedHandles = getSavedHandles;
+window.openImportFilePicker = openImportFilePicker;
 window.saveBlobWithPicker = saveBlobWithPicker;
+window.chooseClipboardOrFileImport = chooseClipboardOrFileImport;
