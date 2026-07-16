@@ -10,7 +10,7 @@ const BROADCAST_REFRESH_MS = 1000;
 const BROADCAST_POLL_INTERVAL_MS = 10 * 1000;
 const BROADCAST_HEARTBEAT_INTERVAL_MS = 30 * 1000;
 const BROADCAST_REQUEST_TIMEOUT_MS = 6000;
-const BROADCAST_MAX_RECORDS = 200;
+const BROADCAST_PREVIEW_MAX_RECORDS = 200;
 const TRIBE_NOTICE_DURATION_MS = 30 * 60 * 1000;
 const KNOWN_BROADCAST_SERVERS = new Set(["ogrest", "rubilax", "pandora"]);
 const BROADCAST_SERVER_OPTIONS = [
@@ -514,8 +514,7 @@ function pruneBroadcastState() {
   const records = Object.values(serverState.tribes || {})
     .map(normalizeLedgerRecord)
     .filter(Boolean)
-    .sort((left, right) => Number(right.updatedAt || 0) - Number(left.updatedAt || 0))
-    .slice(0, BROADCAST_MAX_RECORDS);
+    .sort((left, right) => Number(right.updatedAt || 0) - Number(left.updatedAt || 0));
 
   records.forEach((record) => {
     nextTribes[record.key] = record;
@@ -546,7 +545,7 @@ function pruneBroadcastPreviewState() {
   const records = Object.values(broadcastPreviewTribes || {})
     .filter((record) => record && record.key && record.name && record.activatedAt)
     .sort((left, right) => Number(right.activatedAt || 0) - Number(left.activatedAt || 0))
-    .slice(0, BROADCAST_MAX_RECORDS);
+    .slice(0, BROADCAST_PREVIEW_MAX_RECORDS);
 
   records.forEach((record) => {
     if (!isRecordWithinWindow(record)) return;
@@ -556,27 +555,57 @@ function pruneBroadcastPreviewState() {
   broadcastPreviewTribes = nextTribes;
 }
 
+function getBroadcastCatalogRecords(observedRecords) {
+  if (typeof AREA_CHALLENGE_ZH_MAP !== "object" || !AREA_CHALLENGE_ZH_MAP) return [];
+
+  const observedChallengeIds = new Set(
+    observedRecords.map((record) => String(record?.challengeId || "").trim()).filter(Boolean)
+  );
+  const serverKey = getCurrentBroadcastServerKey();
+
+  return Object.entries(AREA_CHALLENGE_ZH_MAP)
+    .filter(([challengeId]) => !observedChallengeIds.has(String(challengeId)))
+    .map(([challengeId, name]) => ({
+      key: `catalog:${challengeId}`,
+      serverKey,
+      name: normalizeTribeName(name),
+      challengeId: String(challengeId),
+      activatedAt: 0,
+      expiresAt: 0,
+      updatedAt: 0,
+      endedAt: 0,
+      __catalog: true,
+    }))
+    .filter((record) => record.name);
+}
+
 function getBroadcastRecords() {
   pruneBroadcastState();
   pruneBroadcastPreviewState();
   const serverState = getCurrentBroadcastServerState();
   const currentServerKey = getCurrentBroadcastServerKey();
   const filterValue = broadcastFilterText.trim().toLowerCase();
-
-  return [
+  const observedRecords = [
     ...Object.values(serverState.tribes || {}),
     ...Object.values(broadcastPreviewTribes || {}).filter(
       (record) => normalizeBroadcastServerKey(record?.serverKey || "") === currentServerKey
     ),
+  ];
+
+  return [
+    ...observedRecords,
+    ...getBroadcastCatalogRecords(observedRecords),
   ]
     .filter((record) => {
       if (!filterValue) return true;
       return getBroadcastFilterTerms(record).includes(filterValue);
     })
     .sort((left, right) => {
+      if (Boolean(left.__catalog) !== Boolean(right.__catalog)) return left.__catalog ? 1 : -1;
       const leftValue = Number(left.updatedAt || left.activatedAt || 0);
       const rightValue = Number(right.updatedAt || right.activatedAt || 0);
-      return rightValue - leftValue;
+      if (rightValue !== leftValue) return rightValue - leftValue;
+      return String(left.name || "").localeCompare(String(right.name || ""), "zh-CN");
     });
 }
 
@@ -1115,6 +1144,7 @@ function renderBroadcastStrip() {
 }
 
 function buildInactiveRecordNote(record) {
+  if (record.__catalog) return "暂无发现记录";
   if (record.__preview) return "预览测试消息";
   if (isRecordEnded(record)) return `已结束：${formatBroadcastTime(record.endedAt)}`;
   if (isLocallyDismissed(record.key) && canRestoreRecord(record)) return "已手动取消激活";
@@ -1133,7 +1163,9 @@ function renderBroadcastList(target, records, emptyText, activeMode = false) {
     .map((record) => {
       const timeLabel = activeMode
         ? `已持续 ${formatElapsedDuration(record.activatedAt)}`
-        : isRecordEnded(record)
+        : record.__catalog
+          ? "未发现"
+          : isRecordEnded(record)
           ? `距今 ${formatDurationFromNow(record.endedAt || record.updatedAt)}`
           : `距上次记录 ${formatDurationFromNow(record.activatedAt)}`;
       const footer = activeMode
@@ -1217,7 +1249,7 @@ function renderBroadcastHistory() {
   }
 
   renderBroadcastList(activeList, getActiveBroadcastRecords(), "当前没有激活的部族通知。", true);
-  renderBroadcastList(historyList, getInactiveBroadcastRecords(), "暂无历史记录。", false);
+  renderBroadcastList(historyList, getInactiveBroadcastRecords(), "暂无部族目录。", false);
 }
 
 function ensureBroadcastModalStructure() {
@@ -1242,13 +1274,13 @@ function ensureBroadcastModalStructure() {
           placeholder="筛选部族名、地点或等级..."
           oninput="updateBroadcastFilter(this.value)" />
       </div>
-      <div class="broadcast-modal-note">中心服务持有唯一正式账本。开始/结束事件会同步到所有在线客户端；手动取消激活/恢复激活仅影响你自己的显示，不会同步给其他人。</div>
+      <div class="broadcast-modal-note">中心服务永久保存每个部族的最近发现记录。目录会显示全部已知部族；未发现过的条目不会触发通知。手动取消激活/恢复激活仅影响你自己的显示，不会同步给其他人。</div>
       <div class="broadcast-history-section">
         <div class="broadcast-history-title">正在激活</div>
         <div id="broadcast-active-list" class="broadcast-history-list"></div>
       </div>
       <div class="broadcast-history-section">
-        <div class="broadcast-history-title">最近记录</div>
+        <div class="broadcast-history-title">部族目录与最近记录</div>
         <div id="broadcast-history-list" class="broadcast-history-list"></div>
       </div>
     </div>
