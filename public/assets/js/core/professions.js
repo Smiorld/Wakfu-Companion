@@ -482,10 +482,10 @@ function getProfessionCalculationSnapshot() {
   let totalXpNeeded = null;
 
   if (currentProfCalcMode === PROF_CALC_MODE_MANUAL) {
-    if (manualCraftCount === null || manualCraftCount < 0) {
+    if (manualCraftCount !== null && manualCraftCount < 0) {
       return { error: "请填写不小于 0 的生产个数。" };
     }
-    craftsNeeded = manualCraftCount;
+    craftsNeeded = manualCraftCount === null ? 1 : manualCraftCount;
   } else {
     if (
       Number.isNaN(currentLevel) ||
