@@ -208,7 +208,7 @@ const monsterResources = [
   // --- LEVEL 90 (Precious) ---
   { name: "Precious Plank", level: 90, rarity: "Common", imgId: "32721656" },
   { name: "Precious Flour", level: 90, rarity: "Common", imgId: "39321689" },
-  { name: "Precious String", level: 90, rarity: "Common", imgId: "56321667" },
+  { name: "Precious String", level: 90, rarity: "Common", imgId: "56321666" },
   { name: "Precious Steel", level: 90, rarity: "Common", imgId: "51421645" },
   {
     name: "Precious Tiramisoup",
