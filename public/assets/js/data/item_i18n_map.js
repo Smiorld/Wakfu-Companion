@@ -3937,4 +3937,44 @@ const ITEM_I18N_MAP = {
   "Fanatic Fragment": [
     "摄魂碎片　Fanatic Fragment"
   ]
+  ,
+  "Drainacask Tail": [
+    "汲引魔之尾　Drainacask Tail"
+  ]
+  ,
+  "Bombyxolite Wingtip": [
+    "飞蛾翼尖　Bombyxolite Wingtip"
+  ]
+  ,
+  "Blop Guitar": [
+    "软泥吉他　Blop Guitar"
+  ]
+  ,
+  "Blopzart Essence": [
+    "软泥札特精华　Blopzart Essence"
+  ]
+  ,
+  "Root of Evil": [
+    "恶之根　Root of Evil"
+  ]
+  ,
+  "Sandyoptera Eye": [
+    "沙翅虫眼　Sandyoptera Eye"
+  ]
+  ,
+  "Waw Paint": [
+    "天然颜料　Waw Paint"
+  ]
+  ,
+  "Midalurgee": [
+    "秘硬　Midalurgee"
+  ]
+  ,
+  "Commonkore Trunk": [
+    "寻常树干　Commonkore Trunk"
+  ]
+  ,
+  "Thirsty Bulb": [
+    "干渴球茎　Thirsty Bulb"
+  ]
 };
