@@ -797,11 +797,28 @@ async function protectWakfuTerms(text, targetLang) {
 }
 
 function restoreWakfuTerms(text, protectedPayload) {
-  let restored = String(text || "");
+  let restored = normalizeProtectedTermTokens(text, protectedPayload);
   (protectedPayload?.placeholders || []).forEach(({ token, replacement }) => {
     restored = restored.split(token).join(replacement);
   });
   return restored;
+}
+
+function normalizeProtectedTermTokens(text, protectedPayload) {
+  let normalized = String(text || "");
+  (protectedPayload?.placeholders || []).forEach(({ token }) => {
+    const match = /^__WAKFU_TERM_(\d+)__$/.exec(token);
+    if (!match) return;
+
+    // Some translation providers insert spaces inside protected tokens.
+    const tokenIndex = match[1];
+    const spacedTokenPattern = new RegExp(
+      `__\\s*WAKFU\\s*_?\\s*TERM\\s*_?\\s*${tokenIndex}\\s*__`,
+      "gi"
+    );
+    normalized = normalized.replace(spacedTokenPattern, token);
+  });
+  return normalized;
 }
 
 function saveTranslationConfig() {
@@ -1027,17 +1044,145 @@ function getActiveTranslationEngine() {
   return transConfig.engine === "azure" ? "azure" : "google";
 }
 
+function canUseOracleTranslationFallback() {
+  // Local file pages have an opaque origin and are intentionally not whitelisted.
+  return window.location.protocol !== "file:";
+}
+
+const ORACLE_GOOGLE_TRANSLATION_ENDPOINT =
+  "https://t2chips.flashhub.net/wakfu-companion/api/google-translate";
+const GOOGLE_DIRECT_TRANSLATION_ENDPOINT =
+  "https://translate.googleapis.com/translate_a/single";
+const GOOGLE_TRANSLATION_TIMEOUT_MS = 8000;
+const GOOGLE_TRANSLATION_PROBE_TIMEOUT_MS = 3000;
+const AZURE_TRANSLATION_TIMEOUT_MS = 10000;
+let googleTranslationSourceOrder = null;
+let googleTranslationProbePromise = null;
+
+async function fetchWithTranslationTimeout(url, options = {}, timeoutMs) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(`Translation request timed out after ${Math.round(timeoutMs / 1000)} seconds`);
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+function getGoogleTranslationSourceBases() {
+  const sources = [GOOGLE_DIRECT_TRANSLATION_ENDPOINT];
+  if (canUseOracleTranslationFallback()) {
+    sources.push(ORACLE_GOOGLE_TRANSLATION_ENDPOINT);
+  }
+  return sources;
+}
+
+function buildGoogleTranslationUrl(sourceBase, text, targetLang) {
+  const query = `client=gtx&sl=auto&tl=${encodeURIComponent(targetLang)}&dt=t&q=${encodeURIComponent(text)}`;
+  return `${sourceBase}?${query}`;
+}
+
+function promoteGoogleTranslationSource(sourceBase) {
+  if (!googleTranslationSourceOrder) return;
+  googleTranslationSourceOrder = [
+    sourceBase,
+    ...googleTranslationSourceOrder.filter((entry) => entry !== sourceBase),
+  ];
+}
+
+function demoteGoogleTranslationSource(sourceBase) {
+  if (!googleTranslationSourceOrder) return;
+  googleTranslationSourceOrder = [
+    ...googleTranslationSourceOrder.filter((entry) => entry !== sourceBase),
+    sourceBase,
+  ];
+}
+
+async function getGoogleTranslationSourceOrder(targetLang) {
+  if (googleTranslationSourceOrder) return [...googleTranslationSourceOrder];
+
+  const sources = getGoogleTranslationSourceBases();
+  if (sources.length <= 1) return sources;
+
+  if (!googleTranslationProbePromise) {
+    googleTranslationProbePromise = Promise.all(
+      sources.map(async (sourceBase) => {
+        const startedAt = Date.now();
+        try {
+          await requestGoogleTranslationFromSource(
+            buildGoogleTranslationUrl(sourceBase, "Hello", targetLang),
+            GOOGLE_TRANSLATION_PROBE_TIMEOUT_MS
+          );
+          return { sourceBase, elapsedMs: Date.now() - startedAt };
+        } catch (error) {
+          return null;
+        }
+      })
+    )
+      .then((results) => {
+        const reachableSources = results
+          .filter(Boolean)
+          .sort((a, b) => a.elapsedMs - b.elapsedMs)
+          .map(({ sourceBase }) => sourceBase);
+        googleTranslationSourceOrder = reachableSources.length
+          ? [
+              ...reachableSources,
+              ...sources.filter((sourceBase) => !reachableSources.includes(sourceBase)),
+            ]
+          : sources;
+        return [...googleTranslationSourceOrder];
+      })
+      .finally(() => {
+        googleTranslationProbePromise = null;
+      });
+  }
+
+  return googleTranslationProbePromise;
+}
+
 async function requestGoogleTranslation(text, targetLang) {
-  const sourceUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
-  const response = await fetch(sourceUrl);
+  const sources = await getGoogleTranslationSourceOrder(targetLang);
+  let lastError = null;
+
+  for (const sourceBase of sources) {
+    try {
+      const result = await requestGoogleTranslationFromSource(
+        buildGoogleTranslationUrl(sourceBase, text, targetLang)
+      );
+      promoteGoogleTranslationSource(sourceBase);
+      return result;
+    } catch (error) {
+      lastError = error;
+      demoteGoogleTranslationSource(sourceBase);
+    }
+  }
+
+  throw lastError || new Error("Google translation request failed");
+}
+
+async function requestGoogleTranslationFromSource(
+  sourceUrl,
+  timeoutMs = GOOGLE_TRANSLATION_TIMEOUT_MS
+) {
+  const response = await fetchWithTranslationTimeout(sourceUrl, {}, timeoutMs);
   if (!response.ok) {
     throw new Error(`Google translation request failed: ${response.status}`);
   }
+
   const data = await response.json();
-  if (!data || !data[0]) return null;
+  const translatedText = data?.[0]?.map((item) => item?.[0] || "").join("");
+  if (!translatedText) {
+    throw new Error("Google translation response did not contain translated text");
+  }
 
   return {
-    text: data[0].map((x) => x[0]).join(""),
+    text: translatedText,
     lang: data[2] || "",
   };
 }
@@ -1051,7 +1196,7 @@ async function requestAzureTranslation(text, targetLang) {
   }
 
   const resolvedTarget = mapTargetLanguageForEngine("azure", targetLang);
-  const response = await fetch(
+  const response = await fetchWithTranslationTimeout(
     `${AZURE_TRANSLATOR_ENDPOINT}&to=${encodeURIComponent(resolvedTarget)}`,
     {
       method: "POST",
@@ -1061,7 +1206,8 @@ async function requestAzureTranslation(text, targetLang) {
         ...(region ? { "Ocp-Apim-Subscription-Region": region } : {}),
       },
       body: JSON.stringify([{ Text: text }]),
-    }
+    },
+    AZURE_TRANSLATION_TIMEOUT_MS
   );
 
   if (!response.ok) {
