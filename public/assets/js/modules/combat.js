@@ -2,6 +2,7 @@ let fightStartTime = null;
 let pendingArmorDamage = null;
 let pendingReactiveDamageMatches = [];
 let pendingExitReactiveSelfHit = null;
+let pendingWeaponUse = null;
 const COMBAT_BOOTSTRAP_INITIAL_WINDOW_BYTES = 4 * 1024 * 1024;
 const COMBAT_BOOTSTRAP_MAX_WINDOW_BYTES = 32 * 1024 * 1024;
 const COMBAT_BOOTSTRAP_END_ANCHOR_COUNT = MAX_FIGHT_HISTORY + 1;
@@ -102,6 +103,27 @@ function clearReactiveDamageCandidates() {
 
 function clearExitReactiveSelfHit() {
   pendingExitReactiveSelfHit = null;
+}
+
+function clearPendingWeaponUse() {
+  pendingWeaponUse = null;
+}
+
+function rememberWeaponUse(caster, weaponName) {
+  if (!caster || !weaponName) return;
+  pendingWeaponUse = {
+    caster: String(caster).trim(),
+    weaponName: String(weaponName).trim(),
+  };
+}
+
+function getWeaponAttackSpell(caster) {
+  const weaponName =
+    pendingWeaponUse && pendingWeaponUse.caster === caster
+      ? pendingWeaponUse.weaponName
+      : "";
+  clearPendingWeaponUse();
+  return weaponName ? `武器攻击：${weaponName}` : "武器攻击";
 }
 
 function extractExitedCombatant(content) {
@@ -402,6 +424,7 @@ function processFightLog(line) {
     flushPendingIndirectAttribution();
     clearReactiveDamageCandidates();
     clearExitReactiveSelfHit();
+    clearPendingWeaponUse();
     currentCaster = null;
     currentSpell = "Passive / Indirect";
     // Flush pending if any (assume Neutral if turn ended)
@@ -418,6 +441,7 @@ function processFightLog(line) {
     flushPendingIndirectAttribution();
     clearReactiveDamageCandidates();
     clearExitReactiveSelfHit();
+    clearPendingWeaponUse();
     // If we have pending armor damage when a NEW spell starts, flush it as Neutral
     if (pendingArmorDamage) {
       updateCombatData(fightData, pendingArmorDamage.caster, pendingArmorDamage.spell, pendingArmorDamage.amount, "Neutral");
@@ -431,6 +455,39 @@ function processFightLog(line) {
       currentCaster = casterCandidate;
       currentSpell = castSpell;
       detectClass(currentCaster, currentSpell);
+    }
+    return;
+  }
+
+  const weaponNameMatch = content.match(
+    /^(.*?)\s+(?:uses?|utilise|usa|使用)\s*[“"]([^”"]+)[”"]\s*$/iu
+  );
+  if (weaponNameMatch) {
+    const casterCandidate = weaponNameMatch[1].trim();
+    if (!nonCombatantList.some((nc) => casterCandidate.includes(nc))) {
+      rememberWeaponUse(casterCandidate, weaponNameMatch[2]);
+    }
+    return;
+  }
+
+  const weaponAttackMatch = content.match(
+    /^(.*?)\s+(?:uses?\s+(?:a\s+)?weapon attack|utilise\s+(?:une\s+)?attaque d[’']arme|usa\s+(?:un\s+)?ataque de arma|usa\s+(?:um\s+)?ataque de arma|使用武器攻击)[。.!]?(?:\s*[\(（].*)?$/iu
+  );
+  if (weaponAttackMatch) {
+    flushPendingIndirectAttribution();
+    clearReactiveDamageCandidates();
+    clearExitReactiveSelfHit();
+    if (pendingArmorDamage) {
+      updateCombatData(fightData, pendingArmorDamage.caster, pendingArmorDamage.spell, pendingArmorDamage.amount, "Neutral");
+      pendingArmorDamage = null;
+    }
+
+    const casterCandidate = weaponAttackMatch[1].trim();
+    if (!nonCombatantList.some((nc) => casterCandidate.includes(nc))) {
+      currentCaster = casterCandidate;
+      currentSpell = getWeaponAttackSpell(casterCandidate);
+    } else {
+      clearPendingWeaponUse();
     }
     return;
   }
@@ -770,6 +827,7 @@ function clearCombatRuntimeState() {
   pendingIndirectAttribution = null;
   clearReactiveDamageCandidates();
   clearExitReactiveSelfHit();
+  clearPendingWeaponUse();
   stateSources = {};
   stateOwnershipMeta = {};
   stateEventOrder = 0;

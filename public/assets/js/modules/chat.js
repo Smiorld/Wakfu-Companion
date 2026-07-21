@@ -357,10 +357,15 @@ function isLikelyStandaloneGlossaryInput(text) {
 }
 
 function buildLatinBoundaryPattern(alias) {
+  const flexibleWhitespaceAlias = escapeTranslationRegex(alias).replace(/ /g, "\\s+");
   return new RegExp(
-    `(^|[^A-Za-z0-9])(${escapeTranslationRegex(alias)})(?=$|[^A-Za-z0-9])`,
+    `(^|[^A-Za-z0-9])(${flexibleWhitespaceAlias})(?=$|[^A-Za-z0-9])`,
     "gi"
   );
+}
+
+function buildExactAliasPattern(alias) {
+  return new RegExp(escapeTranslationRegex(alias).replace(/ /g, "\\s+"), "g");
 }
 
 async function loadWakfuExternalGlossary() {
@@ -553,7 +558,7 @@ async function buildWakfuTranslationAliases() {
               ? shouldProtectLatinAliasInSentence(entry, normalizedAlias, normalizedLatin)
                 ? buildLatinBoundaryPattern(normalizedAlias)
                 : null
-              : new RegExp(escapeTranslationRegex(normalizedAlias), "g"),
+              : buildExactAliasPattern(normalizedAlias),
           };
         })
       )
