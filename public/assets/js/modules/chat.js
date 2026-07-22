@@ -240,6 +240,7 @@ const WAKFU_FUZZY_STOP_WORDS = new Set([
   "its",
   "me",
   "my",
+  "not",
   "of",
   "on",
   "or",
