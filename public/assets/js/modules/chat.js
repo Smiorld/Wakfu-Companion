@@ -120,7 +120,7 @@ let wakfuFuzzyAliasIndex = null;
 let azureGuideHtmlCache = "";
 
 const WAKFU_GLOSSARY_URL = "assets/data/wakfu_term_glossary.json?v=20260619a";
-const WAKFU_CHAT_ABBR_GLOSSARY_URL = "assets/data/wakfu_chat_abbr_glossary.json?v=20260715a";
+const WAKFU_CHAT_ABBR_GLOSSARY_URL = "assets/data/wakfu_chat_abbr_glossary.json?v=20260722a";
 const TRANSLATION_CONFIG_STORAGE_KEY = "wakfu_translation_config";
 const AZURE_TRANSLATOR_ENDPOINT =
   "https://api.cognitive.microsofttranslator.com/translate?api-version=3.0";

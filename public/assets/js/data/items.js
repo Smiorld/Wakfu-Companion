@@ -177,7 +177,7 @@ const monsterResources = [
     name: "Exquisite Essence",
     level: 100,
     rarity: "Common",
-    imgId: "56821633",
+    imgId: "56821634",
   },
   { name: "Exquisite Spice", level: 100, rarity: "Common", imgId: "56921020" },
   { name: "Exquisite Fiber", level: 100, rarity: "Common", imgId: "57021033" },
