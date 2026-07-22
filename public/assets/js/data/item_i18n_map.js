@@ -627,6 +627,10 @@ const ITEM_I18N_MAP = {
     "黑碳",
     "黑碳　Dark Carbon"
   ],
+  "Carbon Hara": [
+    "暗黑黑碳",
+    "暗黑黑碳　Carbon Hara"
+  ],
   "Dark Cloth": [
     "黑布块　Dark Cloth"
   ],
@@ -3976,5 +3980,61 @@ const ITEM_I18N_MAP = {
   ,
   "Thirsty Bulb": [
     "干渴球茎　Thirsty Bulb"
+  ]
+  ,
+  "Remington Fragment": [
+    "雷明顿碎片　Remington Fragment"
+  ]
+  ,
+  "Show-Stopper Nail": [
+    "老旧长钉　Show-Stopper Nail"
+  ]
+  ,
+  "Dial Hand": [
+    "日晷指针　Dial Hand"
+  ]
+  ,
+  "Hamma-Whip": [
+    "悍匪鞭　Hamma-Whip"
+  ]
+  ,
+  "James Bomb": [
+    "詹姆斯•爆弹　James Bomb"
+  ]
+  ,
+  "Hoodlum Pin": [
+    "蒙面人胸针　Hoodlum Pin"
+  ]
+  ,
+  "Ancestral Cog": [
+    "先祖齿轮　Ancestral Cog"
+  ]
+  ,
+  "Riktus Chief Cloth": [
+    "上等土匪布料　Riktus Chief Cloth"
+  ]
+  ,
+  "Robowl Feather": [
+    "械尔多羽毛　Robowl Feather"
+  ]
+  ,
+  "Steel Beak Feather": [
+    "铁喙羽毛　Steel Beak Feather"
+  ]
+  ,
+  "Neo Remington Fragment": [
+    "新世雷明顿碎片　Neo Remington Fragment"
+  ]
+  ,
+  "Age-Old Fragment": [
+    "包罗碎片　Age-Old Fragment"
+  ]
+  ,
+  "Bonbomb": [
+    "崩坏炸弹　Bonbomb"
+  ]
+  ,
+  "Exquisite Mask": [
+    "１７０级面具　Exquisite Mask"
   ]
 };

@@ -44,6 +44,7 @@ const professionItems = {
     { name: "Sryanide Ore", level: 100, rarity: "Common" },
     { name: "Acid Sryanure", level: 100, rarity: "Rare", imgName: "Sryanide Ore" },
     { name: "Dark Carbon", level: 105, rarity: "Common" },
+    { name: "Carbon Hara", level: 105, rarity: "Rare" },
     { name: "Amber", level: 110, rarity: "Common" },
     { name: "Prehistoric Amber", level: 110, rarity: "Rare", imgName: "Amber" },
     { name: "Mercury", level: 115, rarity: "Common" },
